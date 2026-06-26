@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { ALL_SPRITES, SPRITE_FILES } from "../entities/sprites";
+import { LOCATIONS } from "../data/locations";
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -7,9 +8,27 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image("location", "assets/location.png");
-    this.load.image("location-overlay", "assets/location-overlay.png");
-    this.load.tilemapTiledJSON("map", "assets/office.tmj");
+    // overlay и коллизии могут появиться позже — их отсутствие не фатально.
+    this.load.on("loaderror", () => {});
+
+    for (const loc of LOCATIONS) {
+      // Парковка — не локация, а способ перемещения: её фон лежит в корне assets.
+      if (loc.isParking) {
+        this.load.image(loc.bg, "assets/fastTravel.png");
+        continue;
+      }
+
+      // Ассеты каждой локации лежат в assets/locations/<id>/.
+      const dir = `assets/locations/${loc.id}`;
+      this.load.image(loc.bg, `${dir}/background.png`);
+      if (loc.overlay) {
+        this.load.image(loc.overlay, `${dir}/overlay.png`);
+      }
+      if (loc.map) {
+        this.load.tilemapTiledJSON(loc.map, `${dir}/collisions.tmj`);
+      }
+    }
+
     for (const key of ALL_SPRITES) {
       this.load.image(key, `assets/${SPRITE_FILES[key]}`);
     }

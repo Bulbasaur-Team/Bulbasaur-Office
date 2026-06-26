@@ -8,6 +8,7 @@ export interface Character {
   loc: string;
   x: number;          // позиция в пикселях карты
   y: number;
+  location?: number;   // в какой локации стоит NPC (1 по умолчанию)
   faceRight?: boolean; // спрайт по умолчанию смотрит влево; true — отзеркалить вправо
   slideCount: number; // сколько слайдов: файлы assets/<id>_1.png ... <id>_N.png
   lines: { greet: string; who: string; doing: string; did: string };

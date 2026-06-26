@@ -9,15 +9,15 @@ export type SpriteKey =
   | "qa"
   | "designer";
 
-// Ключ спрайта -> имя файла в public/assets.
+// Ключ спрайта -> имя файла в public/assets/characters.
 export const SPRITE_FILES: Record<SpriteKey, string> = {
-  dev: "dev.png",
-  "dev-fe": "dev-fe.png",
-  analyst: "analyst.png",
-  owner: "product-owner.png",
-  lead: "lead.png",
-  qa: "qa.png",
-  designer: "desinger.png",
+  dev: "characters/dev.png",
+  "dev-fe": "characters/dev-fe.png",
+  analyst: "characters/analyst.png",
+  owner: "characters/product-owner.png",
+  lead: "characters/lead.png",
+  qa: "characters/qa.png",
+  designer: "characters/desinger.png",
 };
 
 export const ALL_SPRITES = Object.keys(SPRITE_FILES) as SpriteKey[];

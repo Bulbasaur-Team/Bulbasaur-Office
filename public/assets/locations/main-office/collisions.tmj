@@ -4,7 +4,7 @@
  "layers":[
         {
          "id":1,
-         "image":"location.png",
+         "image":"background.png",
          "imageheight":768,
          "imagewidth":1408,
          "name":"background",

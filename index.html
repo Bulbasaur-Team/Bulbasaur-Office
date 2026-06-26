@@ -14,11 +14,40 @@
       user-select: none;
     }
     h1 { font-size: 20px; margin: 10px 0 4px; }
-    #game { line-height: 0; }
+    #game { line-height: 0; position: relative; }
     #game canvas { border: 3px solid #3a414c; border-radius: 8px; image-rendering: pixelated; }
     #hint { margin: 8px 0 14px; font-size: 13px; opacity: .85; display: flex; gap: 16px; }
     #hint b { color: var(--accent); }
     .hidden { display: none !important; }
+
+    /* Кнопка выхода в другую локацию */
+    #exitBtn { position: fixed; left: 50%; transform: translateX(-50%); bottom: 13vh; z-index: 25;
+      display: flex; align-items: center; gap: 8px;
+      background: var(--accent); color: #14210f; border: 3px solid #5aa05a; border-radius: 12px;
+      padding: 10px 18px; font-family: inherit; font-size: 16px; font-weight: bold; cursor: pointer;
+      box-shadow: 0 8px 28px rgba(0,0,0,.5); }
+    #exitBtn:hover { transform: translateX(-50%) translateY(-2px); }
+    #exitBtn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* Меню выбора локации на парковке: поверх правой части кадра (пассажирское сиденье) */
+    #parking {
+      position: absolute; top: 50%; right: 4%; transform: translateY(-50%); z-index: 22;
+      line-height: normal;
+      display: flex; flex-direction: column; align-items: stretch; gap: clamp(6px, 1.2vw, 12px);
+      padding: clamp(8px, 1.4vw, 18px); border-radius: 14px;
+      background: rgba(27,31,36,.7); border: 2px solid #3a414c;
+      box-shadow: 0 12px 40px rgba(0,0,0,.5);
+    }
+    #parking h2 { margin: 0; font-size: clamp(13px, 1.6vw, 18px); text-align: center; }
+    #parking p { margin: 0 0 4px; opacity: .75; font-size: clamp(10px, 1.1vw, 13px); text-align: center; }
+    #parkingBtns { display: flex; flex-direction: column; gap: clamp(6px, 1vw, 10px); }
+    .loc-btn {
+      background: var(--panel); border: 2px solid var(--accent); border-radius: 12px;
+      padding: clamp(7px, 1vw, 12px) clamp(12px, 1.8vw, 24px); cursor: pointer;
+      color: var(--text); font-size: clamp(12px, 1.5vw, 17px); font-weight: bold;
+      font-family: inherit; transition: .12s; text-align: center; white-space: nowrap;
+    }
+    .loc-btn:hover, .loc-btn.sel { background: var(--accent); color: #14210f; transform: translateX(-3px); }
 
     /* Выбор персонажа */
     #select {
@@ -83,7 +112,13 @@
 </head>
 <body>
   <h1>🌱 Bulba Office</h1>
-  <div id="game"></div>
+  <div id="game">
+    <div id="parking" class="hidden">
+      <h2>Куда едем?</h2>
+      <p>Выбери локацию.</p>
+      <div id="parkingBtns"></div>
+    </div>
+  </div>
   <div id="hint"><span><b>Стрелки</b> / WASD — ходить</span><span><b>Пробел</b> — поговорить</span></div>
 
   <div id="select">
@@ -91,6 +126,11 @@
     <p>Им будешь управлять. С остальными можно поговорить.</p>
     <div id="cards"></div>
   </div>
+
+  <button id="exitBtn" class="hidden" aria-label="выйти">
+    <svg viewBox="0 0 24 24"><path d="M4 21h12"/><path d="M6 21V4a1 1 0 0 1 1.2-.98l7 1.5A1 1 0 0 1 15 5.5v15"/><circle cx="11.5" cy="12" r="1"/></svg>
+    <span id="exitLabel">Выйти</span>
+  </button>
 
   <div id="dialogue" class="hidden">
     <div class="dlg-frame">
