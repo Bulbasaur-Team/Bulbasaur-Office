@@ -4,6 +4,7 @@ import { LOCATIONS, LOC, type ExitDef } from "../data/locations";
 import { registerSpriteImages, spriteScale } from "../entities/sprites";
 import { Dialogue } from "../ui/Dialogue";
 import { SpeechBubble } from "../ui/SpeechBubble";
+import { ThoughtBubble } from "../ui/ThoughtBubble";
 import { SlideViewer } from "../ui/SlideViewer";
 import { Projector } from "../ui/Projector";
 import { LocationMenu } from "../ui/LocationMenu";
@@ -30,6 +31,10 @@ const INTERACT_DIST = 80;
 const TARGET_H = 74;       // экранная высота персонажа в пикселях
 const EXIT_ZONE_HALF = 52; // полразмера зоны срабатывания выхода вокруг точки двери
 
+const THOUGHT_INTERVAL_MS = 5000;        // базовый интервал проверки «не подумать ли»
+const THOUGHT_INTERVAL_JITTER_MS = 5000; // случайная добавка к интервалу — чтобы NPC думали не разом
+const THOUGHT_PROBABILITY = 0.1;         // вероятность появления мысли при очередной проверке
+
 const DEPTH = {
   prompt: 1_000_000,
   player: 1_000_001,
@@ -47,6 +52,8 @@ export class WorldScene extends Phaser.Scene {
   private loader!: LocationLoader;
   private dialogue!: Dialogue;
   private bubble!: SpeechBubble;
+  private thoughtBubbles: ThoughtBubble[] = []; // облачко мыслей на каждый NPC текущей локации (по индексу npcs)
+  private thoughtTimers: Phaser.Time.TimerEvent[] = []; // персональный таймер проверки на каждый NPC
   private slides!: SlideViewer;
   private projector!: Projector;
   private gameMenu!: GameMenu;
@@ -176,6 +183,18 @@ export class WorldScene extends Phaser.Scene {
 
     const { npcs, doors, spawns, interactions } = this.loader.load(cfg, index, this.chosen.id);
     this.npcs = npcs;
+    this.thoughtBubbles.forEach((b) => b.destroy());
+    this.thoughtTimers.forEach((t) => t.remove());
+    this.thoughtBubbles = npcs.map(() => new ThoughtBubble(this, DEPTH.bubble));
+    // У каждого NPC свой период и фазовый сдвиг старта — мысли всплывают вразнобой.
+    this.thoughtTimers = npcs.map((npc, i) =>
+      this.time.addEvent({
+        delay: THOUGHT_INTERVAL_MS + Phaser.Math.Between(0, THOUGHT_INTERVAL_JITTER_MS),
+        startAt: Phaser.Math.Between(0, THOUGHT_INTERVAL_MS),
+        loop: true,
+        callback: () => this.tryThink(npc, this.thoughtBubbles[i]),
+      }),
+    );
     this.doors = doors;
     this.tv = interactions.get("tv") ?? null;
 
@@ -325,6 +344,7 @@ export class WorldScene extends Phaser.Scene {
       this.showPrompt("Пробел — поговорить", this.nearest.x, this.nearest.y);
       if (space) {
         this.talking = this.nearest;
+        this.thoughtBubbles[this.npcs.indexOf(this.nearest)]?.hide();
         this.dialogue.open(this.nearest.char);
       }
     } else if (this.tv && this.near(this.tv)) {
@@ -358,6 +378,16 @@ export class WorldScene extends Phaser.Scene {
       this.player.setAngle(0);
       this.player.scaleY = this.playerBaseScale;
     }
+  }
+
+  // Срабатывает по персональному таймеру NPC: если он свободен, с вероятностью
+  // THOUGHT_PROBABILITY всплывает облачко со случайной мыслью.
+  private tryThink(npc: PlacedNpc, bubble: ThoughtBubble): void {
+    if (!this.started || this.atParking || this.modalOpen()) return;
+    if (bubble.isActive || npc === this.talking) return;
+    if (Math.random() > THOUGHT_PROBABILITY) return;
+    const thought = Phaser.Utils.Array.GetRandom(npc.char.thoughts);
+    bubble.show(thought, npc.x, npc.y - TARGET_H / 2);
   }
 
   private near(p: Spawn): boolean {
