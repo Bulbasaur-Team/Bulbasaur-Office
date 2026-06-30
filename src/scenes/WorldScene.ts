@@ -56,6 +56,8 @@ export class WorldScene extends Phaser.Scene {
   private bulbaRacing!: BulbaRacing;
   private tvScreen!: TvScreen;
   private activeGame: ArcadeGame | null = null;
+  private playerBaseScale = 1; // исходный масштаб игрока (анимация множит на него)
+  private walkPhase = 0;       // фаза шага игрока
   private prompt!: Phaser.GameObjects.Text;
   private nearest: PlacedNpc | null = null;
   private talking: PlacedNpc | null = null;
@@ -153,7 +155,8 @@ export class WorldScene extends Phaser.Scene {
   private startAs(chosen: Character): void {
     this.chosen = chosen;
     this.player = this.physics.add.sprite(0, 0, chosen.sprite);
-    this.player.setScale(spriteScale(this, chosen.sprite, TARGET_H)).setDepth(DEPTH.player);
+    this.playerBaseScale = spriteScale(this, chosen.sprite, TARGET_H);
+    this.player.setScale(this.playerBaseScale).setDepth(DEPTH.player);
     this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, this.walls);
 
@@ -268,7 +271,7 @@ export class WorldScene extends Phaser.Scene {
     return null;
   }
 
-  update(): void {
+  update(_time: number, delta: number): void {
     if (!this.started) return;
 
     // Мини-версия игры на TV: перерисовываем кадр; если игру закрыли — убираем.
@@ -277,6 +280,8 @@ export class WorldScene extends Phaser.Scene {
       this.activeGame = null;
       this.tvScreen.hide();
     }
+
+    this.animateCharacters(delta);
 
     // На парковке управление недоступно — работает только меню.
     if (this.atParking) {
@@ -335,6 +340,24 @@ export class WorldScene extends Phaser.Scene {
     }
 
     this.showExit(this.findExit());
+  }
+
+  // Процедурная анимация без отдельных кадров: при ходьбе игрок покачивается и
+  // подпрыгивает. Меняем только масштаб и угол (визуально), физическое тело и
+  // позиция не затрагиваются.
+  private animateCharacters(delta: number): void {
+    const moving = this.player.body.velocity.lengthSq() > 4;
+    if (moving) {
+      this.walkPhase += delta * 0.013;
+      const swing = Math.sin(this.walkPhase);
+      const bounce = Math.abs(Math.sin(this.walkPhase)); // дважды за шаг — на каждую ногу
+      this.player.setAngle(swing * 5);
+      this.player.scaleY = this.playerBaseScale * (1 + bounce * 0.05);
+    } else {
+      this.walkPhase = 0;
+      this.player.setAngle(0);
+      this.player.scaleY = this.playerBaseScale;
+    }
   }
 
   private near(p: Spawn): boolean {
