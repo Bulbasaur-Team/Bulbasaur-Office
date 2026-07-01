@@ -1,3 +1,5 @@
+import { publicPath } from "../publicPath";
+
 // Логическое поле игры (px). Канвас масштабируется под экран через CSS.
 const W = 480;
 const H = 600;
@@ -56,7 +58,7 @@ export class BulbaPacker {
     document.getElementById("bpRestart")!.onclick = () => this.reset();
     for (let i = 1; i <= ITEM_COUNT; i++) {
       const img = new Image();
-      img.src = `/assets/items/item${i}.png`;
+      img.src = publicPath(`assets/items/item${i}.png`);
       this.items.push(img);
     }
   }

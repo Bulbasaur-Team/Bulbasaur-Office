@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { ALL_SPRITES, SPRITE_FILES } from "../entities/sprites";
 import { LOCATIONS } from "../data/locations";
+import { publicPath } from "../publicPath";
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -14,12 +15,12 @@ export class BootScene extends Phaser.Scene {
     for (const loc of LOCATIONS) {
       // Парковка — не локация, а способ перемещения: её фон лежит в корне assets.
       if (loc.isParking) {
-        this.load.image(loc.bg, "assets/fastTravel.png");
+        this.load.image(loc.bg, publicPath("assets/fastTravel.png"));
         continue;
       }
 
       // Ассеты каждой локации лежат в assets/locations/<id>/.
-      const dir = `assets/locations/${loc.id}`;
+      const dir = publicPath(`assets/locations/${loc.id}`);
       this.load.image(loc.bg, `${dir}/background.png`);
       if (loc.overlay) {
         this.load.image(loc.overlay, `${dir}/overlay.png`);
@@ -30,7 +31,7 @@ export class BootScene extends Phaser.Scene {
     }
 
     for (const key of ALL_SPRITES) {
-      this.load.image(key, `assets/${SPRITE_FILES[key]}`);
+      this.load.image(key, publicPath(`assets/${SPRITE_FILES[key]}`));
     }
   }
 

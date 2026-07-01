@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "deploy": "npm run build && gh-pages -d dist",
+    "deploy": "npm run build && gh-pages -d dist -r git@github.com:bulbasaur-team/Bulbasaur-Office.git",
     "preview": "vite preview"
   },
   "dependencies": {
