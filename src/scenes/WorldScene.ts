@@ -13,6 +13,7 @@ import { BulbaJump } from "../ui/BulbaJump";
 import { BulbaPacker } from "../ui/BulbaPacker";
 import { BulbaParking } from "../ui/BulbaParking";
 import { BulbaRacing } from "../ui/BulbaRacing";
+import { BulbaGuess } from "../ui/BulbaGuess";
 import { TvScreen } from "../ui/TvScreen";
 
 // Запущенная игра, которую можно свернуть на экран TV и развернуть обратно.
@@ -61,6 +62,7 @@ export class WorldScene extends Phaser.Scene {
   private bulbaPacker!: BulbaPacker;
   private bulbaParking!: BulbaParking;
   private bulbaRacing!: BulbaRacing;
+  private bulbaGuess!: BulbaGuess;
   private tvScreen!: TvScreen;
   private activeGame: ArcadeGame | null = null;
   private playerBaseScale = 1; // исходный масштаб игрока (анимация множит на него)
@@ -126,9 +128,10 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaPacker = new BulbaPacker();
     this.bulbaParking = new BulbaParking();
     this.bulbaRacing = new BulbaRacing();
+    this.bulbaGuess = new BulbaGuess();
     this.tvScreen = new TvScreen(this, () => this.expandGame());
     // Свернуть из любой игры -> показать мини-версию на экране TV.
-    for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaRacing]) {
+    for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaRacing, this.bulbaGuess]) {
       g.onMinimize = () => this.minimizeGame();
     }
     this.gameMenu = new GameMenu((id) => this.openGame(id));
@@ -229,7 +232,8 @@ export class WorldScene extends Phaser.Scene {
       (this.bulbaJump.isOpen && !this.bulbaJump.minimized) ||
       (this.bulbaPacker.isOpen && !this.bulbaPacker.minimized) ||
       (this.bulbaParking.isOpen && !this.bulbaParking.minimized) ||
-      (this.bulbaRacing.isOpen && !this.bulbaRacing.minimized)
+      (this.bulbaRacing.isOpen && !this.bulbaRacing.minimized) ||
+      (this.bulbaGuess.isOpen && !this.bulbaGuess.minimized)
     );
   }
 
@@ -240,6 +244,7 @@ export class WorldScene extends Phaser.Scene {
     else if (id === "bulbapacker") { this.bulbaPacker.open(); this.activeGame = this.bulbaPacker; }
     else if (id === "bulbaparking") { this.bulbaParking.open(); this.activeGame = this.bulbaParking; }
     else if (id === "bulbaracing") { this.bulbaRacing.open(); this.activeGame = this.bulbaRacing; }
+    else if (id === "bulbaguess") { this.bulbaGuess.open(); this.activeGame = this.bulbaGuess; }
   }
 
   // Свернуть текущую игру на экран TV (игра продолжает работать).

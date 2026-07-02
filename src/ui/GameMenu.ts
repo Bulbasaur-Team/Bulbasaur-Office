@@ -11,6 +11,7 @@ const GAMES: GameOption[] = [
   { label: "Bulba Packer", id: "bulbapacker" },
   { label: "Bulba Parking", id: "bulbaparking" },
   { label: "Bulba Racing", id: "bulbaracing" },
+  { label: "Bulba Guess", id: "bulbaguess" },
 ];
 
 // Меню выбора игры у телевизора: ряд «таблеток» внизу, как меню вопросов диалога.
