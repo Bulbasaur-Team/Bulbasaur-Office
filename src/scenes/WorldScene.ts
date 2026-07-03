@@ -115,7 +115,7 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.prompt = this.add
-      .text(0, 0, "Пробел — поговорить", {
+      .text(0, 0, "Пробел / Enter — поговорить", {
         fontFamily: "Trebuchet MS",
         fontSize: "14px",
         color: "#7ac07a",
@@ -140,23 +140,26 @@ export class WorldScene extends Phaser.Scene {
     this.gameMenu = new GameMenu((id) => this.openGame(id));
 
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.keys = this.input.keyboard!.addKeys("W,A,S,D,SPACE") as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = this.input.keyboard!.addKeys("W,A,S,D") as Record<string, Phaser.Input.Keyboard.Key>;
 
     this.menu = new LocationMenu((to) => this.goTo(to));
 
     // Потребители ввода по приоритету: полноэкранные окна (слайды, игра) поверх меню
-    // (диалог, выбор игры, парковка), ниже — выход в дверь по Enter.
+    // (диалог, выбор игры, парковка). Выход в дверь и взаимодействие с NPC/TV
+    // разбираются в update() — там Space и Enter равноценны.
     this.router.register(this.slides);
     this.router.register(this.dialogue);
     this.router.register(this.gameMenu);
     this.router.register(this.menu);
+    // Взаимодействие в мире (NPC / TV / дверь) — ниже всех меню: срабатывает,
+    // только если модалка не перехватила клавишу первой (иначе клавиша, которой
+    // закрыли меню, «протекала» бы в мир и срабатывала повторно). Space и Enter
+    // равноценны.
     this.router.register({
-      isActive: () =>
-        this.started && !this.atParking && !this.modalOpen() && this.currentExit !== null,
+      isActive: () => this.started && !this.atParking && !this.modalOpen(),
       handleKey: (e) => {
-        if (e.code !== "Enter") return false;
-        this.triggerExit();
-        return true;
+        if (e.code !== "Space" && e.code !== "Enter") return false;
+        return this.tryInteract();
       },
     });
 
@@ -349,27 +352,42 @@ export class WorldScene extends Phaser.Scene {
       }
     }
 
-    const space = Phaser.Input.Keyboard.JustDown(this.keys.SPACE);
+    this.showExit(this.findExit());
+
+    // Только подсказки: сами действия по Space/Enter выполняет консьюмер роутера
+    // (tryInteract) — так клавиша, закрывшая меню, не срабатывает повторно в мире.
     if (this.nearest) {
-      this.showPrompt("Пробел — поговорить", this.nearest.x, this.nearest.y);
-      if (space) {
-        this.talking = this.nearest;
-        this.thoughtBubbles[this.npcs.indexOf(this.nearest)]?.hide();
-        this.dialogue.open(this.nearest.char);
-      }
+      this.showPrompt("Пробел / Enter — поговорить", this.nearest.x, this.nearest.y);
     } else if (this.tv && this.near(this.tv)) {
-      if (this.activeGame && this.activeGame.minimized) {
-        this.showPrompt("Пробел — продолжить игру", this.tv.x, this.tv.y);
-        if (space) this.expandGame();
-      } else {
-        this.showPrompt("Пробел — выбрать игру", this.tv.x, this.tv.y);
-        if (space) this.gameMenu.open();
-      }
+      const label =
+        this.activeGame && this.activeGame.minimized
+          ? "Пробел / Enter — продолжить игру"
+          : "Пробел / Enter — выбрать игру";
+      this.showPrompt(label, this.tv.x, this.tv.y);
     } else {
       this.prompt.setVisible(false);
     }
+  }
 
-    this.showExit(this.findExit());
+  // Действие по Space/Enter рядом с объектом. Приоритет: NPC → телевизор → дверь.
+  // Опирается на nearest/tv/currentExit, которые обновляет update() каждый кадр.
+  private tryInteract(): boolean {
+    if (this.nearest) {
+      this.talking = this.nearest;
+      this.thoughtBubbles[this.npcs.indexOf(this.nearest)]?.hide();
+      this.dialogue.open(this.nearest.char);
+      return true;
+    }
+    if (this.tv && this.near(this.tv)) {
+      if (this.activeGame && this.activeGame.minimized) this.expandGame();
+      else this.gameMenu.open();
+      return true;
+    }
+    if (this.currentExit) {
+      this.triggerExit();
+      return true;
+    }
+    return false;
   }
 
   // Процедурная анимация без отдельных кадров: при ходьбе игрок покачивается и

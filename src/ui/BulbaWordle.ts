@@ -94,11 +94,10 @@ export class BulbaWordle {
     this.buildGrid();
     this.buildKeyboard();
 
-    // Ввод перехватываем скрытым полем: stopPropagation не даёт клавишам уйти в
-    // управление миром Phaser (иначе W/A/S/D и стрелки перехватываются), а поле в
-    // фокусе гарантирует, что буквы, Backspace и Enter доходят до игры.
-    this.input.addEventListener("keydown", this.onKeyDown);
-    // Клик по окну игры возвращает фокус в поле, чтобы клавиатура снова работала.
+    // Ввод ловим скрытым полем, когда оно в фокусе (нужно для экранной клавиатуры
+    // на мобильных). stopPropagation не даёт клавишам уйти в управление миром Phaser.
+    this.input.addEventListener("keydown", (e) => this.handleInput(e));
+    // Клик по окну игры возвращает фокус в поле.
     this.root.addEventListener("pointerdown", () => this.focusInput());
   }
 
@@ -109,7 +108,8 @@ export class BulbaWordle {
   async open(): Promise<void> {
     this.isOpen = true;
     this.root.classList.remove("hidden");
-    this.focusInput();
+    window.addEventListener("keydown", this.onWindowKey, true);
+    requestAnimationFrame(() => this.focusInput());
     await this.ensureData();
     this.newGame();
   }
@@ -118,6 +118,7 @@ export class BulbaWordle {
     if (!this.isOpen) return;
     this.isOpen = false;
     this.minimized = false;
+    window.removeEventListener("keydown", this.onWindowKey, true);
     this.root.classList.add("hidden");
     this.stopConfetti();
   }
@@ -125,6 +126,7 @@ export class BulbaWordle {
   minimize(): void {
     if (!this.isOpen || this.minimized) return;
     this.minimized = true;
+    window.removeEventListener("keydown", this.onWindowKey, true);
     this.root.classList.add("hidden");
     this.stopConfetti();
     this.onMinimize?.();
@@ -134,6 +136,7 @@ export class BulbaWordle {
     if (!this.minimized) return;
     this.minimized = false;
     this.root.classList.remove("hidden");
+    window.addEventListener("keydown", this.onWindowKey, true);
     this.focusInput();
   }
 
@@ -155,7 +158,18 @@ export class BulbaWordle {
     this.loaded = true;
   }
 
-  private onKeyDown = (e: KeyboardEvent): void => {
+  // Пока игра открыта — ловим клавиши на window в фазе перехвата, не полагаясь на
+  // фокус поля: программный focus() при открытии срабатывает не всегда, а так первый
+  // же физический ввод работает без клика по экранной клавиатуре. Если поле уже в
+  // фокусе, уступаем событие его собственному обработчику (иначе двойная обработка).
+  private onWindowKey = (e: KeyboardEvent): void => {
+    if (!this.isOpen || this.minimized) return;
+    if (document.activeElement === this.input) return;
+    this.focusInput();
+    this.handleInput(e);
+  };
+
+  private handleInput(e: KeyboardEvent): void {
     e.stopPropagation();
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === "Escape") {
@@ -177,7 +191,7 @@ export class BulbaWordle {
       e.preventDefault();
       this.typeLetter(ch);
     }
-  };
+  }
 
   private buildGrid(): void {
     this.gridEl.innerHTML = "";
