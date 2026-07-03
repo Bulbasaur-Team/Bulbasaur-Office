@@ -108,8 +108,8 @@
 
     /* Bulba Wordle */
     #bwCanvas { display: none; }
-    /* Скрытое поле: держит фокус и ловит физическую клавиатуру, само невидимо. */
-    .bw-input { position: absolute; opacity: 0; width: 1px; height: 1px; padding: 0; border: 0; pointer-events: none; }
+    /* Скрытое поле: держит фокус (для экранной клавиатуры мобильных), само невидимо. */
+    .bw-input { position: absolute; opacity: 0; width: 1px; height: 1px; padding: 0; border: 0; }
     #bwConfetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
     .bw-grid { display: grid; grid-template-columns: repeat(5, 52px); grid-template-rows: repeat(6, 52px); gap: 6px; }
     .bw-cell {
@@ -171,7 +171,7 @@
     #slides.maximized .slides-nav.next { right: 14px; }
     #slides.maximized .slides-count { position: absolute; bottom: 12px; }
   </style>
-  <script type="module" crossorigin src="/Bulbasaur-Office/assets/index-3e2YOtz-.js"></script>
+  <script type="module" crossorigin src="/Bulbasaur-Office/assets/index-ZeynxJ3I.js"></script>
 </head>
 <body>
   <h1>🌱 Bulba Office</h1>
@@ -182,7 +182,7 @@
       <div id="parkingBtns"></div>
     </div>
   </div>
-  <div id="hint"><span><b>Стрелки</b> / WASD — ходить</span><span><b>Пробел</b> — поговорить</span></div>
+  <div id="hint"><span><b>Стрелки</b> / WASD — ходить</span><span><b>Пробел</b> / <b>Enter</b> — действие</span></div>
 
   <div id="select">
     <h2>Выбери Бульбазавра</h2>
@@ -299,7 +299,7 @@
       </button>
       <h2 class="arcade-title">Bulba Wordle</h2>
       <div class="ttt-status" id="bwStatus">Угадай слово из пяти букв</div>
-      <input id="bwInput" class="bw-input" type="text" autocomplete="off" autocapitalize="off" aria-hidden="true" />
+      <input id="bwInput" class="bw-input" type="text" autocomplete="off" autocapitalize="off" />
       <div class="bw-grid" id="bwGrid"></div>
       <div class="bw-keyboard" id="bwKeyboard"></div>
       <button class="ttt-restart" id="bwRestart">Новое слово</button>
