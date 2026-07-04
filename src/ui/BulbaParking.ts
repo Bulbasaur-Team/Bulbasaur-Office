@@ -51,6 +51,8 @@ export class BulbaParking {
   isOpen = false;
   minimized = false;
   onMinimize: (() => void) | null = null;
+  onGameOver: ((value: number) => void) | null = null;
+  private reported = false;
 
   private root = document.getElementById("bulbaparking")!;
   private canvas = document.getElementById("bpkCanvas") as HTMLCanvasElement;
@@ -169,6 +171,7 @@ export class BulbaParking {
     this.up = this.down = this.left = this.right = false;
     this.over = false;
     this.won = false;
+    this.reported = false;
     this.timerOn = false;
     this.startT = 0;
     this.elapsedMs = 0;
@@ -227,6 +230,7 @@ export class BulbaParking {
       this.over = true;
       this.won = true;
       this.v = 0;
+      this.finish(Math.round(this.elapsedMs));
       this.updateStatus();
     }
   }
@@ -457,6 +461,12 @@ export class BulbaParking {
     ctx.fillStyle = "#cdd5df";
     ctx.font = "15px 'Trebuchet MS', sans-serif";
     ctx.fillText("«Заново» — сыграть ещё раз", W / 2, H / 2 + 38);
+  }
+
+  private finish(value: number): void {
+    if (this.reported) return;
+    this.reported = true;
+    this.onGameOver?.(value);
   }
 
   private updateStatus(): void {

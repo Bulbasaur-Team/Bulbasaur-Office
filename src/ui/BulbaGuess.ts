@@ -53,6 +53,8 @@ export class BulbaGuess {
   isOpen = false;
   minimized = false;
   onMinimize: (() => void) | null = null;
+  onGameOver: ((value: number) => void) | null = null;
+  private reported = false;
 
   private root = document.getElementById("bulbaguess")!;
   private statusEl = document.getElementById("bgStatus")!;
@@ -162,6 +164,7 @@ export class BulbaGuess {
     this.posByIndex = new Map(this.round.n.map((idx, i) => [idx, i]));
     this.attempts = [];
     this.won = false;
+    this.reported = false;
     this.input.value = "";
     this.input.disabled = false;
     this.statusEl.textContent = "Угадай слово по смыслу. Попыток: 0";
@@ -192,11 +195,18 @@ export class BulbaGuess {
       this.input.disabled = true;
       this.statusEl.textContent = `Угадал! «${g}» за ${this.attempts.length} попыток.`;
       this.launchConfetti();
+      this.finish(this.attempts.length);
     } else {
       this.statusEl.textContent = `Попыток: ${this.attempts.length}`;
     }
     this.renderList(g);
     this.renderCanvas();
+  }
+
+  private finish(value: number): void {
+    if (this.reported) return;
+    this.reported = true;
+    this.onGameOver?.(value);
   }
 
   private scoreOf(g: string): number {

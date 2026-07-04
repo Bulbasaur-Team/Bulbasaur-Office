@@ -31,6 +31,8 @@ export class BulbaJump {
   isOpen = false;
   minimized = false;
   onMinimize: (() => void) | null = null;
+  onGameOver: ((value: number) => void) | null = null;
+  private reported = false;
 
   private root = document.getElementById("bulbajump")!;
   private canvas = document.getElementById("bjCanvas") as HTMLCanvasElement;
@@ -122,6 +124,7 @@ export class BulbaJump {
   private reset(): void {
     this.score = 0;
     this.over = false;
+    this.reported = false;
     this.left = this.right = false;
     this.px = W / 2;
     this.py = H - 90;
@@ -210,7 +213,10 @@ export class BulbaJump {
     }
 
     // Упал ниже экрана — конец.
-    if (this.py > H + PLAYER_H) this.over = true;
+    if (this.py > H + PLAYER_H) {
+      this.over = true;
+      this.finish(Math.floor(this.score));
+    }
   }
 
   private render(): void {
@@ -293,6 +299,12 @@ export class BulbaJump {
     ctx.fillStyle = "#7ac07a";
     ctx.font = "15px 'Trebuchet MS', sans-serif";
     ctx.fillText("«Заново» — сыграть ещё раз", W / 2, H / 2 + 48);
+  }
+
+  private finish(value: number): void {
+    if (this.reported) return;
+    this.reported = true;
+    this.onGameOver?.(value);
   }
 
   private updateStatus(): void {

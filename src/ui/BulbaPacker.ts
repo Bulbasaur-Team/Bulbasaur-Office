@@ -34,6 +34,8 @@ export class BulbaPacker {
   isOpen = false;
   minimized = false;
   onMinimize: (() => void) | null = null;
+  onGameOver: ((value: number) => void) | null = null;
+  private reported = false;
 
   private root = document.getElementById("bulbapacker")!;
   private canvas = document.getElementById("bpCanvas") as HTMLCanvasElement;
@@ -129,6 +131,7 @@ export class BulbaPacker {
   private reset(): void {
     this.score = 0;
     this.over = false;
+    this.reported = false;
     this.left = this.right = false;
     this.boxX = (W - BOX_W) / 2;
     this.falling = [];
@@ -182,6 +185,7 @@ export class BulbaPacker {
         // Предмет попал в коробку.
         if (it.bomb) {
           this.over = true;
+          this.finish(this.score);
           return;
         }
         this.score += CATCH_POINTS;
@@ -296,6 +300,12 @@ export class BulbaPacker {
     ctx.fillStyle = "#7ac07a";
     ctx.font = "15px 'Trebuchet MS', sans-serif";
     ctx.fillText("«Заново» — сыграть ещё раз", W / 2, H / 2 + 48);
+  }
+
+  private finish(value: number): void {
+    if (this.reported) return;
+    this.reported = true;
+    this.onGameOver?.(value);
   }
 
   private updateStatus(): void {

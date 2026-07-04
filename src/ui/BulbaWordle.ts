@@ -59,6 +59,9 @@ export class BulbaWordle {
   isOpen = false;
   minimized = false;
   onMinimize: (() => void) | null = null;
+  onGameOver: ((value: number) => void) | null = null;
+  private reported = false;
+  private solved = 0;
 
   private root = document.getElementById("bulbawordle")!;
   private statusEl = document.getElementById("bwStatus")!;
@@ -107,6 +110,7 @@ export class BulbaWordle {
 
   async open(): Promise<void> {
     this.isOpen = true;
+    this.solved = 0;
     this.root.classList.remove("hidden");
     window.addEventListener("keydown", this.onWindowKey, true);
     requestAnimationFrame(() => this.focusInput());
@@ -233,6 +237,7 @@ export class BulbaWordle {
     this.guesses = [];
     this.current = "";
     this.done = false;
+    this.reported = false;
     this.keyState.clear();
     this.statusEl.textContent = "Угадай слово из пяти букв";
     this.render();
@@ -271,8 +276,10 @@ export class BulbaWordle {
 
     if (guess === this.target) {
       this.done = true;
+      this.solved += 1;
       this.statusEl.textContent = `Угадал за ${this.guesses.length}!`;
       this.launchConfetti();
+      this.finish(this.solved);
     } else if (this.guesses.length >= ROWS) {
       this.done = true;
       this.statusEl.textContent = `Не угадал. Было: ${this.target}`;
@@ -321,6 +328,12 @@ export class BulbaWordle {
   }
 
   // Салют из конфетти при победе: короткий залп частиц из центра экрана.
+  private finish(value: number): void {
+    if (this.reported) return;
+    this.reported = true;
+    this.onGameOver?.(value);
+  }
+
   private launchConfetti(): void {
     const w = (this.confetti.width = window.innerWidth);
     const h = (this.confetti.height = window.innerHeight);

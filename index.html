@@ -74,11 +74,10 @@
     .opt:hover, .opt.sel { background: var(--accent); color: #14210f; transform: translateY(-2px); }
 
     /* Полноэкранное окно игры */
-    #bulbajump, #bulbapacker, #bulbaparking, #bulbaracing, #bulbaguess, #bulbawordle { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; justify-content: center; padding: 24px; }
+    #bulbajump, #bulbapacker, #bulbaparking, #bulbaguess, #bulbawordle { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; justify-content: center; padding: 24px; }
     #bjCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, 72vh); width: auto; aspect-ratio: 420 / 640; }
     #bpCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(600px, 72vh); width: auto; aspect-ratio: 480 / 600; }
     #bpkCanvas { background: #26303a; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, 72vh); width: auto; aspect-ratio: 480 / 640; }
-    #brCanvas { background: #3a3f47; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, 72vh); width: auto; aspect-ratio: 420 / 640; }
     .arcade-frame { position: relative; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 24px 30px; display: flex; flex-direction: column; align-items: center; gap: 14px; box-shadow: 0 12px 44px rgba(0,0,0,.55); }
     .arcade-title { margin: 0; font-size: 22px; }
     .arcade-close { position: absolute; top: -16px; right: -16px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -170,6 +169,45 @@
     #slides.maximized .slides-nav.prev { left: 14px; }
     #slides.maximized .slides-nav.next { right: 14px; }
     #slides.maximized .slides-count { position: absolute; bottom: 12px; }
+
+    /* Авторизация */
+    #auth { position: fixed; inset: 0; z-index: 60; background: rgba(15,18,23,.97); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .auth-box { background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 26px 30px; width: min(360px, 90vw); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
+    .auth-box h2 { margin: 0 0 6px; text-align: center; }
+    .auth-tabs { display: flex; gap: 8px; margin: 14px 0 16px; }
+    .auth-tab { flex: 1; background: transparent; border: 2px solid #3a414c; border-radius: 10px; padding: 8px; color: var(--text); font-family: inherit; font-size: 15px; cursor: pointer; }
+    .auth-tab.sel { border-color: var(--accent); background: var(--accent); color: #14210f; font-weight: bold; }
+    #authForm { display: flex; flex-direction: column; gap: 10px; }
+    .auth-input { background: #f4f1e8; border: 2px solid var(--accent); border-radius: 10px; padding: 10px 14px; color: #1b1f24; font-family: inherit; font-size: 16px; }
+    .auth-input:focus { outline: none; border-color: #8fd06b; }
+    .auth-error { min-height: 18px; color: #e6807a; font-size: 13px; text-align: center; }
+    .auth-submit { background: var(--accent); border: none; border-radius: 10px; padding: 11px; color: #14210f; font-size: 16px; font-weight: bold; cursor: pointer; }
+    .auth-submit:disabled { opacity: .6; cursor: default; }
+    .auth-submit:not(:disabled):hover { filter: brightness(1.08); }
+
+    /* Лидерборд */
+    #leaderboard { position: fixed; inset: 0; z-index: 70; background: rgba(8,10,14,.85); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .lb-box { position: relative; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 22px 26px; width: min(420px, 92vw); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
+    .lb-title { margin: 0 0 4px; text-align: center; }
+    .lb-status { text-align: center; opacity: .8; font-size: 14px; min-height: 18px; margin-bottom: 10px; }
+    .lb-list { display: flex; flex-direction: column; gap: 4px; max-height: 56vh; overflow-y: auto; }
+    .lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid #353c46; border-radius: 8px; }
+    .lb-row .lb-rank { width: 28px; opacity: .7; font-weight: bold; }
+    .lb-row .lb-login { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lb-row .lb-value { font-weight: bold; }
+    .lb-row.lb-you { border-color: var(--accent); background: rgba(122,192,122,.16); }
+    .lb-sep { text-align: center; opacity: .5; line-height: 1; }
+    .lb-close { position: absolute; top: -16px; right: -16px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .lb-close:hover { background: var(--accent); color: #14210f; }
+    .lb-close svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+    .lb-open-btn { position: fixed; top: 12px; right: 12px; z-index: 25; background: var(--panel); color: var(--text); border: 2px solid var(--accent); border-radius: 12px; padding: 8px 14px; font-family: inherit; font-size: 15px; font-weight: bold; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+    .lb-open-btn:hover { background: var(--accent); color: #14210f; }
+    #logoutBtn { top: 54px; }
+    .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 56px; border: 2px solid var(--accent); border-radius: 10px; background: rgba(38,43,51,.9); color: var(--text); font-size: 26px; cursor: pointer; }
+    .lb-nav:hover { background: var(--accent); color: #14210f; }
+    .lb-nav.prev { left: -56px; }
+    .lb-nav.next { right: -56px; }
+    @media (max-width: 560px) { .lb-nav.prev { left: 4px; } .lb-nav.next { right: 4px; } }
   </style>
 </head>
 <body>
@@ -252,21 +290,6 @@
     </div>
   </div>
 
-  <div id="bulbaracing" class="hidden">
-    <div class="arcade-frame">
-      <button class="arcade-close" id="brClose" aria-label="закрыть">
-        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-      <button class="arcade-min" id="brMin" aria-label="свернуть">
-        <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
-      </button>
-      <h2 class="arcade-title">Bulba Racing</h2>
-      <div class="ttt-status" id="brStatus">Очки: 0</div>
-      <canvas id="brCanvas" width="420" height="640"></canvas>
-      <button class="ttt-restart" id="brRestart">Заново</button>
-    </div>
-  </div>
-
   <div id="bulbaguess" class="hidden">
     <div class="arcade-frame">
       <button class="arcade-close" id="bgClose" aria-label="закрыть">
@@ -325,6 +348,38 @@
       <canvas id="slidesCanvas" class="slides-media"></canvas>
       <button class="slides-nav next" id="slidesNext">›</button>
       <div class="slides-count" id="slidesCount"></div>
+    </div>
+  </div>
+
+  <div id="auth" class="hidden">
+    <div class="auth-box">
+      <h2 id="authTitle">Вход</h2>
+      <div class="auth-tabs">
+        <button id="authTabLogin" class="auth-tab sel" type="button">Вход</button>
+        <button id="authTabRegister" class="auth-tab" type="button">Регистрация</button>
+      </div>
+      <form id="authForm" autocomplete="off">
+        <input id="authLogin" class="auth-input" type="text" placeholder="логин" />
+        <input id="authPassword" class="auth-input" type="password" placeholder="пароль" />
+        <div id="authError" class="auth-error"></div>
+        <button id="authSubmit" class="auth-submit" type="submit">Войти</button>
+      </form>
+    </div>
+  </div>
+
+  <button id="lbBtn" class="lb-open-btn hidden" aria-label="лидерборд">🏆 Лидерборд</button>
+  <button id="logoutBtn" class="lb-open-btn hidden" aria-label="выйти">Выйти</button>
+
+  <div id="leaderboard" class="hidden">
+    <div class="lb-box">
+      <button class="lb-close" id="lbClose" aria-label="закрыть">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <button class="lb-nav prev" id="lbPrev" aria-label="предыдущая игра">‹</button>
+      <button class="lb-nav next" id="lbNext" aria-label="следующая игра">›</button>
+      <h2 class="lb-title" id="lbTitle">Лидерборд</h2>
+      <div class="lb-status" id="lbStatus"></div>
+      <div class="lb-list" id="lbList"></div>
     </div>
   </div>
 

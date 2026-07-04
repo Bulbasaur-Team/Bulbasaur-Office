@@ -12,7 +12,6 @@ import { GameMenu } from "../ui/GameMenu";
 import { BulbaJump } from "../ui/BulbaJump";
 import { BulbaPacker } from "../ui/BulbaPacker";
 import { BulbaParking } from "../ui/BulbaParking";
-import { BulbaRacing } from "../ui/BulbaRacing";
 import { BulbaGuess } from "../ui/BulbaGuess";
 import { BulbaWordle } from "../ui/BulbaWordle";
 import { TvScreen } from "../ui/TvScreen";
@@ -27,6 +26,18 @@ interface ArcadeGame {
 import { KeyboardRouter } from "../ui/KeyboardRouter";
 import { showCharacterSelect } from "../ui/CharacterSelect";
 import { LocationLoader, type Spawn, type PlacedNpc } from "./LocationLoader";
+import { AuthGate } from "../ui/AuthGate";
+import { Leaderboard, type LeaderboardGame } from "../ui/Leaderboard";
+import * as api from "../net/api";
+
+// Мини-игры для лидерборда: порядок листания, заголовок и формат значения.
+const GAMES: LeaderboardGame[] = [
+  { id: "bulbajump", title: "Bulba Jump", format: (v) => String(v) },
+  { id: "bulbapacker", title: "Bulba Packer", format: (v) => String(v) },
+  { id: "bulbaparking", title: "Bulba Parking", format: (v) => (v / 1000).toFixed(1) + " с" },
+  { id: "bulbaguess", title: "Bulba Guess", format: (v) => v + " поп." },
+  { id: "bulbawordle", title: "Bulba Wordle", format: (v) => v + " слов" },
+];
 
 const SPEED = 400;
 const INTERACT_DIST = 80;
@@ -62,10 +73,11 @@ export class WorldScene extends Phaser.Scene {
   private bulbaJump!: BulbaJump;
   private bulbaPacker!: BulbaPacker;
   private bulbaParking!: BulbaParking;
-  private bulbaRacing!: BulbaRacing;
   private bulbaGuess!: BulbaGuess;
   private bulbaWordle!: BulbaWordle;
   private tvScreen!: TvScreen;
+  private authGate!: AuthGate;
+  private leaderboard!: Leaderboard;
   private activeGame: ArcadeGame | null = null;
   private playerBaseScale = 1; // исходный масштаб игрока (анимация множит на него)
   private walkPhase = 0;       // фаза шага игрока
@@ -129,14 +141,27 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaJump = new BulbaJump();
     this.bulbaPacker = new BulbaPacker();
     this.bulbaParking = new BulbaParking();
-    this.bulbaRacing = new BulbaRacing();
     this.bulbaGuess = new BulbaGuess();
     this.bulbaWordle = new BulbaWordle();
     this.tvScreen = new TvScreen(this, () => this.expandGame());
     // Свернуть из любой игры -> показать мини-версию на экране TV.
-    for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaRacing, this.bulbaGuess, this.bulbaWordle]) {
+    for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaGuess, this.bulbaWordle]) {
       g.onMinimize = () => this.minimizeGame();
     }
+
+    // По завершении партии игра отдаёт результат — отправляем его и показываем лидерборд.
+    this.leaderboard = new Leaderboard(GAMES);
+    document.getElementById("lbBtn")!.onclick = () => void this.leaderboard.open();
+    document.getElementById("logoutBtn")!.onclick = () => {
+      api.logout();
+      window.location.reload();
+    };
+    this.bulbaJump.onGameOver = (v) => this.reportScore("bulbajump", v);
+    this.bulbaPacker.onGameOver = (v) => this.reportScore("bulbapacker", v);
+    this.bulbaParking.onGameOver = (v) => this.reportScore("bulbaparking", v);
+    this.bulbaGuess.onGameOver = (v) => this.reportScore("bulbaguess", v);
+    this.bulbaWordle.onGameOver = (v) => this.reportScore("bulbawordle", v);
+
     this.gameMenu = new GameMenu((id) => this.openGame(id));
 
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -165,7 +190,21 @@ export class WorldScene extends Phaser.Scene {
 
     this.exitBtn.onclick = () => this.triggerExit();
 
-    showCharacterSelect(CHARACTERS, (chosen) => this.startAs(chosen));
+    // Сначала вход/регистрация. Если игрок уже авторизован — сразу выбор персонажа.
+    this.authGate = new AuthGate();
+    const pickCharacter = () => showCharacterSelect(CHARACTERS, (chosen) => this.startAs(chosen));
+    if (api.isAuthenticated()) pickCharacter();
+    else void this.authGate.open().then(pickCharacter);
+  }
+
+  // Отправить результат мини-игры на сервер и показать лидерборд.
+  private async reportScore(gameId: string, value: number): Promise<void> {
+    try {
+      const board = await api.submitScore(gameId, value);
+      this.leaderboard.showBoard(gameId, board);
+    } catch (e) {
+      console.error("Не удалось отправить результат:", e);
+    }
   }
 
   private startAs(chosen: Character): void {
@@ -179,6 +218,8 @@ export class WorldScene extends Phaser.Scene {
     // Без fromId — игрок встанет на точку своего персонажа из слоя spawns.
     this.loadLocation(0);
     this.started = true;
+    document.getElementById("lbBtn")!.classList.remove("hidden");
+    document.getElementById("logoutBtn")!.classList.remove("hidden");
   }
 
   // Строит локацию index, снося предыдущую. fromId — id локации, откуда пришли:
@@ -238,9 +279,9 @@ export class WorldScene extends Phaser.Scene {
       (this.bulbaJump.isOpen && !this.bulbaJump.minimized) ||
       (this.bulbaPacker.isOpen && !this.bulbaPacker.minimized) ||
       (this.bulbaParking.isOpen && !this.bulbaParking.minimized) ||
-      (this.bulbaRacing.isOpen && !this.bulbaRacing.minimized) ||
       (this.bulbaGuess.isOpen && !this.bulbaGuess.minimized) ||
-      (this.bulbaWordle.isOpen && !this.bulbaWordle.minimized)
+      (this.bulbaWordle.isOpen && !this.bulbaWordle.minimized) ||
+      this.leaderboard.isOpen
     );
   }
 
@@ -250,7 +291,6 @@ export class WorldScene extends Phaser.Scene {
     if (id === "bulbajump") { this.bulbaJump.open(this.chosen.sprite); this.activeGame = this.bulbaJump; }
     else if (id === "bulbapacker") { this.bulbaPacker.open(); this.activeGame = this.bulbaPacker; }
     else if (id === "bulbaparking") { this.bulbaParking.open(); this.activeGame = this.bulbaParking; }
-    else if (id === "bulbaracing") { this.bulbaRacing.open(); this.activeGame = this.bulbaRacing; }
     else if (id === "bulbaguess") { this.bulbaGuess.open(); this.activeGame = this.bulbaGuess; }
     else if (id === "bulbawordle") { this.bulbaWordle.open(); this.activeGame = this.bulbaWordle; }
   }
