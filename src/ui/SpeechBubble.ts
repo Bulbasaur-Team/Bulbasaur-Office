@@ -10,6 +10,10 @@ export class SpeechBubble {
   private bg: Phaser.GameObjects.Graphics;
   private label: Phaser.GameObjects.Text;
   private timer?: Phaser.Time.TimerEvent;
+  private hideTimer?: Phaser.Time.TimerEvent;
+  private w = 0;
+  private h = 0;
+  private follow?: () => { x: number; y: number }; // если задан — облачко следует за якорем
 
   constructor(private scene: Phaser.Scene, depth: number) {
     this.bg = scene.add.graphics();
@@ -25,17 +29,21 @@ export class SpeechBubble {
       .setVisible(false);
   }
 
-  // Показывает облачко так, чтобы кончик хвостика был в точке (x, y) — над головой NPC.
-  show(fullText: string, x: number, y: number): void {
+  // Показывает облачко так, чтобы кончик хвостика был в точке (x, y) — над головой.
+  // autoHideMs (если задан) — скрыть облачко через столько мс после конца печати (для чата).
+  // follow (если задан) — источник живой позиции якоря: облачко едет за ним (см. update).
+  show(fullText: string, x: number, y: number, autoHideMs?: number, follow?: () => { x: number; y: number }): void {
     this.timer?.remove();
+    this.hideTimer?.remove();
+    this.follow = follow;
 
     // Размер считаем по полному тексту, чтобы облачко не «прыгало» во время печати.
     this.label.setText(fullText);
-    const w = this.label.width + PAD * 2;
-    const h = this.label.height + PAD * 2;
+    this.w = this.label.width + PAD * 2;
+    this.h = this.label.height + PAD * 2;
 
-    this.drawBubble(w, h);
-    this.container.setPosition(Math.round(x - w / 2), Math.round(y - h - TAIL_H));
+    this.drawBubble(this.w, this.h);
+    this.place(x, y);
     this.container.setVisible(true);
 
     this.label.setText("");
@@ -46,14 +54,37 @@ export class SpeechBubble {
       callback: () => {
         shown++;
         this.label.setText(fullText.slice(0, shown));
-        if (shown >= fullText.length) this.timer?.remove();
+        if (shown >= fullText.length) {
+          this.timer?.remove();
+          if (autoHideMs != null) this.hideTimer = this.scene.time.delayedCall(autoHideMs, () => this.hide());
+        }
       },
     });
   }
 
+  // Если задан follow — подтянуть облачко к текущей позиции якоря. Зовётся каждый кадр.
+  update(): void {
+    if (this.follow && this.container.visible) {
+      const p = this.follow();
+      this.place(p.x, p.y);
+    }
+  }
+
+  private place(x: number, y: number): void {
+    this.container.setPosition(Math.round(x - this.w / 2), Math.round(y - this.h - TAIL_H));
+  }
+
   hide(): void {
     this.timer?.remove();
+    this.hideTimer?.remove();
+    this.follow = undefined;
     this.container.setVisible(false);
+  }
+
+  destroy(): void {
+    this.timer?.remove();
+    this.hideTimer?.remove();
+    this.container.destroy(); // уничтожает и дочерние bg/label
   }
 
   private drawBubble(w: number, h: number): void {

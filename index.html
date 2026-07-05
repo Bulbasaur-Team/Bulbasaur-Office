@@ -50,20 +50,38 @@
     .loc-btn:hover, .loc-btn.sel { background: var(--accent); color: #14210f; transform: translateX(-3px); }
 
     /* Выбор персонажа */
-    #select {
+    #select, #modeSelect, #roleSelect {
       position: fixed; inset: 0; background: rgba(15,18,23,.96); z-index: 20;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       padding: 20px; overflow: auto;
     }
-    #select h2 { margin: 0 0 4px; }
-    #select p { margin: 0 0 18px; opacity: .75; font-size: 14px; }
-    #cards { display: grid; grid-template-columns: repeat(auto-fill, 132px); gap: 12px; max-width: 720px; justify-content: center; }
+    #select h2, #modeSelect h2, #roleSelect h2 { margin: 0 0 4px; }
+    #select p, #modeSelect p, #roleSelect p { margin: 0 0 18px; opacity: .75; font-size: 14px; }
+    #cards, #roleCards { display: grid; grid-template-columns: repeat(auto-fill, 132px); gap: 12px; max-width: 720px; justify-content: center; }
     .card { background: var(--panel); border: 2px solid #353c46; border-radius: 10px; padding: 8px; text-align: center; cursor: pointer; transition: .12s; }
     .card:hover { border-color: var(--accent); transform: translateY(-3px); }
     .card canvas { display: block; margin: 0 auto 4px; border-radius: 50%; }
     .card .nm { font-weight: bold; font-size: 13px; }
     .card .rl { font-size: 11px; opacity: .7; }
     .card .loc { font-size: 10px; opacity: .5; margin-top: 2px; }
+    #modeCards { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+    .mode-card {
+      background: var(--panel); border: 2px solid #353c46; border-radius: 12px; padding: 22px 20px;
+      width: 240px; text-align: center; cursor: pointer; transition: .12s;
+    }
+    .mode-card:hover { border-color: var(--accent); transform: translateY(-3px); }
+    .mode-card .mode-icon { font-size: 40px; margin-bottom: 8px; }
+    .mode-card .nm { font-weight: bold; font-size: 17px; margin-bottom: 6px; }
+    .mode-card .rl { font-size: 12px; opacity: .7; line-height: 1.4; }
+
+    /* Поле ввода чата (мультиплеер) */
+    .chat-input {
+      position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 30;
+      width: min(420px, 80vw); padding: 10px 14px; border-radius: 20px;
+      border: 2px solid var(--accent); background: rgba(15,18,23,.92); color: var(--text);
+      font-family: inherit; font-size: 14px; outline: none;
+    }
+    .chat-input::placeholder { color: #7a828c; }
 
     /* Диалог и меню выбора игры */
     #dialogue, #gameMenu { position: fixed; inset: 0; pointer-events: none; z-index: 30; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5vh; }
@@ -204,7 +222,8 @@
     .lb-close svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
     .lb-open-btn { position: fixed; top: 12px; right: 12px; z-index: 25; background: var(--panel); color: var(--text); border: 2px solid var(--accent); border-radius: 12px; padding: 8px 14px; font-family: inherit; font-size: 15px; font-weight: bold; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
     .lb-open-btn:hover { background: var(--accent); color: #14210f; }
-    #logoutBtn { top: 54px; }
+    #modeBtn { top: 54px; }
+    #logoutBtn { top: 96px; }
     .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 56px; border: 2px solid var(--accent); border-radius: 10px; background: rgba(38,43,51,.9); color: var(--text); font-size: 26px; cursor: pointer; }
     .lb-nav:hover { background: var(--accent); color: #14210f; }
     .lb-nav.prev { left: -56px; }
@@ -223,10 +242,25 @@
   </div>
   <div id="hint"><span><b>Стрелки</b> / WASD — ходить</span><span><b>Пробел</b> / <b>Enter</b> — действие</span></div>
 
-  <div id="select">
+  <input id="chatInput" class="chat-input hidden" type="text" maxlength="200" autocomplete="off"
+         placeholder="Сообщение… (Enter — отправить)" />
+
+  <div id="select" class="hidden">
     <h2>Выбери Бульбазавра</h2>
     <p>Им будешь управлять. С остальными можно поговорить.</p>
     <div id="cards"></div>
+  </div>
+
+  <div id="modeSelect" class="hidden">
+    <h2>Как играть?</h2>
+    <p>Выбери режим.</p>
+    <div id="modeCards"></div>
+  </div>
+
+  <div id="roleSelect" class="hidden">
+    <h2>Выбери роль</h2>
+    <p>От роли зависит скин. В мультиплеере видно других игроков.</p>
+    <div id="roleCards"></div>
   </div>
 
   <button id="exitBtn" class="hidden" aria-label="выйти">
@@ -370,6 +404,7 @@
   </div>
 
   <button id="lbBtn" class="lb-open-btn hidden" aria-label="лидерборд">🏆 Лидерборд</button>
+  <button id="modeBtn" class="lb-open-btn hidden" aria-label="сменить режим">🔄 Сменить режим</button>
   <button id="logoutBtn" class="lb-open-btn hidden" aria-label="выйти">Выйти</button>
 
   <div id="leaderboard" class="hidden">

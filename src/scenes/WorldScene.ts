@@ -25,6 +25,12 @@ interface ArcadeGame {
 }
 import { KeyboardRouter } from "../ui/KeyboardRouter";
 import { showCharacterSelect } from "../ui/CharacterSelect";
+import { showModeSelect } from "../ui/ModeSelect";
+import { showRoleSelect } from "../ui/RoleSelect";
+import type { RoleDef } from "../data/roles";
+import { spriteForRole } from "../data/roles";
+import { Realtime, type RemoteState } from "../net/realtime";
+import { RemotePlayer } from "../entities/RemotePlayer";
 import { LocationLoader, type Spawn, type PlacedNpc } from "./LocationLoader";
 import { AuthGate } from "../ui/AuthGate";
 import { Leaderboard, type LeaderboardGame } from "../ui/Leaderboard";
@@ -41,6 +47,7 @@ const GAMES: LeaderboardGame[] = [
 
 const SPEED = 400;
 const INTERACT_DIST = 80;
+const CHAT_HOLD_MS = 4000; // сколько держать облачко своего чата после печати
 const TARGET_H = 74;       // экранная высота персонажа в пикселях
 const EXIT_ZONE_HALF = 52; // полразмера зоны срабатывания выхода вокруг точки двери
 
@@ -87,6 +94,15 @@ export class WorldScene extends Phaser.Scene {
   private talking: PlacedNpc | null = null;
   private started = false;
 
+  private multiplayer = false;
+  private role: RoleDef | null = null;
+  private realtime = new Realtime();
+  private remotePlayers = new Map<string, RemotePlayer>(); // чужие игроки текущей комнаты, ключ — id сессии
+  private moveAcc = 0;             // накопитель времени для троттлинга отправки move
+  private lastSentX = -1;
+  private lastSentY = -1;
+  private lastSentFacing = false;
+
   private chosen!: Character;
   private locIndex = 0;
   private atParking = false;
@@ -95,6 +111,7 @@ export class WorldScene extends Phaser.Scene {
   private menu!: LocationMenu;
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
   private exitLabel = document.getElementById("exitLabel") as HTMLSpanElement;
+  private chatInput = document.getElementById("chatInput") as HTMLInputElement;
   private currentExit: ExitDef | null = null;
 
   constructor() {
@@ -102,6 +119,9 @@ export class WorldScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Только для dev/тестов: доступ к сцене из консоли/CDP (в проде вырезается).
+    if (import.meta.env.DEV) (window as unknown as { __world?: WorldScene }).__world = this;
+
     registerSpriteImages(this);
     this.walls = this.physics.add.staticGroup();
     this.router = new KeyboardRouter();
@@ -157,6 +177,9 @@ export class WorldScene extends Phaser.Scene {
       api.logout();
       window.location.reload();
     };
+    // Сменить режим: перезагрузка (токен в localStorage сохраняется) возвращает к
+    // выбору режима и чисто рвёт мультиплеерное соединение/состояние.
+    document.getElementById("modeBtn")!.onclick = () => window.location.reload();
     this.bulbaJump.onGameOver = (v) => this.reportScore("bulbajump", v);
     this.bulbaPacker.onGameOver = (v) => this.reportScore("bulbapacker", v);
     this.bulbaParking.onGameOver = (v) => this.reportScore("bulbaparking", v);
@@ -190,12 +213,18 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.exitBtn.onclick = () => this.triggerExit();
+    // Ввод чата (мультиплеер): stopPropagation, чтобы клавиши не уходили в управление миром.
+    this.chatInput.addEventListener("keydown", (e) => this.onChatKey(e));
 
-    // Сначала вход/регистрация. Если игрок уже авторизован — сразу выбор персонажа.
+    // Сначала вход/регистрация, затем выбор режима: одиночная (персонаж) или мультиплеер (роль).
     this.authGate = new AuthGate();
-    const pickCharacter = () => showCharacterSelect(CHARACTERS, (chosen) => this.startAs(chosen));
-    if (api.isAuthenticated()) pickCharacter();
-    else void this.authGate.open().then(pickCharacter);
+    const chooseMode = () =>
+      showModeSelect((mode) => {
+        if (mode === "single") showCharacterSelect(CHARACTERS, (chosen) => this.startAs(chosen));
+        else showRoleSelect((role) => this.startAsRole(role));
+      });
+    if (api.isAuthenticated()) chooseMode();
+    else void this.authGate.open().then(chooseMode);
   }
 
   // Отправить результат мини-игры на сервер и показать лидерборд.
@@ -232,7 +261,99 @@ export class WorldScene extends Phaser.Scene {
     this.loadLocation(0);
     this.started = true;
     document.getElementById("lbBtn")!.classList.remove("hidden");
+    document.getElementById("modeBtn")!.classList.remove("hidden");
     document.getElementById("logoutBtn")!.classList.remove("hidden");
+  }
+
+  // Старт в мультиплеере: скин по роли, NPC скрыты, подключаемся к реалтайму.
+  private startAsRole(role: RoleDef): void {
+    this.role = role;
+    this.multiplayer = true;
+    // Игрок в MP — не один из NPC, а роль. Собираем «пустышку» Character, чтобы
+    // переиспользовать общий путь запуска (скин, спавн, переходы между локациями).
+    const me: Character = {
+      id: "__me__",
+      name: api.getLogin() ?? "Игрок",
+      sprite: role.sprite,
+      roleLabel: role.label,
+      areaLabel: "",
+      slideCount: 0,
+      lines: { greet: "", who: "", doing: "", did: "" },
+      thoughts: [],
+    };
+    this.startAs(me);
+    this.chatInput.classList.remove("hidden");
+    this.realtime.connect({
+      onOpen: () => this.sendJoin(),
+      onSnapshot: (players) => this.onSnapshot(players),
+      onJoined: (player) => this.addRemote(player),
+      onMoved: (id, x, y, facing) => this.remotePlayers.get(id)?.setTarget(x, y, facing),
+      onChat: (id, _login, text) => this.remotePlayers.get(id)?.showMessage(text),
+      onLeft: (id) => this.removeRemote(id),
+    });
+  }
+
+  // Полный состав комнаты: пересобираем чужих аватаров с нуля.
+  private onSnapshot(players: RemoteState[]): void {
+    this.clearRemotes();
+    for (const player of players) this.addRemote(player);
+  }
+
+  private addRemote(player: RemoteState): void {
+    this.remotePlayers.get(player.id)?.destroy();
+    this.remotePlayers.set(
+      player.id,
+      new RemotePlayer(
+        this, spriteForRole(player.role), player.login,
+        player.x, player.y, player.facing, TARGET_H, DEPTH.bubble,
+      ),
+    );
+  }
+
+  private removeRemote(id: string): void {
+    this.remotePlayers.get(id)?.destroy();
+    this.remotePlayers.delete(id);
+  }
+
+  private clearRemotes(): void {
+    for (const rp of this.remotePlayers.values()) rp.destroy();
+    this.remotePlayers.clear();
+  }
+
+  private onChatKey(e: KeyboardEvent): void {
+    e.stopPropagation();
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const text = this.chatInput.value.trim().slice(0, 200);
+      this.chatInput.value = "";
+      if (text) this.sendChat(text);
+      this.chatInput.blur(); // вернуть управление миром
+    } else if (e.key === "Escape") {
+      this.chatInput.value = "";
+      this.chatInput.blur();
+    }
+  }
+
+  private sendChat(text: string): void {
+    this.realtime.chat(text);
+    // Своё сообщение показываем локально над своим бульбазавром; облачко едет за игроком.
+    // Якорь выше бейджа с логином (0.7), чтобы облачко его не перекрывало.
+    this.bubble.show(text, this.player.x, this.player.y - TARGET_H * 0.95, CHAT_HOLD_MS, () => ({
+      x: this.player.x,
+      y: this.player.y - TARGET_H * 0.95,
+    }));
+  }
+
+  // Отправить роль/локацию/позицию как вход в мир (в т.ч. после реконнекта).
+  private sendJoin(): void {
+    if (!this.role) return;
+    this.realtime.join(
+      this.role.id,
+      LOCATIONS[this.locIndex].id,
+      Math.round(this.player.x),
+      Math.round(this.player.y),
+      this.player.flipX,
+    );
   }
 
   // Строит локацию index, снося предыдущую. fromId — id локации, откуда пришли:
@@ -244,7 +365,7 @@ export class WorldScene extends Phaser.Scene {
     this.locIndex = index;
     this.atParking = !!cfg.isParking;
 
-    const { npcs, doors, spawns, interactions } = this.loader.load(cfg, index, this.chosen.id);
+    const { npcs, doors, spawns, interactions } = this.loader.load(cfg, index, this.chosen.id, this.multiplayer);
     this.npcs = npcs;
     this.thoughtBubbles.forEach((b) => b.destroy());
     this.thoughtTimers.forEach((t) => t.remove());
@@ -278,7 +399,7 @@ export class WorldScene extends Phaser.Scene {
       const p =
         fromId !== undefined
           ? doors.get(fromId) ?? doors.values().next().value
-          : spawns.get(this.chosen.id);
+          : spawns.get(this.chosen.id) ?? (this.multiplayer ? spawns.values().next().value : undefined);
       if (p) this.player.setPosition(p.x, p.y);
     }
   }
@@ -323,6 +444,15 @@ export class WorldScene extends Phaser.Scene {
   private goTo(to: number): void {
     this.showExit(null);
     this.loadLocation(to, LOCATIONS[this.locIndex].id);
+    if (this.multiplayer) {
+      this.clearRemotes(); // чужие из прежней комнаты не должны оставаться
+      this.realtime.room(
+        LOCATIONS[this.locIndex].id,
+        Math.round(this.player.x),
+        Math.round(this.player.y),
+        this.player.flipX,
+      );
+    }
   }
 
   private triggerExit(): void {
@@ -368,6 +498,8 @@ export class WorldScene extends Phaser.Scene {
 
     this.animateCharacters(delta);
     this.updatePlayerLabel();
+    this.bubble.update(); // своё чат-облачко едет за игроком (если follow задан)
+    for (const rp of this.remotePlayers.values()) rp.update();
 
     // На парковке управление недоступно — работает только меню.
     if (this.atParking) {
@@ -395,6 +527,8 @@ export class WorldScene extends Phaser.Scene {
     if (this.cursors.up.isDown || this.keys.W.isDown) this.player.setVelocityY(-SPEED);
     else if (this.cursors.down.isDown || this.keys.S.isDown) this.player.setVelocityY(SPEED);
     this.player.body.velocity.normalize().scale(SPEED);
+
+    if (this.multiplayer) this.syncMovement(delta);
 
     this.nearest = null;
     let best = INTERACT_DIST;
@@ -470,6 +604,21 @@ export class WorldScene extends Phaser.Scene {
     if (Math.random() > THOUGHT_PROBABILITY) return;
     const thought = Phaser.Utils.Array.GetRandom(npc.char.thoughts);
     bubble.show(thought, npc.x, npc.y - TARGET_H / 2);
+  }
+
+  // Шлём свою позицию не чаще ~10/сек и только при изменении.
+  private syncMovement(delta: number): void {
+    this.moveAcc += delta;
+    if (this.moveAcc < 100) return;
+    this.moveAcc = 0;
+    const x = Math.round(this.player.x);
+    const y = Math.round(this.player.y);
+    const facing = this.player.flipX;
+    if (x === this.lastSentX && y === this.lastSentY && facing === this.lastSentFacing) return;
+    this.lastSentX = x;
+    this.lastSentY = y;
+    this.lastSentFacing = facing;
+    this.realtime.move(x, y, facing);
   }
 
   // Бейдж следует за игроком над его головой; прячется вместе с игроком (напр. на парковке).

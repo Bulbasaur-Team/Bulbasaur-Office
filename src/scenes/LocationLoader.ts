@@ -31,7 +31,7 @@ export class LocationLoader {
     private doorOverlayDepth: number,
   ) {}
 
-  load(cfg: LocationDef, locIndex: number, chosenId: string): LoadedLocation {
+  load(cfg: LocationDef, locIndex: number, chosenId: string, hideNpcs = false): LoadedLocation {
     this.scenery.forEach((o) => o.destroy());
     this.scenery = [];
     this.walls.clear(true, true);
@@ -49,7 +49,7 @@ export class LocationLoader {
       ? this.buildFromMap(cfg.map)
       : { doors: empty(), spawns: empty(), interactions: empty() };
 
-    const npcs: PlacedNpc[] = cfg.isParking
+    const npcs: PlacedNpc[] = cfg.isParking || hideNpcs
       ? []
       : CHARACTERS.filter((c) => (c.locationIndex ?? 0) === locIndex && c.id !== chosenId)
           .map((char) => ({ char, ...(spawns.get(char.id) ?? { x: 0, y: 0 }) }));
