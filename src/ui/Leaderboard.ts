@@ -1,5 +1,8 @@
 import { fetchLeaderboard, type Leaderboard as Board, type LeaderboardEntry } from "../net/api";
 
+// Медали за первые три места вместо номера.
+const MEDALS: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
+
 export interface LeaderboardGame {
   id: string;
   title: string;
@@ -116,7 +119,9 @@ export class Leaderboard {
 
     const rank = document.createElement("span");
     rank.className = "lb-rank";
-    rank.textContent = `${entry.rank}`;
+    const medal = MEDALS[entry.rank];
+    rank.textContent = medal ?? `${entry.rank}`;
+    if (medal) rank.classList.add("lb-medal");
 
     const login = document.createElement("span");
     login.className = "lb-login";

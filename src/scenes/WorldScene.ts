@@ -81,6 +81,7 @@ export class WorldScene extends Phaser.Scene {
   private activeGame: ArcadeGame | null = null;
   private playerBaseScale = 1; // исходный масштаб игрока (анимация множит на него)
   private walkPhase = 0;       // фаза шага игрока
+  private playerLabel!: Phaser.GameObjects.Text; // бейдж с логином над игроком
   private prompt!: Phaser.GameObjects.Text;
   private nearest: PlacedNpc | null = null;
   private talking: PlacedNpc | null = null;
@@ -214,6 +215,18 @@ export class WorldScene extends Phaser.Scene {
     this.player.setScale(this.playerBaseScale).setDepth(DEPTH.player);
     this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, this.walls);
+
+    // Бейдж с логином над головой игрока — подсвечен акцентным цветом.
+    this.playerLabel = this.add
+      .text(0, 0, api.getLogin() ?? "Игрок", {
+        fontFamily: "Trebuchet MS",
+        fontSize: "14px",
+        color: "#14210f",
+        backgroundColor: "#7ac07a",
+        padding: { x: 6, y: 2 },
+      })
+      .setOrigin(0.5)
+      .setDepth(DEPTH.player);
 
     // Без fromId — игрок встанет на точку своего персонажа из слоя spawns.
     this.loadLocation(0);
@@ -354,6 +367,7 @@ export class WorldScene extends Phaser.Scene {
     }
 
     this.animateCharacters(delta);
+    this.updatePlayerLabel();
 
     // На парковке управление недоступно — работает только меню.
     if (this.atParking) {
@@ -456,6 +470,14 @@ export class WorldScene extends Phaser.Scene {
     if (Math.random() > THOUGHT_PROBABILITY) return;
     const thought = Phaser.Utils.Array.GetRandom(npc.char.thoughts);
     bubble.show(thought, npc.x, npc.y - TARGET_H / 2);
+  }
+
+  // Бейдж следует за игроком над его головой; прячется вместе с игроком (напр. на парковке).
+  private updatePlayerLabel(): void {
+    this.playerLabel.setVisible(this.player.visible);
+    if (this.player.visible) {
+      this.playerLabel.setPosition(this.player.x, this.player.y - TARGET_H * 0.7);
+    }
   }
 
   private near(p: Spawn): boolean {
