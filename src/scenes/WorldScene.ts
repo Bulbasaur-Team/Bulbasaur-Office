@@ -300,6 +300,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private addRemote(player: RemoteState): void {
+    // На парковке ходить нельзя — это экран-меню, чужих аватаров там не показываем.
+    if (this.atParking) return;
     this.remotePlayers.get(player.id)?.destroy();
     this.remotePlayers.set(
       player.id,

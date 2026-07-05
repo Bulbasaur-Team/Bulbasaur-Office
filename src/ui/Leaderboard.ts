@@ -107,7 +107,8 @@ export class Leaderboard {
       e.preventDefault();
       e.stopPropagation();
       this.step(1);
-    } else if (e.key === "Escape") {
+    } else if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
       e.stopPropagation();
       this.close();
     }

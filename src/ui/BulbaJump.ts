@@ -4,7 +4,7 @@ import { getSpriteImage, type SpriteKey } from "../entities/sprites";
 const W = 420;
 const H = 640;
 
-const GRAVITY = 0.35;
+const GRAVITY = 0.4;
 const JUMP_V = -12;      // скорость отскока от платформы
 const SPRING_MULT = 1.6; // усиление отскока от батута на посылке
 const MOVE = 5.2;        // горизонтальная скорость
@@ -15,6 +15,7 @@ const PLAT_H = 16;
 const GAP_MIN = 70;
 const GAP_MAX = 120;
 const SCROLL_LINE = H * 0.4; // выше этой линии мир едет вниз, а не игрок вверх
+const STEP_MS = 1000 / 90;   // 90 тиков физики/сек — игра идёт в 1.5× быстрее базовых 60; от частоты кадров экрана не зависит
 
 type PlatformType = "box" | "belt";
 interface Platform {
@@ -51,6 +52,8 @@ export class BulbaJump {
   private left = false;
   private right = false;
   private raf = 0;
+  private lastT = 0;  // время предыдущего кадра для аккумулятора фиксированного шага
+  private acc = 0;    // накопленное время, ещё не отработанное шагами физики
 
   constructor() {
     document.getElementById("bjClose")!.onclick = () => this.close();
@@ -80,6 +83,8 @@ export class BulbaJump {
     this.root.classList.remove("hidden");
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
+    this.lastT = performance.now();
+    this.acc = 0;
     this.loop();
   }
 
@@ -144,6 +149,8 @@ export class BulbaJump {
     }
 
     this.updateStatus();
+    this.lastT = performance.now();
+    this.acc = 0;
     cancelAnimationFrame(this.raf);
     this.loop();
   }
@@ -161,7 +168,16 @@ export class BulbaJump {
 
   private loop = (): void => {
     if (!this.isOpen) return;
-    this.step();
+    const now = performance.now();
+    let dt = now - this.lastT;
+    this.lastT = now;
+    if (dt > 100) dt = 100; // после сворачивания/лага не навёрстываем лавину шагов
+    this.acc += dt;
+    while (this.acc >= STEP_MS) {
+      this.step();
+      this.acc -= STEP_MS;
+      if (this.over) break;
+    }
     this.render();
     if (!this.over) this.raf = requestAnimationFrame(this.loop);
   };

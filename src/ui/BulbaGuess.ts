@@ -79,11 +79,13 @@ export class BulbaGuess {
   private posByIndex = new Map<number, number>(); // индекс слова -> позиция среди соседей
   private attempts: Attempt[] = [];
   private won = false;
+  private surrendered = false; // игрок сдался — слово раскрыто, приём догадок остановлен
 
   constructor() {
     document.getElementById("bgClose")!.onclick = () => this.close();
     document.getElementById("bgMin")!.onclick = () => this.minimize();
     document.getElementById("bgRestart")!.onclick = () => this.newRound();
+    document.getElementById("bgGiveUp")!.onclick = () => this.giveUp();
     this.form.onsubmit = (e) => {
       e.preventDefault();
       this.submitGuess();
@@ -163,6 +165,7 @@ export class BulbaGuess {
     this.posByIndex = new Map(this.round.n.map((idx, i) => [idx, i]));
     this.attempts = [];
     this.won = false;
+    this.surrendered = false;
     this.reported = false;
     this.input.value = "";
     this.input.disabled = false;
@@ -172,8 +175,18 @@ export class BulbaGuess {
     this.input.focus();
   }
 
+  // Сдаться: показать загаданное слово и остановить приём догадок. Результат не
+  // отправляется в лидерборд (это не победа). Дальше — «Новое слово».
+  private giveUp(): void {
+    if (!this.loaded || !this.round || this.won || this.surrendered) return;
+    this.surrendered = true;
+    this.input.disabled = true;
+    this.statusEl.textContent = `Загадано было «${this.round.t}». Жми «Новое слово».`;
+    this.renderCanvas();
+  }
+
   private submitGuess(): void {
-    if (this.won || !this.round || !this.loaded) return;
+    if (this.won || this.surrendered || !this.round || !this.loaded) return;
     const g = normalize(this.input.value);
     this.input.value = "";
     if (!g) return;
@@ -319,7 +332,7 @@ export class BulbaGuess {
     if (best !== null) {
       ctx.fillText(`Лучший: ${best === Infinity ? "∞" : best}`, w / 2, h / 2 + 24);
     }
-    if (this.won && this.round) {
+    if ((this.won || this.surrendered) && this.round) {
       ctx.fillStyle = "#8fd06b";
       ctx.font = "bold 24px 'Trebuchet MS', sans-serif";
       ctx.fillText(this.round.t, w / 2, h / 2 + 70);
