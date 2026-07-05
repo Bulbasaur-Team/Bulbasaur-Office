@@ -160,7 +160,6 @@ export class BulbaGuess {
     if (!this.loaded || this.rounds.length === 0) return;
     this.stopConfetti();
     this.round = this.rounds[Math.floor(Math.random() * this.rounds.length)];
-    console.log("[BulbaGuess] загадано слово:", this.round.t); // TODO: временный лог, убрать
     this.posByIndex = new Map(this.round.n.map((idx, i) => [idx, i]));
     this.attempts = [];
     this.won = false;
