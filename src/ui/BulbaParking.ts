@@ -131,6 +131,9 @@ export class BulbaParking {
         this.timerOn = true;
         this.startT = performance.now();
       }
+    } else if (this.over && (e.code === "Enter" || e.code === "Space")) {
+      e.preventDefault();
+      this.reset();
     } else if (e.code === "Escape") {
       this.close();
     }

@@ -89,6 +89,10 @@ export class BulbaWordle {
   private guesses: string[] = [];  // отправленные слова
   private current = "";            // набираемая строка текущего ряда
   private done = false;
+  private invalidRow: number | null = null;  // ряд, временно подсвеченный красным (слова нет в словаре)
+  private invalidTimer = 0;
+  private hintShown = false;      // сейчас в статусе висит подсказка про EN раскладку
+  private statusBeforeHint = "";  // что было в статусе до подсказки — чтобы вернуть его
 
   constructor() {
     document.getElementById("bwClose")!.onclick = () => this.close();
@@ -193,7 +197,14 @@ export class BulbaWordle {
     const ch = normalize(e.key);
     if (ch.length === 1 && ch >= "а" && ch <= "я") {
       e.preventDefault();
+      this.hideLayoutHint(); // игрок переключился на RU — убираем подсказку
       this.typeLetter(ch);
+      return;
+    }
+    // Латинская буква — скорее всего забыли переключить раскладку.
+    if (/^[a-z]$/i.test(e.key)) {
+      e.preventDefault();
+      this.showLayoutHint();
     }
   }
 
@@ -238,11 +249,38 @@ export class BulbaWordle {
     this.current = "";
     this.done = false;
     this.reported = false;
+    this.invalidRow = null;
+    window.clearTimeout(this.invalidTimer);
+    this.hintShown = false;
     this.keyState.clear();
     this.statusEl.textContent = "Угадай слово из пяти букв";
     this.render();
     this.renderCanvas();
     this.focusInput();
+  }
+
+  private showLayoutHint(): void {
+    if (this.hintShown) return;
+    this.statusBeforeHint = this.statusEl.textContent ?? "";
+    this.statusEl.textContent = "Кажется, включена EN раскладка — переключись на RU";
+    this.hintShown = true;
+  }
+
+  private hideLayoutHint(): void {
+    if (!this.hintShown) return;
+    this.statusEl.textContent = this.statusBeforeHint;
+    this.hintShown = false;
+  }
+
+  // Подсветить текущий ряд красным на пару секунд (введённого слова нет в словаре).
+  private flashInvalid(): void {
+    this.invalidRow = this.guesses.length;
+    window.clearTimeout(this.invalidTimer);
+    this.invalidTimer = window.setTimeout(() => {
+      this.invalidRow = null;
+      this.render();
+    }, 1500);
+    this.render();
   }
 
   private typeLetter(ch: string): void {
@@ -265,6 +303,7 @@ export class BulbaWordle {
     }
     if (!this.wordSet.has(this.current)) {
       this.statusEl.textContent = `Нет слова «${this.current}»`;
+      this.flashInvalid();
       return;
     }
 
@@ -315,6 +354,8 @@ export class BulbaWordle {
         cell.className = "bw-cell";
         if (marks) {
           cell.classList.add("bw-" + marks[c]);
+        } else if (r === this.invalidRow) {
+          cell.classList.add("bw-invalid");
         } else if (ch) {
           cell.classList.add("bw-filled");
         }

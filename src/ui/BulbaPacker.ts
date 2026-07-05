@@ -100,6 +100,9 @@ export class BulbaPacker {
     } else if (e.code === "ArrowRight" || e.code === "KeyD") {
       this.right = true;
       e.preventDefault();
+    } else if (this.over && (e.code === "Enter" || e.code === "Space")) {
+      e.preventDefault();
+      this.reset();
     } else if (e.code === "Escape") {
       this.close();
     }
