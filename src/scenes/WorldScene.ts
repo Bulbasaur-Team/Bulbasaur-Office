@@ -31,7 +31,7 @@ import type { RoleDef } from "../data/roles";
 import { spriteForRole } from "../data/roles";
 import { Realtime, type RemoteState } from "../net/realtime";
 import { RemotePlayer } from "../entities/RemotePlayer";
-import { LocationLoader, type Spawn, type PlacedNpc } from "./LocationLoader";
+import { LocationLoader, type Spawn, type Rect, type PlacedNpc } from "./LocationLoader";
 import { AuthGate } from "../ui/AuthGate";
 import { Leaderboard, type LeaderboardGame } from "../ui/Leaderboard";
 import * as api from "../net/api";
@@ -108,6 +108,7 @@ export class WorldScene extends Phaser.Scene {
   private atParking = false;
   private doors: Map<string, Spawn> = new Map(); // двери текущей локации (ключ — id соседней локации)
   private tv: Spawn | null = null;               // точка телевизора в текущей локации, если есть
+  private tvRect: Rect | null = null;            // прямоугольник экрана TV из карты (объект "tvScreen")
   private menu!: LocationMenu;
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
   private exitLabel = document.getElementById("exitLabel") as HTMLSpanElement;
@@ -380,7 +381,7 @@ export class WorldScene extends Phaser.Scene {
     this.locIndex = index;
     this.atParking = !!cfg.isParking;
 
-    const { npcs, doors, spawns, interactions } = this.loader.load(cfg, index, this.chosen.id, this.multiplayer);
+    const { npcs, doors, spawns, interactions, rects } = this.loader.load(cfg, index, this.chosen.id, this.multiplayer);
     this.npcs = npcs;
     this.thoughtBubbles.forEach((b) => b.destroy());
     this.thoughtTimers.forEach((t) => t.remove());
@@ -396,10 +397,11 @@ export class WorldScene extends Phaser.Scene {
     );
     this.doors = doors;
     this.tv = interactions.get("tv") ?? null;
+    this.tvRect = rects.get("tvScreen") ?? null;
 
-    // Свёрнутая игра видна на экране TV только в чилл-зоне.
-    if (this.activeGame && this.activeGame.minimized && index === LOC.chillZone) {
-      this.tvScreen.show(this.activeGame.getCanvas());
+    // Свёрнутая игра видна на экране TV только в чилл-зоне (где задан прямоугольник экрана).
+    if (this.activeGame && this.activeGame.minimized && index === LOC.chillZone && this.tvRect) {
+      this.tvScreen.show(this.tvRect, this.activeGame.getCanvas());
     } else {
       this.tvScreen.hide();
     }
@@ -446,7 +448,7 @@ export class WorldScene extends Phaser.Scene {
 
   // Свернуть текущую игру на экран TV (игра продолжает работать).
   private minimizeGame(): void {
-    if (this.activeGame) this.tvScreen.show(this.activeGame.getCanvas());
+    if (this.activeGame && this.tvRect) this.tvScreen.show(this.tvRect, this.activeGame.getCanvas());
   }
 
   // Развернуть свёрнутую игру обратно на весь экран.
