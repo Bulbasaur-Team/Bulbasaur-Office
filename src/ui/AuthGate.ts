@@ -12,6 +12,8 @@ export class AuthGate {
   private form = document.getElementById("authForm") as HTMLFormElement;
   private loginEl = document.getElementById("authLogin") as HTMLInputElement;
   private passwordEl = document.getElementById("authPassword") as HTMLInputElement;
+  private consentRow = document.getElementById("authConsentRow")!;
+  private consentEl = document.getElementById("authConsent") as HTMLInputElement;
   private errorEl = document.getElementById("authError")!;
   private submitEl = document.getElementById("authSubmit") as HTMLButtonElement;
 
@@ -49,13 +51,20 @@ export class AuthGate {
     this.tabRegister.classList.toggle("sel", mode === "register");
     this.title.textContent = mode === "login" ? "Вход" : "Регистрация";
     this.submitEl.textContent = mode === "login" ? "Войти" : "Зарегистрироваться";
+    // Согласие на обработку данных нужно только при регистрации нового аккаунта.
+    this.consentRow.classList.toggle("hidden", mode !== "register");
+    this.consentEl.checked = false;
   }
 
   private async submit(): Promise<void> {
     const loginValue = this.loginEl.value.trim();
     const passwordValue = this.passwordEl.value;
     if (!loginValue || !passwordValue) {
-      this.errorEl.textContent = "Введите логин и пароль";
+      this.errorEl.textContent = "Введите ник и пароль";
+      return;
+    }
+    if (this.mode === "register" && !this.consentEl.checked) {
+      this.errorEl.textContent = "Примите условия и согласие на обработку данных";
       return;
     }
 

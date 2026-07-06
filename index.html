@@ -200,6 +200,9 @@
     #authForm { display: flex; flex-direction: column; gap: 10px; }
     .auth-input { background: #f4f1e8; border: 2px solid var(--accent); border-radius: 10px; padding: 10px 14px; color: #1b1f24; font-family: inherit; font-size: 16px; }
     .auth-input:focus { outline: none; border-color: #8fd06b; }
+    .auth-consent { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; opacity: .85; line-height: 1.35; cursor: pointer; }
+    .auth-consent input { margin-top: 2px; accent-color: var(--accent); cursor: pointer; }
+    .auth-consent a { color: var(--accent); }
     .auth-error { min-height: 18px; color: #e6807a; font-size: 13px; text-align: center; }
     .auth-submit { background: var(--accent); border: none; border-radius: 10px; padding: 11px; color: #14210f; font-size: 16px; font-weight: bold; cursor: pointer; }
     .auth-submit:disabled { opacity: .6; cursor: default; }
@@ -225,6 +228,8 @@
     .lb-open-btn:hover { background: var(--accent); color: #14210f; }
     #modeBtn { top: 54px; }
     #logoutBtn { top: 96px; }
+    #deleteBtn { top: 138px; border-color: #c94f4f; }
+    #deleteBtn:hover { background: #c94f4f; color: #fff; }
     .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 56px; border: 2px solid var(--accent); border-radius: 10px; background: rgba(38,43,51,.9); color: var(--text); font-size: 26px; cursor: pointer; }
     .lb-nav:hover { background: var(--accent); color: #14210f; }
     .lb-nav.prev { left: -56px; }
@@ -399,8 +404,12 @@
         <button id="authTabRegister" class="auth-tab" type="button">Регистрация</button>
       </div>
       <form id="authForm" autocomplete="off">
-        <input id="authLogin" class="auth-input" type="text" placeholder="логин" />
+        <input id="authLogin" class="auth-input" type="text" placeholder="ник" />
         <input id="authPassword" class="auth-input" type="password" placeholder="пароль" />
+        <label id="authConsentRow" class="auth-consent hidden">
+          <input id="authConsent" type="checkbox" />
+          <span>Регистрируясь, принимаю <a href="terms.html" target="_blank" rel="noopener">Пользовательское соглашение</a> и согласен с <a href="privacy.html" target="_blank" rel="noopener">обработкой данных</a></span>
+        </label>
         <div id="authError" class="auth-error"></div>
         <button id="authSubmit" class="auth-submit" type="submit">Войти</button>
       </form>
@@ -410,6 +419,7 @@
   <button id="lbBtn" class="lb-open-btn hidden" aria-label="лидерборд">🏆 Лидерборд</button>
   <button id="modeBtn" class="lb-open-btn hidden" aria-label="сменить режим">🔄 Сменить режим</button>
   <button id="logoutBtn" class="lb-open-btn hidden" aria-label="выйти">Выйти</button>
+  <button id="deleteBtn" class="lb-open-btn hidden" aria-label="удалить аккаунт">🗑 Удалить аккаунт</button>
 
   <div id="leaderboard" class="hidden">
     <div class="lb-box">

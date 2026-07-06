@@ -52,6 +52,19 @@ export function fetchLeaderboard(gameId: string): Promise<Leaderboard> {
   return leaderboardRequest(`/api/leaderboard/${gameId}`, { method: "GET" });
 }
 
+// Удалить свой аккаунт вместе с результатами. При успехе локальный токен стоит очистить.
+export async function deleteAccount(): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/account`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+  });
+  if (res.status === 401 || res.status === 403) {
+    logout();
+    throw new Error("Сессия истекла — войдите заново");
+  }
+  if (!res.ok) throw new Error(await errorMessage(res));
+}
+
 async function authRequest(path: string, login: string, password: string): Promise<void> {
   const res = await fetch(`${API_BASE}/api/auth/${path}`, {
     method: "POST",

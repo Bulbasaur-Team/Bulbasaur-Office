@@ -180,6 +180,7 @@ export class WorldScene extends Phaser.Scene {
     // Сменить режим: перезагрузка (токен в localStorage сохраняется) возвращает к
     // выбору режима и чисто рвёт мультиплеерное соединение/состояние.
     document.getElementById("modeBtn")!.onclick = () => window.location.reload();
+    document.getElementById("deleteBtn")!.onclick = () => void this.deleteAccount();
     this.bulbaJump.onGameOver = (v) => this.reportScore("bulbajump", v);
     this.bulbaPacker.onGameOver = (v) => this.reportScore("bulbapacker", v);
     this.bulbaParking.onGameOver = (v) => this.reportScore("bulbaparking", v);
@@ -263,6 +264,19 @@ export class WorldScene extends Phaser.Scene {
     document.getElementById("lbBtn")!.classList.remove("hidden");
     document.getElementById("modeBtn")!.classList.remove("hidden");
     document.getElementById("logoutBtn")!.classList.remove("hidden");
+    document.getElementById("deleteBtn")!.classList.remove("hidden");
+  }
+
+  // Удалить аккаунт: подтверждение, запрос на сервер, затем выход и перезагрузка.
+  private async deleteAccount(): Promise<void> {
+    if (!confirm("Удалить аккаунт? Действие необратимо — ник и результаты будут удалены.")) return;
+    try {
+      await api.deleteAccount();
+      api.logout();
+      window.location.reload();
+    } catch (e) {
+      alert((e as Error).message);
+    }
   }
 
   // Старт в мультиплеере: скин по роли, NPC скрыты, подключаемся к реалтайму.
@@ -282,13 +296,12 @@ export class WorldScene extends Phaser.Scene {
       thoughts: [],
     };
     this.startAs(me);
-    this.chatInput.classList.remove("hidden");
+    // Чат временно отключён: поле ввода не показываем и входящие сообщения не подписываем.
     this.realtime.connect({
       onOpen: () => this.sendJoin(),
       onSnapshot: (players) => this.onSnapshot(players),
       onJoined: (player) => this.addRemote(player),
       onMoved: (id, x, y, facing) => this.remotePlayers.get(id)?.setTarget(x, y, facing),
-      onChat: (id, _login, text) => this.remotePlayers.get(id)?.showMessage(text),
       onLeft: (id) => this.removeRemote(id),
     });
   }
