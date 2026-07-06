@@ -83,6 +83,18 @@
     }
     .chat-input::placeholder { color: #7a828c; }
 
+    /* Панель реакций (мультиплеер) */
+    .emote-bar {
+      position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 30;
+      display: flex; gap: 8px; padding: 6px 8px; border-radius: 26px;
+      background: rgba(15,18,23,.92); border: 2px solid var(--accent);
+    }
+    .emote-bar button {
+      width: 40px; height: 40px; border: none; border-radius: 50%; background: transparent;
+      font-size: 22px; line-height: 1; cursor: pointer; transition: .1s;
+    }
+    .emote-bar button:hover { background: rgba(122,192,122,.25); transform: translateY(-2px); }
+
     /* Диалог и меню выбора игры */
     #dialogue, #gameMenu { position: fixed; inset: 0; pointer-events: none; z-index: 30; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5vh; }
     .dlg-frame { pointer-events: auto; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 16px 22px; box-shadow: 0 12px 44px rgba(0,0,0,.55); }
@@ -250,6 +262,8 @@
 
   <input id="chatInput" class="chat-input hidden" type="text" maxlength="200" autocomplete="off"
          placeholder="Сообщение… (Enter — отправить)" />
+
+  <div id="emoteBar" class="emote-bar hidden"></div>
 
   <div id="select" class="hidden">
     <h2>Выбери Бульбазавра</h2>

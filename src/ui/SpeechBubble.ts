@@ -30,12 +30,14 @@ export class SpeechBubble {
   }
 
   // Показывает облачко так, чтобы кончик хвостика был в точке (x, y) — над головой.
-  // autoHideMs (если задан) — скрыть облачко через столько мс после конца печати (для чата).
+  // autoHideMs (если задан) — скрыть облачко через столько мс после конца печати (для чата/реакций).
   // follow (если задан) — источник живой позиции якоря: облачко едет за ним (см. update).
-  show(fullText: string, x: number, y: number, autoHideMs?: number, follow?: () => { x: number; y: number }): void {
+  // fontSize — размер шрифта (для реакций крупнее, чтобы эмодзи читался).
+  show(fullText: string, x: number, y: number, autoHideMs?: number, follow?: () => { x: number; y: number }, fontSize = 14): void {
     this.timer?.remove();
     this.hideTimer?.remove();
     this.follow = follow;
+    this.label.setFontSize(fontSize);
 
     // Размер считаем по полному тексту, чтобы облачко не «прыгало» во время печати.
     this.label.setText(fullText);

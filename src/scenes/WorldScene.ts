@@ -29,6 +29,7 @@ import { showModeSelect } from "../ui/ModeSelect";
 import { showRoleSelect } from "../ui/RoleSelect";
 import type { RoleDef } from "../data/roles";
 import { spriteForRole } from "../data/roles";
+import { EMOTES, emojiForEmote } from "../data/emotes";
 import { Realtime, type RemoteState } from "../net/realtime";
 import { RemotePlayer } from "../entities/RemotePlayer";
 import { LocationLoader, type Spawn, type Rect, type PlacedNpc } from "./LocationLoader";
@@ -48,6 +49,8 @@ const GAMES: LeaderboardGame[] = [
 const SPEED = 400;
 const INTERACT_DIST = 80;
 const CHAT_HOLD_MS = 4000; // сколько держать облачко своего чата после печати
+const EMOTE_HOLD_MS = 2500; // сколько держать свою реакцию
+const EMOTE_FONT = 30;      // размер эмодзи-реакции
 const TARGET_H = 74;       // экранная высота персонажа в пикселях
 const EXIT_ZONE_HALF = 52; // полразмера зоны срабатывания выхода вокруг точки двери
 
@@ -113,6 +116,8 @@ export class WorldScene extends Phaser.Scene {
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
   private exitLabel = document.getElementById("exitLabel") as HTMLSpanElement;
   private chatInput = document.getElementById("chatInput") as HTMLInputElement;
+  private emoteBar = document.getElementById("emoteBar") as HTMLDivElement;
+  private emoteBarBuilt = false;
   private currentExit: ExitDef | null = null;
 
   constructor() {
@@ -297,14 +302,50 @@ export class WorldScene extends Phaser.Scene {
       thoughts: [],
     };
     this.startAs(me);
-    // Чат временно отключён: поле ввода не показываем и входящие сообщения не подписываем.
+    this.showEmoteBar();
+    // Чат временно отключён: поле ввода не показываем. Реакции (фиксированный набор) — есть.
     this.realtime.connect({
       onOpen: () => this.sendJoin(),
       onSnapshot: (players) => this.onSnapshot(players),
       onJoined: (player) => this.addRemote(player),
       onMoved: (id, x, y, facing) => this.remotePlayers.get(id)?.setTarget(x, y, facing),
+      onEmote: (id, code) => this.showRemoteEmote(id, code),
       onLeft: (id) => this.removeRemote(id),
     });
+  }
+
+  // Панель реакций (мультиплеер): строим один раз из EMOTES, потом показываем.
+  private showEmoteBar(): void {
+    if (!this.emoteBarBuilt) {
+      for (const e of EMOTES) {
+        const btn = document.createElement("button");
+        btn.textContent = e.emoji;
+        btn.title = e.title;
+        btn.onclick = () => {
+          this.sendEmote(e.code);
+          btn.blur(); // чтобы Space/Enter не «нажимали» кнопку повторно и уходили в мир
+        };
+        this.emoteBar.appendChild(btn);
+      }
+      this.emoteBarBuilt = true;
+    }
+    this.emoteBar.classList.remove("hidden");
+  }
+
+  private sendEmote(code: string): void {
+    const emoji = emojiForEmote(code);
+    if (!emoji) return;
+    this.realtime.emote(code);
+    // Свою реакцию показываем локально над своим бульбазавром; едет за игроком.
+    this.bubble.show(emoji, this.player.x, this.player.y - TARGET_H * 0.95, EMOTE_HOLD_MS, () => ({
+      x: this.player.x,
+      y: this.player.y - TARGET_H * 0.95,
+    }), EMOTE_FONT);
+  }
+
+  private showRemoteEmote(id: string, code: string): void {
+    const emoji = emojiForEmote(code);
+    if (emoji) this.remotePlayers.get(id)?.showEmote(emoji);
   }
 
   // Полный состав комнаты: пересобираем чужих аватаров с нуля.

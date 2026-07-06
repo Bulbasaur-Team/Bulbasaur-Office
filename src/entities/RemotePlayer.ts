@@ -4,6 +4,8 @@ import { SpeechBubble } from "../ui/SpeechBubble";
 
 const LERP = 0.2; // доля пути к целевой позиции за кадр — сглаживает рывки между move
 const CHAT_HOLD_MS = 4000; // сколько держать облачко чата после печати
+const EMOTE_HOLD_MS = 2500; // сколько держать реакцию
+const EMOTE_FONT = 30;      // размер эмодзи-реакции
 
 // Чужой игрок в мире: скин по роли, бейдж с логином и своё облачко для чата.
 // Позиция приходит редкими move; между ними положение интерполируется в update().
@@ -58,6 +60,13 @@ export class RemotePlayer {
       x: this.sprite.x,
       y: this.sprite.y - this.targetH * 0.95,
     }));
+  }
+
+  showEmote(emoji: string): void {
+    this.bubble.show(emoji, this.sprite.x, this.sprite.y - this.targetH * 0.95, EMOTE_HOLD_MS, () => ({
+      x: this.sprite.x,
+      y: this.sprite.y - this.targetH * 0.95,
+    }), EMOTE_FONT);
   }
 
   update(): void {

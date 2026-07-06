@@ -20,6 +20,7 @@ export interface RealtimeHandlers {
   onJoined?: (player: RemoteState) => void;
   onMoved?: (id: string, x: number, y: number, facing: boolean) => void;
   onChat?: (id: string, login: string, text: string) => void;
+  onEmote?: (id: string, emote: string) => void;
   onLeft?: (id: string) => void;
 }
 
@@ -59,6 +60,10 @@ export class Realtime {
     this.send({ type: "chat", text });
   }
 
+  emote(emote: string): void {
+    this.send({ type: "emote", emote });
+  }
+
   private open(): void {
     const token = getToken() ?? "";
     const ws = new WebSocket(`${WS_BASE}?token=${encodeURIComponent(token)}`);
@@ -76,6 +81,7 @@ export class Realtime {
       case "joined": this.handlers.onJoined?.(msg.player); break;
       case "moved": this.handlers.onMoved?.(msg.id, msg.x, msg.y, msg.facing); break;
       case "chat": this.handlers.onChat?.(msg.id, msg.login, msg.text); break;
+      case "emote": this.handlers.onEmote?.(msg.id, msg.emote); break;
       case "left": this.handlers.onLeft?.(msg.id); break;
     }
   }
