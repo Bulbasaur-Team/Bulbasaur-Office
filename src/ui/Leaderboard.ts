@@ -1,4 +1,4 @@
-import { fetchLeaderboard, type Leaderboard as Board, type LeaderboardEntry } from "../net/api";
+import { fetchLeaderboard, fetchDailyLeaderboard, type Leaderboard as Board, type LeaderboardEntry } from "../net/api";
 
 // Медали за первые три места вместо номера.
 const MEDALS: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
@@ -7,6 +7,8 @@ export interface LeaderboardGame {
   id: string;
   title: string;
   format: (value: number) => string;
+  daily?: boolean;  // борд слова дня — грузится через дневной эндпоинт
+  code?: string;    // код игры для API, если id отличается (у дневных бордов)
 }
 
 // Экран лидерборда поверх игры. Открывается по кнопке (грузит с сервера) или после
@@ -72,7 +74,10 @@ export class Leaderboard {
     this.statusEl.textContent = "Загрузка...";
     this.listEl.innerHTML = "";
     try {
-      this.render(await fetchLeaderboard(game.id));
+      const board = game.daily
+        ? await fetchDailyLeaderboard(game.code ?? game.id)
+        : await fetchLeaderboard(game.id);
+      this.render(board);
     } catch (e) {
       this.statusEl.textContent = (e as Error).message;
     }

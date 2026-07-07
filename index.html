@@ -238,10 +238,13 @@
     .lb-close svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
     .lb-open-btn { position: fixed; top: 12px; right: 12px; z-index: 25; background: var(--panel); color: var(--text); border: 2px solid var(--accent); border-radius: 12px; padding: 8px 14px; font-family: inherit; font-size: 15px; font-weight: bold; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
     .lb-open-btn:hover { background: var(--accent); color: #14210f; }
-    #modeBtn { top: 54px; }
-    #logoutBtn { top: 96px; }
-    #deleteBtn { top: 138px; border-color: #c94f4f; }
+    #wotdGuessBtn { top: 54px; }
+    #wotdWordleBtn { top: 96px; }
+    #modeBtn { top: 138px; }
+    #logoutBtn { top: 180px; }
+    #deleteBtn { top: 222px; border-color: #c94f4f; }
     #deleteBtn:hover { background: #c94f4f; color: #fff; }
+    .wotd-yesterday { font-size: 13px; opacity: .8; margin: 2px 0 6px; }
     .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 56px; border: 2px solid var(--accent); border-radius: 10px; background: rgba(38,43,51,.9); color: var(--text); font-size: 26px; cursor: pointer; }
     .lb-nav:hover { background: var(--accent); color: #14210f; }
     .lb-nav.prev { left: -56px; }
@@ -356,6 +359,7 @@
       </button>
       <h2 class="arcade-title">Bulba Guess</h2>
       <div class="ttt-status" id="bgStatus">Угадай слово по смыслу</div>
+      <div class="wotd-yesterday hidden" id="bgYesterday"></div>
       <form id="bgForm" class="bg-form" autocomplete="off">
         <input id="bgInput" class="bg-input" type="text" placeholder="введите слово" />
         <button class="bg-submit" type="submit" aria-label="проверить">→</button>
@@ -380,6 +384,7 @@
       </button>
       <h2 class="arcade-title">Bulba Wordle</h2>
       <div class="ttt-status" id="bwStatus">Угадай слово из пяти букв</div>
+      <div class="wotd-yesterday hidden" id="bwYesterday"></div>
       <input id="bwInput" class="bw-input" type="text" autocomplete="off" autocapitalize="off" />
       <div class="bw-grid" id="bwGrid"></div>
       <div class="bw-keyboard" id="bwKeyboard"></div>
@@ -434,6 +439,8 @@
   <button id="modeBtn" class="lb-open-btn hidden" aria-label="сменить режим">🔄 Сменить режим</button>
   <button id="logoutBtn" class="lb-open-btn hidden" aria-label="выйти">Выйти</button>
   <button id="deleteBtn" class="lb-open-btn hidden" aria-label="удалить аккаунт">🗑 Удалить аккаунт</button>
+  <button id="wotdGuessBtn" class="lb-open-btn hidden" aria-label="слово дня guess">📅 Слово дня: Bulba Guess</button>
+  <button id="wotdWordleBtn" class="lb-open-btn hidden" aria-label="слово дня wordle">📅 Слово дня: Bulba Wordle</button>
 
   <div id="leaderboard" class="hidden">
     <div class="lb-box">

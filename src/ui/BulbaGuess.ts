@@ -1,3 +1,6 @@
+import { seedToIndex } from "../data/wotd";
+import type { DailyProgress } from "../net/api";
+
 interface Round {
   t: string;      // загаданное слово (нормализованное)
   n: number[];    // индексы ближайших по смыслу слов в порядке близости; n[0] — само
@@ -54,10 +57,19 @@ export class BulbaGuess {
   minimized = false;
   onMinimize: (() => void) | null = null;
   onGameOver: ((value: number) => void) | null = null;
+  onDailyOver: ((attempts: number) => void) | null = null;
+  onDailyProgress: ((state: DailyProgress) => void | Promise<void>) | null = null;
   private reported = false;
+
+  private daily = false;                  // режим слова дня: без «Сдаться»/«Новое слово», со вчерашним словом
+  private prevWord: string | null = null;
+  private dailyAttempts = 0;              // число подошедших попыток слова дня (для счётчика/лидерборда)
 
   private root = document.getElementById("bulbaguess")!;
   private statusEl = document.getElementById("bgStatus")!;
+  private giveUpBtn = document.getElementById("bgGiveUp")!;
+  private restartBtn = document.getElementById("bgRestart")!;
+  private yesterdayEl = document.getElementById("bgYesterday")!;
   private form = document.getElementById("bgForm") as HTMLFormElement;
   private input = document.getElementById("bgInput") as HTMLInputElement;
   private listEl = document.getElementById("bgList")!;
@@ -105,10 +117,56 @@ export class BulbaGuess {
 
   async open(): Promise<void> {
     this.isOpen = true;
+    this.daily = false;
+    this.giveUpBtn.classList.remove("hidden"); // «Сдаться»/«Новое слово» — только в обычной игре
+    this.restartBtn.classList.remove("hidden");
+    this.yesterdayEl.classList.add("hidden");
     this.root.classList.remove("hidden");
     window.addEventListener("keydown", this.onKeyDown);
     await this.ensureData();
     this.newRound();
+  }
+
+  // Режим слова дня: раунд выводится из сида, «Сдаться»/«Новое слово» скрыты, показано вчерашнее слово.
+  // progress — сохранённый прогресс (восстанавливаем список догадок, блокируем если пройдено).
+  async openDaily(todaySeed: string, prevSeed: string | null, progress: DailyProgress): Promise<void> {
+    this.isOpen = true;
+    this.daily = true;
+    this.giveUpBtn.classList.add("hidden");
+    this.restartBtn.classList.add("hidden");
+    this.root.classList.remove("hidden");
+    window.addEventListener("keydown", this.onKeyDown);
+    await this.ensureData();
+    if (this.rounds.length === 0) return;
+    this.prevWord = prevSeed ? this.rounds[seedToIndex(prevSeed, this.rounds.length)].t : null;
+    this.yesterdayEl.textContent = `Слово вчерашнего дня: ${this.prevWord ?? "—"}`;
+    this.yesterdayEl.classList.remove("hidden");
+    this.startRound(this.rounds[seedToIndex(todaySeed, this.rounds.length)]);
+    this.restoreDaily(progress);
+  }
+
+  // Восстановить список подошедших догадок и счётчик из сохранённого прогресса.
+  private restoreDaily(progress: DailyProgress): void {
+    this.dailyAttempts = progress.attempts;
+    for (const word of progress.guesses) {
+      this.attempts.push({ word, score: this.scoreOf(word), seq: this.attempts.length });
+    }
+    this.attempts.sort((a, b) => a.score - b.score || b.seq - a.seq);
+    if (progress.solved) {
+      this.won = true;
+      this.input.disabled = true;
+      this.statusEl.textContent = `Слово дня уже пройдено за ${progress.attempts}`;
+    } else {
+      this.statusEl.textContent = `Попыток: ${this.dailyAttempts}`;
+    }
+    this.renderList();
+    this.renderCanvas();
+  }
+
+  // Топ-20 подошедших слов (по возрастанию score) + счётчик — на сервер.
+  private persistDaily(solved: boolean): void | Promise<void> {
+    const guesses = this.attempts.filter((a) => a.score !== Infinity).slice(0, 20).map((a) => a.word);
+    return this.onDailyProgress?.({ solved, attempts: this.dailyAttempts, guesses });
   }
 
   close(): void {
@@ -160,13 +218,19 @@ export class BulbaGuess {
 
   private newRound(): void {
     if (!this.loaded || this.rounds.length === 0) return;
+    this.startRound(this.rounds[Math.floor(Math.random() * this.rounds.length)]);
+  }
+
+  // Начать раунд с заданным словом (общий путь для обычной игры и слова дня).
+  private startRound(round: Round): void {
     this.stopConfetti();
-    this.round = this.rounds[Math.floor(Math.random() * this.rounds.length)];
-    this.posByIndex = new Map(this.round.n.map((idx, i) => [idx, i]));
+    this.round = round;
+    this.posByIndex = new Map(round.n.map((idx, i) => [idx, i]));
     this.attempts = [];
     this.won = false;
     this.surrendered = false;
     this.reported = false;
+    this.dailyAttempts = 0;
     this.input.value = "";
     this.input.disabled = false;
     this.statusEl.textContent = "Угадай слово по смыслу. Попыток: 0";
@@ -191,8 +255,10 @@ export class BulbaGuess {
     this.input.value = "";
     if (!g) return;
 
+    const count = () => (this.daily ? this.dailyAttempts : this.attempts.length);
+
     if (this.attempts.some((a) => a.word === g)) {
-      this.statusEl.textContent = `«${g}» уже было. Попыток: ${this.attempts.length}`;
+      this.statusEl.textContent = `«${g}» уже было. Попыток: ${count()}`;
       return;
     }
 
@@ -202,14 +268,25 @@ export class BulbaGuess {
     // введённые выше. «Бесконечность» — в самый низ.
     this.attempts.sort((a, b) => a.score - b.score || b.seq - a.seq);
 
+    // Слово дня: считаем и сохраняем только подошедшие по словарю догадки.
+    const matched = score !== Infinity;
+    if (this.daily && matched) this.dailyAttempts += 1;
+
     if (score === 1) {
       this.won = true;
       this.input.disabled = true;
-      this.statusEl.textContent = `Угадал! «${g}» за ${this.attempts.length} попыток.`;
+      this.statusEl.textContent = `Угадал! «${g}» за ${count()} попыток.`;
       this.launchConfetti();
-      this.finish(this.attempts.length);
+      if (this.daily) {
+        // Лидерборд открываем только ПОСЛЕ подтверждения сохранения прогресса сервером:
+        // иначе GET за топом обгоняет PUT прогресса и игрока ещё нет в выборке.
+        void Promise.resolve(this.persistDaily(true)).then(() => this.reportDaily(this.dailyAttempts));
+      } else {
+        this.finish(this.attempts.length);
+      }
     } else {
-      this.statusEl.textContent = `Попыток: ${this.attempts.length}`;
+      this.statusEl.textContent = `Попыток: ${count()}`;
+      if (this.daily && matched) this.persistDaily(false);
     }
     this.renderList(g);
     this.renderCanvas();
@@ -219,6 +296,12 @@ export class BulbaGuess {
     if (this.reported) return;
     this.reported = true;
     this.onGameOver?.(value);
+  }
+
+  private reportDaily(attempts: number): void {
+    if (this.reported) return;
+    this.reported = true;
+    this.onDailyOver?.(attempts);
   }
 
   private scoreOf(g: string): number {

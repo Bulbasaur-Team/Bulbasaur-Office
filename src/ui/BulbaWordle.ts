@@ -1,3 +1,6 @@
+import { seedToIndex } from "../data/wotd";
+import type { DailyProgress } from "../net/api";
+
 const ROWS = 6;
 const COLS = 5;
 
@@ -61,7 +64,6 @@ export class BulbaWordle {
   onMinimize: (() => void) | null = null;
   onGameOver: ((value: number) => void) | null = null;
   private reported = false;
-  private solved = 0;
 
   private root = document.getElementById("bulbawordle")!;
   private statusEl = document.getElementById("bwStatus")!;
@@ -94,6 +96,14 @@ export class BulbaWordle {
   private hintShown = false;      // сейчас в статусе висит подсказка про EN раскладку
   private statusBeforeHint = "";  // что было в статусе до подсказки — чтобы вернуть его
 
+  private daily = false;                  // режим слова дня: без «Новое слово», со вчерашним словом
+  private prevWord: string | null = null; // вчерашнее слово дня (для подписи)
+  onDailyOver: ((attempts: number) => void) | null = null;
+  onDailyProgress: ((state: DailyProgress) => void | Promise<void>) | null = null;
+
+  private restartBtn = document.getElementById("bwRestart")!;
+  private yesterdayEl = document.getElementById("bwYesterday")!;
+
   constructor() {
     document.getElementById("bwClose")!.onclick = () => this.close();
     document.getElementById("bwMin")!.onclick = () => this.minimize();
@@ -114,12 +124,53 @@ export class BulbaWordle {
 
   async open(): Promise<void> {
     this.isOpen = true;
-    this.solved = 0;
+    this.daily = false;
+    this.restartBtn.classList.remove("hidden"); // «Новое слово» доступно только в обычной игре
+    this.yesterdayEl.classList.add("hidden");
     this.root.classList.remove("hidden");
     window.addEventListener("keydown", this.onWindowKey, true);
     requestAnimationFrame(() => this.focusInput());
     await this.ensureData();
     this.newGame();
+  }
+
+  // Режим слова дня: слово выводится из сида, «Новое слово» скрыто, показано вчерашнее слово.
+  // progress — сохранённый на сервере прогресс (восстанавливаем доску, блокируем если пройдено).
+  async openDaily(todaySeed: string, prevSeed: string | null, progress: DailyProgress): Promise<void> {
+    this.isOpen = true;
+    this.daily = true;
+    this.restartBtn.classList.add("hidden");
+    this.root.classList.remove("hidden");
+    window.addEventListener("keydown", this.onWindowKey, true);
+    requestAnimationFrame(() => this.focusInput());
+    await this.ensureData();
+    if (this.words.length === 0) return;
+    this.prevWord = prevSeed ? this.words[seedToIndex(prevSeed, this.words.length)] : null;
+    this.yesterdayEl.textContent = `Слово вчерашнего дня: ${this.prevWord ? this.prevWord.toUpperCase() : "—"}`;
+    this.yesterdayEl.classList.remove("hidden");
+    this.startWith(this.words[seedToIndex(todaySeed, this.words.length)]);
+    this.restoreDaily(progress);
+  }
+
+  // Восстановить доску из сохранённого прогресса (переигрываем прошлые догадки).
+  private restoreDaily(progress: DailyProgress): void {
+    for (const word of progress.guesses) {
+      this.guesses.push(word);
+      this.applyKeyState(word, evaluate(word, this.target));
+    }
+    if (progress.solved) {
+      this.done = true;
+      this.statusEl.textContent = `Слово дня уже пройдено за ${progress.attempts}`;
+    } else if (this.guesses.length >= ROWS) {
+      this.done = true;
+      this.statusEl.textContent = `Слово дня: не угадано. Было: ${this.target}`;
+    }
+    this.render();
+    this.renderCanvas();
+  }
+
+  private persistDaily(solved: boolean): void | Promise<void> {
+    return this.onDailyProgress?.({ solved, attempts: this.guesses.length, guesses: [...this.guesses] });
   }
 
   close(): void {
@@ -243,8 +294,13 @@ export class BulbaWordle {
 
   private newGame(): void {
     if (!this.loaded || this.words.length === 0) return;
+    this.startWith(this.words[Math.floor(Math.random() * this.words.length)]);
+  }
+
+  // Начать раунд с заданным словом (общий путь для обычной игры и слова дня).
+  private startWith(target: string): void {
     this.stopConfetti();
-    this.target = this.words[Math.floor(Math.random() * this.words.length)];
+    this.target = target;
     this.guesses = [];
     this.current = "";
     this.done = false;
@@ -315,15 +371,23 @@ export class BulbaWordle {
 
     if (guess === this.target) {
       this.done = true;
-      this.solved += 1;
       this.statusEl.textContent = `Угадал за ${this.guesses.length}!`;
       this.launchConfetti();
-      this.finish(this.solved);
+      if (this.daily) {
+        // Слово дня: лидерборд открываем только ПОСЛЕ подтверждения сохранения прогресса
+        // сервером — иначе GET за топом обгоняет PUT прогресса и игрока ещё нет в выборке.
+        void Promise.resolve(this.persistDaily(true)).then(() => this.reportDaily(this.guesses.length));
+      } else {
+        // Обычная игра: каждое угаданное слово +1 к тоталу (накопительно).
+        this.finish(1);
+      }
     } else if (this.guesses.length >= ROWS) {
       this.done = true;
       this.statusEl.textContent = `Не угадал. Было: ${this.target}`;
+      if (this.daily) this.persistDaily(false);
     } else {
       this.statusEl.textContent = `Попытка ${this.guesses.length} из ${ROWS}`;
+      if (this.daily) this.persistDaily(false);
     }
     this.render();
     this.renderCanvas();
@@ -373,6 +437,12 @@ export class BulbaWordle {
     if (this.reported) return;
     this.reported = true;
     this.onGameOver?.(value);
+  }
+
+  private reportDaily(attempts: number): void {
+    if (this.reported) return;
+    this.reported = true;
+    this.onDailyOver?.(attempts);
   }
 
   private launchConfetti(): void {

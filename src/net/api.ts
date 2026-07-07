@@ -16,6 +16,17 @@ export interface Leaderboard {
   you: LeaderboardEntry | null;
 }
 
+// Сиды слова дня: today — для сегодняшнего слова, prev — для вчерашнего (null, если вчера не было).
+export interface WotdGameSeeds {
+  today: string;
+  prev: string | null;
+}
+
+export interface Wotd {
+  guess: WotdGameSeeds;
+  wordle: WotdGameSeeds;
+}
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -50,6 +61,59 @@ export function submitScore(gameId: string, value: number): Promise<Leaderboard>
 
 export function fetchLeaderboard(gameId: string): Promise<Leaderboard> {
   return leaderboardRequest(`/api/leaderboard/${gameId}`, { method: "GET" });
+}
+
+// Слово дня: сиды (сегодня/вчера) для обеих игр.
+export async function fetchWotd(): Promise<Wotd> {
+  const res = await fetch(`${API_BASE}/api/wotd`, {
+    headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+  });
+  if (res.status === 401 || res.status === 403) {
+    logout();
+    throw new Error("Сессия истекла — войдите заново");
+  }
+  if (!res.ok) throw new Error(await errorMessage(res));
+  return (await res.json()) as Wotd;
+}
+
+export function fetchDailyLeaderboard(gameId: string): Promise<Leaderboard> {
+  return leaderboardRequest(`/api/leaderboard/wotd/${gameId}`, { method: "GET" });
+}
+
+// Прогресс слова дня: пройдено ли, число попыток и подошедшие слова (для восстановления доски).
+export interface DailyProgress {
+  solved: boolean;
+  attempts: number;
+  guesses: string[];
+}
+
+export function fetchDailyProgress(gameId: string): Promise<DailyProgress> {
+  return authedJson<DailyProgress>(`/api/wotd/${gameId}/progress`);
+}
+
+export function saveDailyProgress(gameId: string, state: DailyProgress): Promise<DailyProgress> {
+  return authedJson<DailyProgress>(`/api/wotd/${gameId}/progress`, {
+    method: "PUT",
+    body: JSON.stringify(state),
+  });
+}
+
+// Аутентифицированный JSON-запрос с обработкой протухшей сессии.
+async function authedJson<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getToken() ?? ""}`,
+      ...(init.headers ?? {}),
+    },
+  });
+  if (res.status === 401 || res.status === 403) {
+    logout();
+    throw new Error("Сессия истекла — войдите заново");
+  }
+  if (!res.ok) throw new Error(await errorMessage(res));
+  return (await res.json()) as T;
 }
 
 // Удалить свой аккаунт вместе с результатами. При успехе локальный токен стоит очистить.

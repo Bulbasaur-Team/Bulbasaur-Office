@@ -44,7 +44,16 @@ const GAMES: LeaderboardGame[] = [
   { id: "bulbaparking", title: "Bulba Parking", format: (v) => (v / 1000).toFixed(1) + " с" },
   { id: "bulbaguess", title: "Bulba Guess", format: (v) => v + " поп." },
   { id: "bulbawordle", title: "Bulba Wordle", format: (v) => v + " слов" },
+  // Отдельные лидерборды слова дня (по числу попыток, меньше — лучше).
+  { id: "wotd-bulbaguess", code: "bulbaguess", daily: true, title: "Слово дня: Bulba Guess", format: (v) => v + " поп." },
+  { id: "wotd-bulbawordle", code: "bulbawordle", daily: true, title: "Слово дня: Bulba Wordle", format: (v) => v + " поп." },
 ];
+
+// Соответствие базовой игры её id в списке дневных лидербордов.
+const WOTD_BOARD_ID: Record<string, string> = {
+  bulbaguess: "wotd-bulbaguess",
+  bulbawordle: "wotd-bulbawordle",
+};
 
 const SPEED = 400;
 const INTERACT_DIST = 80;
@@ -187,11 +196,24 @@ export class WorldScene extends Phaser.Scene {
     // выбору режима и чисто рвёт мультиплеерное соединение/состояние.
     document.getElementById("modeBtn")!.onclick = () => window.location.reload();
     document.getElementById("deleteBtn")!.onclick = () => void this.deleteAccount();
+    document.getElementById("wotdGuessBtn")!.onclick = () => void this.openDailyGame("bulbaguess");
+    document.getElementById("wotdWordleBtn")!.onclick = () => void this.openDailyGame("bulbawordle");
     this.bulbaJump.onGameOver = (v) => this.reportScore("bulbajump", v);
     this.bulbaPacker.onGameOver = (v) => this.reportScore("bulbapacker", v);
     this.bulbaParking.onGameOver = (v) => this.reportScore("bulbaparking", v);
     this.bulbaGuess.onGameOver = (v) => this.reportScore("bulbaguess", v);
     this.bulbaWordle.onGameOver = (v) => this.reportScore("bulbawordle", v);
+    this.bulbaGuess.onDailyOver = () => void this.showDailyBoard("bulbaguess");
+    this.bulbaWordle.onDailyOver = () => void this.showDailyBoard("bulbawordle");
+    // Возвращаем промис (а не void): игра ждёт подтверждения сохранения перед показом
+    // лидерборда. При ошибке логируем, но резолвим — чтобы борд всё равно открылся.
+    const saveDaily = (gameId: string, s: api.DailyProgress) =>
+      api.saveDailyProgress(gameId, s).then(
+        () => {},
+        (e) => console.error("Не удалось сохранить прогресс слова дня:", e),
+      );
+    this.bulbaGuess.onDailyProgress = (s) => saveDaily("bulbaguess", s);
+    this.bulbaWordle.onDailyProgress = (s) => saveDaily("bulbawordle", s);
 
     this.gameMenu = new GameMenu((id) => this.openGame(id));
 
@@ -244,6 +266,34 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  // Показать дневной лидерборд слова дня (прогресс уже сохранён игрой при решении).
+  private async showDailyBoard(gameId: string): Promise<void> {
+    try {
+      const board = await api.fetchDailyLeaderboard(gameId);
+      this.leaderboard.showBoard(WOTD_BOARD_ID[gameId], board);
+    } catch (e) {
+      console.error("Не удалось показать лидерборд слова дня:", e);
+    }
+  }
+
+  // Открыть игру в режиме слова дня: тянем сиды и сохранённый прогресс, передаём в игру.
+  private async openDailyGame(gameId: "bulbaguess" | "bulbawordle"): Promise<void> {
+    this.gameMenu.close();
+    this.tvScreen.hide();
+    try {
+      const [wotd, progress] = await Promise.all([api.fetchWotd(), api.fetchDailyProgress(gameId)]);
+      if (gameId === "bulbaguess") {
+        await this.bulbaGuess.openDaily(wotd.guess.today, wotd.guess.prev, progress);
+        this.activeGame = this.bulbaGuess;
+      } else {
+        await this.bulbaWordle.openDaily(wotd.wordle.today, wotd.wordle.prev, progress);
+        this.activeGame = this.bulbaWordle;
+      }
+    } catch (e) {
+      console.error("Не удалось открыть слово дня:", e);
+    }
+  }
+
   private startAs(chosen: Character): void {
     this.chosen = chosen;
     this.player = this.physics.add.sprite(0, 0, chosen.sprite);
@@ -271,6 +321,8 @@ export class WorldScene extends Phaser.Scene {
     document.getElementById("modeBtn")!.classList.remove("hidden");
     document.getElementById("logoutBtn")!.classList.remove("hidden");
     document.getElementById("deleteBtn")!.classList.remove("hidden");
+    document.getElementById("wotdGuessBtn")!.classList.remove("hidden");
+    document.getElementById("wotdWordleBtn")!.classList.remove("hidden");
   }
 
   // Удалить аккаунт: подтверждение, запрос на сервер, затем выход и перезагрузка.
