@@ -317,12 +317,7 @@ export class WorldScene extends Phaser.Scene {
     // Без fromId — игрок встанет на точку своего персонажа из слоя spawns.
     this.loadLocation(0);
     this.started = true;
-    document.getElementById("lbBtn")!.classList.remove("hidden");
-    document.getElementById("modeBtn")!.classList.remove("hidden");
-    document.getElementById("logoutBtn")!.classList.remove("hidden");
-    document.getElementById("deleteBtn")!.classList.remove("hidden");
-    document.getElementById("wotdGuessBtn")!.classList.remove("hidden");
-    document.getElementById("wotdWordleBtn")!.classList.remove("hidden");
+    document.getElementById("hudPanel")!.classList.remove("hidden");
   }
 
   // Удалить аккаунт: подтверждение, запрос на сервер, затем выход и перезагрузка.

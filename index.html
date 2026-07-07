@@ -236,14 +236,22 @@
     .lb-close { position: absolute; top: -16px; right: -16px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
     .lb-close:hover { background: var(--accent); color: #14210f; }
     .lb-close svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-    .lb-open-btn { position: fixed; top: 12px; right: 12px; z-index: 25; background: var(--panel); color: var(--text); border: 2px solid var(--accent); border-radius: 12px; padding: 8px 14px; font-family: inherit; font-size: 15px; font-weight: bold; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
-    .lb-open-btn:hover { background: var(--accent); color: #14210f; }
-    #wotdGuessBtn { top: 54px; }
-    #wotdWordleBtn { top: 96px; }
-    #modeBtn { top: 138px; }
-    #logoutBtn { top: 180px; }
-    #deleteBtn { top: 222px; border-color: #c94f4f; }
-    #deleteBtn:hover { background: #c94f4f; color: #fff; }
+    /* HUD-панель: сгруппированные кнопки в правом верхнем углу, сворачивается по клику на шапку. */
+    .hud-panel { position: fixed; top: 12px; right: 12px; z-index: 25; width: 216px; background: var(--panel); border: 2px solid var(--accent); border-radius: 14px; box-shadow: 0 8px 28px rgba(0,0,0,.45); overflow: hidden; }
+    .hud-toggle { list-style: none; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; font-size: 15px; font-weight: bold; color: var(--text); background: rgba(122,192,122,.14); }
+    .hud-toggle::-webkit-details-marker { display: none; }
+    .hud-toggle::after { content: "▾"; opacity: .65; transition: transform .2s; }
+    .hud-panel[open] .hud-toggle::after { transform: rotate(180deg); }
+    .hud-body { padding: 12px; display: flex; flex-direction: column; gap: 14px; }
+    .hud-group { display: flex; flex-direction: column; gap: 6px; }
+    .hud-group + .hud-group { border-top: 1px solid #353c46; padding-top: 12px; }
+    .hud-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; opacity: .5; padding: 0 2px 1px; }
+    .hud-btn { width: 100%; text-align: left; background: rgba(255,255,255,.04); color: var(--text); border: 1px solid #3a414c; border-radius: 10px; padding: 9px 12px; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s, transform .05s; }
+    .hud-btn:hover { background: var(--accent); color: #14210f; border-color: var(--accent); }
+    .hud-btn:active { transform: translateY(1px); }
+    .hud-btn-danger { border-color: #6b3535; color: #e6807a; }
+    .hud-btn-danger:hover { background: #c94f4f; color: #fff; border-color: #c94f4f; }
+    @media (max-width: 560px) { .hud-panel { width: 176px; } }
     .wotd-yesterday { font-size: 13px; opacity: .8; margin: 2px 0 6px; }
     .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 56px; border: 2px solid var(--accent); border-radius: 10px; background: rgba(38,43,51,.9); color: var(--text); font-size: 26px; cursor: pointer; }
     .lb-nav:hover { background: var(--accent); color: #14210f; }
@@ -435,12 +443,26 @@
     </div>
   </div>
 
-  <button id="lbBtn" class="lb-open-btn hidden" aria-label="лидерборд">🏆 Лидерборд</button>
-  <button id="modeBtn" class="lb-open-btn hidden" aria-label="сменить режим">🔄 Сменить режим</button>
-  <button id="logoutBtn" class="lb-open-btn hidden" aria-label="выйти">Выйти</button>
-  <button id="deleteBtn" class="lb-open-btn hidden" aria-label="удалить аккаунт">🗑 Удалить аккаунт</button>
-  <button id="wotdGuessBtn" class="lb-open-btn hidden" aria-label="слово дня guess">📅 Слово дня: Bulba Guess</button>
-  <button id="wotdWordleBtn" class="lb-open-btn hidden" aria-label="слово дня wordle">📅 Слово дня: Bulba Wordle</button>
+  <details id="hudPanel" class="hud-panel hidden" open>
+    <summary class="hud-toggle">☰ Меню</summary>
+    <div class="hud-body">
+      <div class="hud-group">
+        <div class="hud-label">Слово дня</div>
+        <button id="wotdGuessBtn" class="hud-btn" aria-label="слово дня guess">📅 Bulba Guess</button>
+        <button id="wotdWordleBtn" class="hud-btn" aria-label="слово дня wordle">📅 Bulba Wordle</button>
+      </div>
+      <div class="hud-group">
+        <div class="hud-label">Игра</div>
+        <button id="lbBtn" class="hud-btn" aria-label="лидерборд">🏆 Лидерборд</button>
+        <button id="modeBtn" class="hud-btn" aria-label="сменить режим">🔄 Сменить режим</button>
+      </div>
+      <div class="hud-group">
+        <div class="hud-label">Аккаунт</div>
+        <button id="logoutBtn" class="hud-btn" aria-label="выйти">🚪 Выйти</button>
+        <button id="deleteBtn" class="hud-btn hud-btn-danger" aria-label="удалить аккаунт">🗑 Удалить аккаунт</button>
+      </div>
+    </div>
+  </details>
 
   <div id="leaderboard" class="hidden">
     <div class="lb-box">
