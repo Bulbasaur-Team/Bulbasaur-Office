@@ -1,4 +1,5 @@
 import { getSpriteImage, type SpriteKey } from "../entities/sprites";
+import { attachArcadePad } from "./TouchControls";
 
 // Логическое поле игры (px). Канвас масштабируется под экран через CSS.
 const W = 420;
@@ -59,6 +60,17 @@ export class BulbaJump {
     document.getElementById("bjClose")!.onclick = () => this.close();
     document.getElementById("bjMin")!.onclick = () => this.minimize();
     document.getElementById("bjRestart")!.onclick = () => this.reset();
+    attachArcadePad(this.root.querySelector<HTMLElement>(".arcade-frame")!, (c, d) => this.pressKey(c, d), {
+      left: [{ label: "◀", code: "ArrowLeft" }],
+      right: [{ label: "▶", code: "ArrowRight" }],
+    });
+  }
+
+  // Тач-кнопка: дёргаем те же обработчики, что и клавиатура.
+  pressKey(code: string, down: boolean): void {
+    const e = { code, preventDefault() {} } as unknown as KeyboardEvent;
+    if (down) this.onKeyDown(e);
+    else this.onKeyUp(e);
   }
 
   getCanvas(): HTMLCanvasElement {

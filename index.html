@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Bulba Office</title>
   <style>
     :root { --bg:#1b1f24; --panel:#262b33; --accent:#7ac07a; --text:#e8efe6; }
@@ -237,7 +237,7 @@
     .lb-close:hover { background: var(--accent); color: #14210f; }
     .lb-close svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
     /* HUD-панель: сгруппированные кнопки в правом верхнем углу, сворачивается по клику на шапку. */
-    .hud-panel { position: fixed; top: 12px; right: 12px; z-index: 25; width: 216px; background: var(--panel); border: 2px solid var(--accent); border-radius: 14px; box-shadow: 0 8px 28px rgba(0,0,0,.45); overflow: hidden; }
+    .hud-panel { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); z-index: 25; width: 216px; background: var(--panel); border: 2px solid var(--accent); border-radius: 14px; box-shadow: 0 8px 28px rgba(0,0,0,.45); overflow: hidden; }
     .hud-toggle { list-style: none; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; font-size: 15px; font-weight: bold; color: var(--text); background: rgba(122,192,122,.14); }
     .hud-toggle::-webkit-details-marker { display: none; }
     .hud-toggle::after { content: "▾"; opacity: .65; transition: transform .2s; }
@@ -258,6 +258,60 @@
     .lb-nav.prev { left: -56px; }
     .lb-nav.next { right: -56px; }
     @media (max-width: 560px) { .lb-nav.prev { left: 4px; } .lb-nav.next { right: 4px; } }
+
+    /* --- Мобильный адаптив --- */
+    /* У canvas аркад размер задан по высоте (72vh) + aspect-ratio; на узком портрете
+       ширина от высоты может вылезать за экран — ограничиваем по ширине (высота подстроится). */
+    #bjCanvas, #bpCanvas, #bpkCanvas { max-width: 100%; }
+    /* На телефоне режем поля модалок и рамок, чтобы игровое поле влезало. */
+    @media (max-width: 640px) {
+      h1 { font-size: 16px; margin: 6px 0 2px; }
+      #game canvas { border-width: 2px; }
+      #bulbajump, #bulbapacker, #bulbaparking, #bulbaguess, #bulbawordle, #slides { padding: 10px; }
+      .arcade-frame { padding: 16px 14px; gap: 10px; }
+      .arcade-title { font-size: 18px; }
+    }
+    /* Доска и клавиатура Wordle заданы в фиксированных px — ужимаем под узкий экран. */
+    @media (max-width: 400px) {
+      .bw-grid { grid-template-columns: repeat(5, 44px); grid-template-rows: repeat(6, 44px); gap: 5px; }
+      .bw-cell { font-size: 24px; }
+      .bw-key { min-width: 24px; height: 40px; padding: 0 4px; font-size: 14px; }
+      .bw-key-wide { min-width: 42px; font-size: 12px; }
+    }
+    /* На тач-устройствах клавиатурные подсказки не нужны (заменены тач-контролами),
+       а мир-канвас позиционируется фиксированно и на весь экран — прячем заголовок и прокрутку. */
+    @media (pointer: coarse) {
+      #hint { display: none; }
+      h1 { display: none; }
+      html, body { overflow: hidden; }
+    }
+
+    /* Тач-управление миром: джойстик слева, кнопка действия справа. */
+    .touch-joy { position: fixed; left: calc(20px + env(safe-area-inset-left)); bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 35; touch-action: none; }
+    .touch-joy-base { position: relative; width: 128px; height: 128px; border-radius: 50%; background: rgba(38,43,51,.45); border: 2px solid rgba(122,192,122,.55); }
+    .touch-joy-knob { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%; background: rgba(122,192,122,.9); border: 2px solid #5aa05a; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
+    .touch-action { position: fixed; right: calc(24px + env(safe-area-inset-right)); bottom: calc(34px + env(safe-area-inset-bottom)); z-index: 35; width: 78px; height: 78px; border-radius: 50%; border: 3px solid #5aa05a; background: var(--accent); color: #14210f; font-size: 30px; font-weight: bold; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.5); touch-action: none; }
+    .touch-action:active { filter: brightness(.9); transform: translateY(1px); }
+
+    /* Тач-панель аркад (появляется только на тач-устройствах). */
+    .touch-pad { display: none; width: 100%; justify-content: space-between; gap: 16px; margin-top: 2px; }
+    .touch-pad-group { display: flex; gap: 12px; }
+    .touch-pad-btn { width: 62px; height: 62px; border-radius: 14px; border: 2px solid var(--accent); background: rgba(38,43,51,.9); color: var(--text); font-size: 26px; font-weight: bold; cursor: pointer; touch-action: none; user-select: none; }
+    .touch-pad-btn:active { background: var(--accent); color: #14210f; }
+    @media (pointer: coarse) { .touch-pad { display: flex; } }
+
+    /* --- Принудительная ориентация аркад на мобильных --- */
+    /* Аркады-экшены всегда в портрете: если телефон держат горизонтально, разворачиваем
+       окно игры. Канвас растёт по длинной стороне экрана; min() из трёх ограничений
+       удерживает и высоту, и ширину в пределах экрана. */
+    @media (pointer: coarse) and (orientation: landscape) {
+      #bulbajump .arcade-frame,
+      #bulbapacker .arcade-frame,
+      #bulbaparking .arcade-frame { transform: rotate(90deg); }
+      #bjCanvas  { height: min(640px, 130vh, 94vw); }
+      #bpCanvas  { height: min(600px, 106vh, 94vw); }
+      #bpkCanvas { height: min(640px, 113vh, 94vw); }
+    }
   </style>
 </head>
 <body>
@@ -443,7 +497,7 @@
     </div>
   </div>
 
-  <details id="hudPanel" class="hud-panel hidden" open>
+  <details id="hudPanel" class="hud-panel hidden">
     <summary class="hud-toggle">☰ Меню</summary>
     <div class="hud-body">
       <div class="hud-group">

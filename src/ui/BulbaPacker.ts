@@ -1,4 +1,5 @@
 import { publicPath } from "../publicPath";
+import { attachArcadePad } from "./TouchControls";
 
 // Логическое поле игры (px). Канвас масштабируется под экран через CSS.
 const W = 480;
@@ -58,6 +59,10 @@ export class BulbaPacker {
     document.getElementById("bpClose")!.onclick = () => this.close();
     document.getElementById("bpMin")!.onclick = () => this.minimize();
     document.getElementById("bpRestart")!.onclick = () => this.reset();
+    attachArcadePad(this.root.querySelector<HTMLElement>(".arcade-frame")!, (c, d) => this.pressKey(c, d), {
+      left: [{ label: "◀", code: "ArrowLeft" }],
+      right: [{ label: "▶", code: "ArrowRight" }],
+    });
     for (let i = 1; i <= ITEM_COUNT; i++) {
       const img = new Image();
       img.src = publicPath(`assets/items/item${i}.png`);
@@ -112,6 +117,13 @@ export class BulbaPacker {
     if (e.code === "ArrowLeft" || e.code === "KeyA") this.left = false;
     else if (e.code === "ArrowRight" || e.code === "KeyD") this.right = false;
   };
+
+  // Тач-кнопка: дёргаем те же обработчики, что и клавиатура.
+  pressKey(code: string, down: boolean): void {
+    const e = { code, preventDefault() {} } as unknown as KeyboardEvent;
+    if (down) this.onKeyDown(e);
+    else this.onKeyUp(e);
+  }
 
   open(): void {
     this.isOpen = true;

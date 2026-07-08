@@ -35,6 +35,7 @@ import { RemotePlayer } from "../entities/RemotePlayer";
 import { LocationLoader, type Spawn, type Rect, type PlacedNpc } from "./LocationLoader";
 import { AuthGate } from "../ui/AuthGate";
 import { Leaderboard, type LeaderboardGame } from "../ui/Leaderboard";
+import { Joystick, isTouch } from "../ui/TouchControls";
 import * as api from "../net/api";
 
 // Мини-игры для лидерборда: порядок листания, заголовок и формат значения.
@@ -97,6 +98,8 @@ export class WorldScene extends Phaser.Scene {
   private tvScreen!: TvScreen;
   private authGate!: AuthGate;
   private leaderboard!: Leaderboard;
+  private joystick: Joystick | null = null;
+  private readonly portraitMql = window.matchMedia("(orientation: portrait)");
   private activeGame: ArcadeGame | null = null;
   private playerBaseScale = 1; // исходный масштаб игрока (анимация множит на него)
   private walkPhase = 0;       // фаза шага игрока
@@ -214,6 +217,12 @@ export class WorldScene extends Phaser.Scene {
       );
     this.bulbaGuess.onDailyProgress = (s) => saveDaily("bulbaguess", s);
     this.bulbaWordle.onDailyProgress = (s) => saveDaily("bulbawordle", s);
+
+    // Тач-управление (только на мобильных): джойстик двигает игрока, кнопка — действие.
+    if (isTouch()) {
+      this.joystick = new Joystick();
+      this.joystick.onAction = () => void this.tryInteract();
+    }
 
     this.gameMenu = new GameMenu((id) => this.openGame(id));
 
@@ -611,6 +620,7 @@ export class WorldScene extends Phaser.Scene {
       this.player.setVelocity(0);
       this.prompt.setVisible(false);
       this.showExit(null);
+      this.joystick?.setVisible(false);
       return;
     }
 
@@ -618,20 +628,37 @@ export class WorldScene extends Phaser.Scene {
       this.player.setVelocity(0);
       this.prompt.setVisible(false);
       this.showExit(null);
+      this.joystick?.setVisible(false);
       return;
     }
 
+    this.joystick?.setVisible(true);
+
     this.player.setVelocity(0);
-    if (this.cursors.left.isDown || this.keys.A.isDown) {
-      this.player.setVelocityX(-SPEED);
-      this.player.setFlipX(false);
-    } else if (this.cursors.right.isDown || this.keys.D.isDown) {
-      this.player.setVelocityX(SPEED);
-      this.player.setFlipX(true);
+    // Направление от клавиатуры; джойстик (если отклонён) перекрывает его.
+    let vx = 0;
+    let vy = 0;
+    if (this.cursors.left.isDown || this.keys.A.isDown) vx = -1;
+    else if (this.cursors.right.isDown || this.keys.D.isDown) vx = 1;
+    if (this.cursors.up.isDown || this.keys.W.isDown) vy = -1;
+    else if (this.cursors.down.isDown || this.keys.S.isDown) vy = 1;
+    if (this.joystick && (this.joystick.vector.x !== 0 || this.joystick.vector.y !== 0)) {
+      const j = this.joystick.vector;
+      // В портрете мир повёрнут на 90° (rotate(90deg)) — компенсируем оси джойстика,
+      // чтобы «вправо» на экране двигало персонажа вправо в кадре.
+      if (this.portraitMql.matches) {
+        vx = j.y;
+        vy = -j.x;
+      } else {
+        vx = j.x;
+        vy = j.y;
+      }
     }
-    if (this.cursors.up.isDown || this.keys.W.isDown) this.player.setVelocityY(-SPEED);
-    else if (this.cursors.down.isDown || this.keys.S.isDown) this.player.setVelocityY(SPEED);
-    this.player.body.velocity.normalize().scale(SPEED);
+    if (vx !== 0 || vy !== 0) {
+      this.player.setVelocity(vx * SPEED, vy * SPEED);
+      if (vx !== 0) this.player.setFlipX(vx > 0);
+      this.player.body.velocity.normalize().scale(SPEED);
+    }
 
     if (this.multiplayer) this.syncMovement(delta);
 
