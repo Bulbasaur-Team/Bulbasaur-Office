@@ -17,10 +17,15 @@ function posToScore(pos: number): number {
   return Math.min(100, 1 + Math.round((99 * pos) / (pos + SIM_K)));
 }
 
+// Слова-подсказки выдаются в начале раунда, чтобы игроку было от чего оттолкнуться.
+// Счёт выше 81 недостижим: дальше окна близости слово сразу получает 100.
+const HINT_SCORES = [70, 50];
+
 interface Attempt {
   word: string;
   score: number;  // 1..100, либо Infinity («бесконечность» — слово неизвестно)
   seq: number;    // порядок ввода — при равном score недавние показываем выше
+  hint?: boolean; // выданное игре слово-подсказка: не считается попыткой и не сохраняется
 }
 
 interface Particle {
@@ -99,6 +104,8 @@ export class BulbaGuess {
     document.getElementById("bgMin")!.onclick = () => this.minimize();
     document.getElementById("bgRestart")!.onclick = () => this.newRound();
     document.getElementById("bgGiveUp")!.onclick = () => this.giveUp();
+    const help = document.getElementById("bgHelp")!;
+    help.onclick = () => help.parentElement!.classList.toggle("bg-open");
     this.form.onsubmit = (e) => {
       e.preventDefault();
       this.submitGuess();
@@ -166,7 +173,7 @@ export class BulbaGuess {
 
   // Топ-20 подошедших слов (по возрастанию score) + счётчик — на сервер.
   private persistDaily(solved: boolean): void | Promise<void> {
-    const guesses = this.attempts.filter((a) => a.score !== Infinity).slice(0, 20).map((a) => a.word);
+    const guesses = this.guesses().filter((a) => a.score !== Infinity).slice(0, 20).map((a) => a.word);
     return this.onDailyProgress?.({ solved, attempts: this.dailyAttempts, guesses });
   }
 
@@ -228,16 +235,36 @@ export class BulbaGuess {
     this.round = round;
     this.posByIndex = new Map(round.n.map((idx, i) => [idx, i]));
     this.attempts = [];
+    const hints = this.hintWords(round);
+    hints.forEach((h, i) => this.attempts.push({ word: h.word, score: h.score, seq: i, hint: true }));
+    this.attempts.sort((a, b) => a.score - b.score);
     this.won = false;
     this.surrendered = false;
     this.reported = false;
     this.dailyAttempts = 0;
     this.input.value = "";
     this.input.disabled = false;
-    this.statusEl.textContent = "Угадай слово по смыслу. Попыток: 0";
+    this.statusEl.textContent = hints.length
+      ? "Подсказки уже в списке. Попыток: 0"
+      : "Угадай слово по смыслу. Попыток: 0";
     this.renderList();
     this.renderCanvas();
     this.input.focus();
+  }
+
+  // Слова-подсказки: по одному соседу на каждый счёт из HINT_SCORES.
+  private hintWords(round: Round): { word: string; score: number }[] {
+    const hints: { word: string; score: number }[] = [];
+    for (const score of HINT_SCORES) {
+      const pos = round.n.findIndex((_, i) => posToScore(i) === score);
+      if (pos !== -1) hints.push({ word: this.words[round.n[pos]], score });
+    }
+    return hints;
+  }
+
+  // Догадки игрока — без выданного слова-подсказки.
+  private guesses(): Attempt[] {
+    return this.attempts.filter((a) => !a.hint);
   }
 
   // Сдаться: показать загаданное слово и остановить приём догадок. Результат не
@@ -256,7 +283,7 @@ export class BulbaGuess {
     this.input.value = "";
     if (!g) return;
 
-    const count = () => (this.daily ? this.dailyAttempts : this.attempts.length);
+    const count = () => (this.daily ? this.dailyAttempts : this.guesses().length);
 
     if (this.attempts.some((a) => a.word === g)) {
       this.statusEl.textContent = `«${g}» уже было. Попыток: ${count()}`;
@@ -283,7 +310,7 @@ export class BulbaGuess {
         // иначе GET за топом обгоняет PUT прогресса и игрока ещё нет в выборке.
         void Promise.resolve(this.persistDaily(true)).then(() => this.reportDaily(this.dailyAttempts));
       } else {
-        this.finish(this.attempts.length);
+        this.finish(this.guesses().length);
       }
     } else {
       this.statusEl.textContent = `Попыток: ${count()}`;
@@ -317,7 +344,7 @@ export class BulbaGuess {
     this.listEl.innerHTML = "";
     for (const a of this.attempts.slice(0, 20)) {
       const row = document.createElement("div");
-      row.className = "bg-row" + (a.word === highlight ? " bg-new" : "");
+      row.className = "bg-row" + (a.word === highlight ? " bg-new" : "") + (a.hint ? " bg-hint" : "");
 
       const bar = document.createElement("div");
       bar.className = "bg-bar";
@@ -409,10 +436,11 @@ export class BulbaGuess {
     ctx.font = "bold 26px 'Trebuchet MS', sans-serif";
     ctx.fillText("Bulba Guess", w / 2, 48);
 
-    const best = this.attempts.length ? this.attempts[0].score : null;
+    const guesses = this.guesses();
+    const best = guesses.length ? Math.min(...guesses.map((a) => a.score)) : null;
     ctx.fillStyle = "#e8efe6";
     ctx.font = "20px 'Trebuchet MS', sans-serif";
-    ctx.fillText(`Попыток: ${this.attempts.length}`, w / 2, h / 2 - 10);
+    ctx.fillText(`Попыток: ${guesses.length}`, w / 2, h / 2 - 10);
     if (best !== null) {
       ctx.fillText(`Лучший: ${best === Infinity ? "∞" : best}`, w / 2, h / 2 + 24);
     }

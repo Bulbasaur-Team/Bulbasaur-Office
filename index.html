@@ -154,9 +154,16 @@
     .bg-list { width: min(360px, calc(var(--sw) * .76)); max-height: calc(var(--sh) * .46); overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
     .bg-row { position: relative; border: 1px solid #353c46; border-radius: 8px; padding: 7px 12px; display: flex; align-items: center; overflow: hidden; }
     .bg-row.bg-new { border-color: #8fd06b; }
+    .bg-row.bg-hint { border-style: dashed; }
     .bg-bar { position: absolute; left: 0; top: 0; bottom: 0; opacity: .32; z-index: 0; }
     .bg-word { position: relative; z-index: 1; flex: 1; font-size: 16px; }
     .bg-score { position: relative; z-index: 1; font-weight: bold; font-size: 16px; }
+    .bg-help { position: relative; display: inline-block; vertical-align: middle; margin-left: 8px; }
+    .bg-help-btn { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--accent); background: var(--panel); color: var(--text); font-family: inherit; font-size: 14px; font-weight: bold; line-height: 1; cursor: pointer; padding: 0; }
+    .bg-help-btn:hover { background: var(--accent); color: #14210f; }
+    .bg-tip { position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: min(300px, calc(var(--sw) * .7)); background: var(--panel); border: 2px solid var(--accent); border-radius: 10px; padding: 10px 12px; font-size: 14px; font-weight: normal; line-height: 1.4; text-align: left; opacity: 0; visibility: hidden; z-index: 70; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+    /* .bg-open — тап по (i): Safari на iOS не наводит фокус на кнопку по касанию. */
+    .bg-help:hover .bg-tip, .bg-help.bg-open .bg-tip { opacity: 1; visibility: visible; }
 
     /* Bulba Wordle */
     #bwCanvas { display: none; }
@@ -447,7 +454,10 @@
         <button class="arcade-min" id="bgMin" aria-label="свернуть">
           <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
         </button>
-        <h2 class="arcade-title">Bulba Guess</h2>
+        <h2 class="arcade-title">Bulba Guess<span class="bg-help">
+          <button class="bg-help-btn" id="bgHelp" type="button" aria-label="правила">i</button>
+          <div class="bg-tip">Нужно найти слово с номером 1. Чем ближе слово по смыслу к загаданному, тем меньше его номер. Знак ∞ значит, что слова нет в словаре. Словарь составлен на основе художественной литературы. Среди подсказок могут попасться незнакомые слова — хороший повод узнать что-то новое.</div>
+        </span></h2>
         <div class="ttt-status" id="bgStatus">Угадай слово по смыслу</div>
         <div class="wotd-yesterday hidden" id="bgYesterday"></div>
         <form id="bgForm" class="bg-form" autocomplete="off">
