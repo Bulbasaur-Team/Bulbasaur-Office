@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Bulba Office</title>
   <style>
-    :root { --bg:#1b1f24; --panel:#262b33; --accent:#7ac07a; --text:#e8efe6; }
+    :root { --bg:#1b1f24; --panel:#262b33; --accent:#7ac07a; --text:#e8efe6; --sw: 100vw; --sh: 100vh; }
     * { box-sizing: border-box; }
     html, body {
       margin: 0; min-height: 100%; background: var(--bg); color: var(--text);
@@ -13,6 +13,25 @@
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       user-select: none;
     }
+
+    /* Сцена: на десктопе прозрачна (display: contents) — вёрстка как была.
+       На тач-устройствах это фиксированный прямоугольник размером --sw × --sh,
+       который поворачивается на 90°, когда физическая ориентация не совпадает с
+       нужной текущему экрану. Он же containing block для position: fixed внутри,
+       поэтому все оверлеи, HUD и джойстик поворачиваются вместе с ним. */
+    #stage { display: contents; }
+    @media (pointer: coarse) {
+      #stage {
+        display: block; position: fixed; left: 50%; top: 50%;
+        width: var(--sw); height: var(--sh);
+        transform: translate(-50%, -50%); transform-origin: center center;
+      }
+      html[data-rot="1"] #stage { transform: translate(-50%, -50%) rotate(90deg); }
+      /* Канвас мира позиционируется фиксированно, так что #game — только система
+         координат для #parking: растягиваем его на всю сцену. */
+      #stage > #game { position: absolute; inset: 0; }
+    }
+
     h1 { font-size: 20px; margin: 10px 0 4px; }
     #game { line-height: 0; position: relative; }
     #game canvas { border: 3px solid #3a414c; border-radius: 8px; image-rendering: pixelated; }
@@ -21,7 +40,7 @@
     .hidden { display: none !important; }
 
     /* Кнопка выхода в другую локацию */
-    #exitBtn { position: fixed; left: 50%; transform: translateX(-50%); bottom: 13vh; z-index: 25;
+    #exitBtn { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--sh) * .13); z-index: 25;
       display: flex; align-items: center; gap: 8px;
       background: var(--accent); color: #14210f; border: 3px solid #5aa05a; border-radius: 12px;
       padding: 10px 18px; font-family: inherit; font-size: 16px; font-weight: bold; cursor: pointer;
@@ -33,18 +52,18 @@
     #parking {
       position: absolute; top: 50%; right: 4%; transform: translateY(-50%); z-index: 22;
       line-height: normal;
-      display: flex; flex-direction: column; align-items: stretch; gap: clamp(6px, 1.2vw, 12px);
-      padding: clamp(8px, 1.4vw, 18px); border-radius: 14px;
+      display: flex; flex-direction: column; align-items: stretch; gap: clamp(6px, calc(var(--sw) * .012), 12px);
+      padding: clamp(8px, calc(var(--sw) * .014), 18px); border-radius: 14px;
       background: rgba(27,31,36,.7); border: 2px solid #3a414c;
       box-shadow: 0 12px 40px rgba(0,0,0,.5);
     }
-    #parking h2 { margin: 0; font-size: clamp(13px, 1.6vw, 18px); text-align: center; }
-    #parking p { margin: 0 0 4px; opacity: .75; font-size: clamp(10px, 1.1vw, 13px); text-align: center; }
-    #parkingBtns { display: flex; flex-direction: column; gap: clamp(6px, 1vw, 10px); }
+    #parking h2 { margin: 0; font-size: clamp(13px, calc(var(--sw) * .016), 18px); text-align: center; }
+    #parking p { margin: 0 0 4px; opacity: .75; font-size: clamp(10px, calc(var(--sw) * .011), 13px); text-align: center; }
+    #parkingBtns { display: flex; flex-direction: column; gap: clamp(6px, calc(var(--sw) * .01), 10px); }
     .loc-btn {
       background: var(--panel); border: 2px solid var(--accent); border-radius: 12px;
-      padding: clamp(7px, 1vw, 12px) clamp(12px, 1.8vw, 24px); cursor: pointer;
-      color: var(--text); font-size: clamp(12px, 1.5vw, 17px); font-weight: bold;
+      padding: clamp(7px, calc(var(--sw) * .01), 12px) clamp(12px, calc(var(--sw) * .018), 24px); cursor: pointer;
+      color: var(--text); font-size: clamp(12px, calc(var(--sw) * .015), 17px); font-weight: bold;
       font-family: inherit; transition: .12s; text-align: center; white-space: nowrap;
     }
     .loc-btn:hover, .loc-btn.sel { background: var(--accent); color: #14210f; transform: translateX(-3px); }
@@ -77,7 +96,7 @@
     /* Поле ввода чата (мультиплеер) */
     .chat-input {
       position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 30;
-      width: min(420px, 80vw); padding: 10px 14px; border-radius: 20px;
+      width: min(420px, calc(var(--sw) * .8)); padding: 10px 14px; border-radius: 20px;
       border: 2px solid var(--accent); background: rgba(15,18,23,.92); color: var(--text);
       font-family: inherit; font-size: 14px; outline: none;
     }
@@ -96,18 +115,21 @@
     .emote-bar button:hover { background: rgba(122,192,122,.25); transform: translateY(-2px); }
 
     /* Диалог и меню выбора игры */
-    #dialogue, #gameMenu { position: fixed; inset: 0; pointer-events: none; z-index: 30; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5vh; }
-    .dlg-frame { pointer-events: auto; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 16px 22px; box-shadow: 0 12px 44px rgba(0,0,0,.55); }
+    #dialogue, #gameMenu { position: fixed; inset: 0; pointer-events: none; z-index: 30; display: flex; align-items: flex-end; justify-content: center; padding-bottom: calc(var(--sh) * .05); }
+    .dlg-frame { pointer-events: auto; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 16px 22px; box-shadow: 0 12px 44px rgba(0,0,0,.55);
+      max-width: calc(var(--sw) - 24px); max-height: calc(var(--sh) - 24px); overflow-y: auto; }
     .dlg-title { text-align: center; font-weight: bold; margin-bottom: 12px; opacity: .9; }
     .dlg-options { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
     .opt { background: #f4f1e8; border: 2px solid var(--accent); border-radius: 999px; padding: 9px 20px; cursor: pointer; color: #1b1f24; font-size: 17px; font-family: inherit; transition: .12s; }
     .opt:hover, .opt.sel { background: var(--accent); color: #14210f; transform: translateY(-2px); }
 
     /* Полноэкранное окно игры */
-    #bulbajump, #bulbapacker, #bulbaparking, #bulbaguess, #bulbawordle { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; justify-content: center; padding: 24px; }
-    #bjCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, 72vh); width: auto; aspect-ratio: 420 / 640; }
-    #bpCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(600px, 72vh); width: auto; aspect-ratio: 480 / 600; }
-    #bpkCanvas { background: #26303a; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, 72vh); width: auto; aspect-ratio: 480 / 640; }
+    /* safe center — второй строкой: если окно игры выше экрана, верх не уезжает
+       за край (иначе flex-центрирование делает его недоступным для скролла). */
+    #bulbajump, #bulbapacker, #bulbaparking, #bulbaguess, #bulbawordle { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; align-items: safe center; justify-content: center; padding: 24px; overflow: auto; }
+    #bjCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 420 / 640; }
+    #bpCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(600px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 600; }
+    #bpkCanvas { background: #26303a; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 640; }
     .arcade-frame { position: relative; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 24px 30px; display: flex; flex-direction: column; align-items: center; gap: 14px; box-shadow: 0 12px 44px rgba(0,0,0,.55); }
     .arcade-title { margin: 0; font-size: 22px; }
     .arcade-close { position: absolute; top: -16px; right: -16px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -124,12 +146,12 @@
     /* Bulba Guess */
     #bgCanvas { display: none; }
     #bgConfetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
-    .bg-form { display: flex; gap: 8px; width: min(360px, 76vw); }
+    .bg-form { display: flex; gap: 8px; width: min(360px, calc(var(--sw) * .76)); }
     .bg-input { flex: 1; background: #f4f1e8; border: 2px solid var(--accent); border-radius: 10px; padding: 9px 14px; color: #1b1f24; font-family: inherit; font-size: 17px; }
     .bg-input:focus { outline: none; border-color: #8fd06b; }
     .bg-submit { background: var(--accent); border: none; border-radius: 10px; padding: 0 16px; color: #14210f; font-size: 20px; font-weight: bold; cursor: pointer; }
     .bg-submit:hover { filter: brightness(1.1); }
-    .bg-list { width: min(360px, 76vw); max-height: 46vh; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+    .bg-list { width: min(360px, calc(var(--sw) * .76)); max-height: calc(var(--sh) * .46); overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
     .bg-row { position: relative; border: 1px solid #353c46; border-radius: 8px; padding: 7px 12px; display: flex; align-items: center; overflow: hidden; }
     .bg-row.bg-new { border-color: #8fd06b; }
     .bg-bar { position: absolute; left: 0; top: 0; bottom: 0; opacity: .32; z-index: 0; }
@@ -138,7 +160,8 @@
 
     /* Bulba Wordle */
     #bwCanvas { display: none; }
-    /* Скрытое поле: держит фокус (для экранной клавиатуры мобильных), само невидимо. */
+    /* Скрытое поле: ловит физическую клавиатуру на десктопе, само невидимо.
+       На тач-устройствах фокус в него не ставится — ввод только через .bw-keyboard. */
     .bw-input { position: absolute; opacity: 0; width: 1px; height: 1px; padding: 0; border: 0; }
     #bwConfetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
     .bw-grid { display: grid; grid-template-columns: repeat(5, 52px); grid-template-rows: repeat(6, 52px); gap: 6px; }
@@ -152,15 +175,18 @@
     .bw-cell.bw-present { background: #c9b458; border-color: #c9b458; color: #1b1f24; }
     .bw-cell.bw-absent { background: #3a414c; border-color: #3a414c; }
     .bw-cell.bw-invalid { border-color: #c0492f; background: rgba(192,73,47,.22); }
-    .bw-keyboard { display: flex; flex-direction: column; gap: 6px; align-items: center; }
-    .bw-krow { display: flex; gap: 5px; justify-content: center; }
+    /* Клавиатура тянется по ширине сцены: в ряду 12 клавиш, на узком экране они ужимаются
+       (fixed min-width их раньше выносил за край). */
+    .bw-keyboard { display: flex; flex-direction: column; gap: 6px; align-items: center; width: min(460px, calc(var(--sw) - 56px)); }
+    .bw-krow { display: flex; gap: 4px; justify-content: center; width: 100%; }
     .bw-key {
-      min-width: 28px; height: 46px; padding: 0 6px; border: none; border-radius: 6px;
-      background: #6b7480; color: var(--text); font-family: inherit; font-size: 15px; font-weight: bold;
+      flex: 1 1 0; min-width: 0; height: 46px; padding: 0; border: none; border-radius: 6px;
+      background: #6b7480; color: var(--text); font-family: inherit; font-weight: bold;
+      font-size: clamp(11px, calc(var(--sw) * .036), 15px);
       text-transform: uppercase; cursor: pointer; transition: .12s;
     }
     .bw-key:hover { filter: brightness(1.12); }
-    .bw-key-wide { min-width: 52px; font-size: 13px; }
+    .bw-key-wide { flex: 1.9 1 0; font-size: clamp(9px, calc(var(--sw) * .026), 13px); }
     .bw-key.bw-correct { background: #5aa05a; }
     .bw-key.bw-present { background: #c9b458; color: #1b1f24; }
     .bw-key.bw-absent { background: #2a2f37; color: #7a828c; }
@@ -168,7 +194,7 @@
     /* Слайды */
     #slides { position: fixed; inset: 0; z-index: 40; background: rgba(8,10,14,.82); display: flex; align-items: center; justify-content: center; padding: 24px; }
     .slides-box { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; }
-    .slides-media { max-width: min(900px, 86vw); max-height: 76vh; border: 3px solid var(--accent); border-radius: 10px; background: #11141a; }
+    .slides-media { max-width: min(900px, calc(var(--sw) * .86)); max-height: calc(var(--sh) * .76); border: 3px solid var(--accent); border-radius: 10px; background: #11141a; }
     #slides:not(.pixel) #slidesCanvas { display: none; }
     #slides.pixel #slidesImg { display: none; }
     .slides-icon { position: absolute; top: -14px; width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -192,8 +218,8 @@
 
     /* Режим «во весь экран»: слайд растягивается по экрану */
     #slides.maximized { padding: 0; background: #0b0e12; }
-    #slides.maximized .slides-box { width: 100vw; height: 100vh; justify-content: center; }
-    #slides.maximized .slides-media { width: 100vw; height: 100vh; max-width: none; max-height: none; object-fit: contain; border: none; border-radius: 0; }
+    #slides.maximized .slides-box { width: var(--sw); height: var(--sh); justify-content: center; }
+    #slides.maximized .slides-media { width: var(--sw); height: var(--sh); max-width: none; max-height: none; object-fit: contain; border: none; border-radius: 0; }
     #slides.maximized .slides-icon { top: 14px; }
     #slides.maximized .slides-close { right: 14px; }
     #slides.maximized .slides-full { left: 14px; }
@@ -204,7 +230,7 @@
 
     /* Авторизация */
     #auth { position: fixed; inset: 0; z-index: 60; background: rgba(15,18,23,.97); display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .auth-box { background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 26px 30px; width: min(360px, 90vw); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
+    .auth-box { background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 26px 30px; width: min(360px, calc(var(--sw) * .9)); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
     .auth-box h2 { margin: 0 0 6px; text-align: center; }
     .auth-tabs { display: flex; gap: 8px; margin: 14px 0 16px; }
     .auth-tab { flex: 1; background: transparent; border: 2px solid #3a414c; border-radius: 10px; padding: 8px; color: var(--text); font-family: inherit; font-size: 15px; cursor: pointer; }
@@ -222,10 +248,10 @@
 
     /* Лидерборд */
     #leaderboard { position: fixed; inset: 0; z-index: 70; background: rgba(8,10,14,.85); display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .lb-box { position: relative; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 22px 26px; width: min(420px, 92vw); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
+    .lb-box { position: relative; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 22px 26px; width: min(420px, calc(var(--sw) * .92)); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
     .lb-title { margin: 0 0 4px; text-align: center; }
     .lb-status { text-align: center; opacity: .8; font-size: 14px; min-height: 18px; margin-bottom: 10px; }
-    .lb-list { display: flex; flex-direction: column; gap: 4px; max-height: 56vh; overflow-y: auto; }
+    .lb-list { display: flex; flex-direction: column; gap: 4px; max-height: calc(var(--sh) * .56); overflow-y: auto; }
     .lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid #353c46; border-radius: 8px; }
     .lb-row .lb-rank { width: 28px; opacity: .7; font-weight: bold; }
     .lb-row .lb-rank.lb-medal { opacity: 1; font-size: 18px; text-align: center; }
@@ -236,30 +262,15 @@
     .lb-close { position: absolute; top: -16px; right: -16px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
     .lb-close:hover { background: var(--accent); color: #14210f; }
     .lb-close svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-    /* HUD-панель: сгруппированные кнопки в правом верхнем углу, сворачивается по клику на шапку. */
-.hud-panel {
-  position: fixed;
-  top: calc(12px + env(safe-area-inset-top));
-  right: calc(12px + env(safe-area-inset-right));
-  z-index: 25;
-
-  width: 216px;
-  max-height: calc(100vh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-
-  background: var(--panel);
-  border: 2px solid var(--accent);
-  border-radius: 14px;
-  box-shadow: 0 8px 28px rgba(0,0,0,.45);
-
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
+    /* HUD-панель: сгруппированные кнопки в правом верхнем углу, сворачивается по клику на шапку.
+       На телефоне список кнопок выше экрана — шапка закреплена, тело скроллится. */
+    .hud-panel { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); z-index: 25; width: 216px; background: var(--panel); border: 2px solid var(--accent); border-radius: 14px; box-shadow: 0 8px 28px rgba(0,0,0,.45); overflow: hidden; }
     .hud-toggle { list-style: none; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; font-size: 15px; font-weight: bold; color: var(--text); background: rgba(122,192,122,.14); }
     .hud-toggle::-webkit-details-marker { display: none; }
     .hud-toggle::after { content: "▾"; opacity: .65; transition: transform .2s; }
     .hud-panel[open] .hud-toggle::after { transform: rotate(180deg); }
-    .hud-body { padding: 12px; display: flex; flex-direction: column; gap: 14px; }
+    /* 66px = шапка панели + отступы сверху/снизу: остаток высоты сцены отдаём под скролл. */
+    .hud-body { padding: 12px; display: flex; flex-direction: column; gap: 14px; max-height: calc(var(--sh) - 66px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
     .hud-group { display: flex; flex-direction: column; gap: 6px; }
     .hud-group + .hud-group { border-top: 1px solid #353c46; padding-top: 12px; }
     .hud-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; opacity: .5; padding: 0 2px 1px; }
@@ -268,33 +279,34 @@
     .hud-btn:active { transform: translateY(1px); }
     .hud-btn-danger { border-color: #6b3535; color: #e6807a; }
     .hud-btn-danger:hover { background: #c94f4f; color: #fff; border-color: #c94f4f; }
-    @media (max-width: 560px) { .hud-panel { width: 176px; } }
+    html.bp-560 .hud-panel { width: 176px; }
     .wotd-yesterday { font-size: 13px; opacity: .8; margin: 2px 0 6px; }
     .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 56px; border: 2px solid var(--accent); border-radius: 10px; background: rgba(38,43,51,.9); color: var(--text); font-size: 26px; cursor: pointer; }
     .lb-nav:hover { background: var(--accent); color: #14210f; }
     .lb-nav.prev { left: -56px; }
     .lb-nav.next { right: -56px; }
-    @media (max-width: 560px) { .lb-nav.prev { left: 4px; } .lb-nav.next { right: 4px; } }
+    html.bp-560 .lb-nav.prev { left: 4px; }
+    html.bp-560 .lb-nav.next { right: 4px; }
 
     /* --- Мобильный адаптив --- */
-    /* У canvas аркад размер задан по высоте (72vh) + aspect-ratio; на узком портрете
+    /* У canvas аркад размер задан по высоте сцены + aspect-ratio; на узком портрете
        ширина от высоты может вылезать за экран — ограничиваем по ширине (высота подстроится). */
     #bjCanvas, #bpCanvas, #bpkCanvas { max-width: 100%; }
-    /* На телефоне режем поля модалок и рамок, чтобы игровое поле влезало. */
-    @media (max-width: 640px) {
-      h1 { font-size: 16px; margin: 6px 0 2px; }
-      #game canvas { border-width: 2px; }
-      #bulbajump, #bulbapacker, #bulbaparking, #bulbaguess, #bulbawordle, #slides { padding: 10px; }
-      .arcade-frame { padding: 16px 14px; gap: 10px; }
-      .arcade-title { font-size: 18px; }
-    }
-    /* Доска и клавиатура Wordle заданы в фиксированных px — ужимаем под узкий экран. */
-    @media (max-width: 400px) {
-      .bw-grid { grid-template-columns: repeat(5, 44px); grid-template-rows: repeat(6, 44px); gap: 5px; }
-      .bw-cell { font-size: 24px; }
-      .bw-key { min-width: 24px; height: 40px; padding: 0 4px; font-size: 14px; }
-      .bw-key-wide { min-width: 42px; font-size: 12px; }
-    }
+    /* На телефоне режем поля модалок и рамок, чтобы игровое поле влезало.
+       Брейкпоинты — классы bp-* от ширины сцены (media-запрос мерил бы окно,
+       а сцена может быть повёрнута на 90°). Классы ставит orientation.ts. */
+    html.bp-640 h1 { font-size: 16px; margin: 6px 0 2px; }
+    html.bp-640 #game canvas { border-width: 2px; }
+    html.bp-640 :is(#bulbajump, #bulbapacker, #bulbaparking, #bulbaguess, #bulbawordle, #slides) { padding: 10px; }
+    html.bp-640 .arcade-frame { padding: 16px 14px; gap: 10px; }
+    html.bp-640 .arcade-title { font-size: 18px; }
+    /* Кнопки окна вынесены за рамку на -16px — на узком экране убираем их внутрь. */
+    html.bp-640 .arcade-close { top: 6px; right: 6px; width: 34px; height: 34px; }
+    html.bp-640 .arcade-min { top: 6px; left: 6px; width: 34px; height: 34px; }
+    /* Доска Wordle задана в фиксированных px — ужимаем под узкий экран. */
+    html.bp-400 .bw-grid { grid-template-columns: repeat(5, 44px); grid-template-rows: repeat(6, 44px); gap: 5px; }
+    html.bp-400 .bw-cell { font-size: 24px; }
+    html.bp-400 .bw-key { height: 40px; }
     /* На тач-устройствах клавиатурные подсказки не нужны (заменены тач-контролами),
        а мир-канвас позиционируется фиксированно и на весь экран — прячем заголовок и прокрутку. */
     @media (pointer: coarse) {
@@ -316,236 +328,226 @@
     .touch-pad-btn { width: 62px; height: 62px; border-radius: 14px; border: 2px solid var(--accent); background: rgba(38,43,51,.9); color: var(--text); font-size: 26px; font-weight: bold; cursor: pointer; touch-action: none; user-select: none; }
     .touch-pad-btn:active { background: var(--accent); color: #14210f; }
     @media (pointer: coarse) { .touch-pad { display: flex; } }
-
-    /* --- Принудительная ориентация аркад на мобильных --- */
-    /* Аркады-экшены всегда в портрете: если телефон держат горизонтально, разворачиваем
-       окно игры. Канвас растёт по длинной стороне экрана; min() из трёх ограничений
-       удерживает и высоту, и ширину в пределах экрана. */
-    @media (pointer: coarse) and (orientation: landscape) {
-      #bulbajump .arcade-frame,
-      #bulbapacker .arcade-frame,
-      #bulbaparking .arcade-frame { transform: rotate(90deg); }
-      #bjCanvas  { height: min(640px, 130vh, 94vw); }
-      #bpCanvas  { height: min(600px, 106vh, 94vw); }
-      #bpkCanvas { height: min(640px, 113vh, 94vw); }
-    }
   </style>
 </head>
 <body>
-  <h1>🌱 Bulba Office</h1>
-  <div id="game">
-    <div id="parking" class="hidden">
-      <h2>Куда едем?</h2>
-      <p>Выбери локацию.</p>
-      <div id="parkingBtns"></div>
-    </div>
-  </div>
-  <div id="hint"><span><b>Стрелки</b> / WASD — ходить</span><span><b>Пробел</b> / <b>Enter</b> — действие</span></div>
-
-  <input id="chatInput" class="chat-input hidden" type="text" maxlength="200" autocomplete="off"
-         placeholder="Сообщение… (Enter — отправить)" />
-
-  <div id="emoteBar" class="emote-bar hidden"></div>
-
-  <div id="select" class="hidden">
-    <h2>Выбери Бульбазавра</h2>
-    <p>Им будешь управлять. С остальными можно поговорить.</p>
-    <div id="cards"></div>
-  </div>
-
-  <div id="modeSelect" class="hidden">
-    <h2>Как играть?</h2>
-    <p>Выбери режим.</p>
-    <div id="modeCards"></div>
-  </div>
-
-  <div id="roleSelect" class="hidden">
-    <h2>Выбери роль</h2>
-    <p>От роли зависит скин. В мультиплеере видно других игроков.</p>
-    <div id="roleCards"></div>
-  </div>
-
-  <button id="exitBtn" class="hidden" aria-label="выйти">
-    <svg viewBox="0 0 24 24"><path d="M4 21h12"/><path d="M6 21V4a1 1 0 0 1 1.2-.98l7 1.5A1 1 0 0 1 15 5.5v15"/><circle cx="11.5" cy="12" r="1"/></svg>
-    <span id="exitLabel">Выйти</span>
-  </button>
-
-  <div id="dialogue" class="hidden">
-    <div class="dlg-frame">
-      <div class="dlg-options" id="dlgOptions"></div>
-    </div>
-  </div>
-
-  <div id="gameMenu" class="hidden">
-    <div class="dlg-frame">
-      <div class="dlg-title">Выбери игру</div>
-      <div class="dlg-options" id="gameMenuOptions"></div>
-    </div>
-  </div>
-
-  <div id="bulbajump" class="hidden">
-    <div class="arcade-frame">
-      <button class="arcade-close" id="bjClose" aria-label="закрыть">
-        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-      <button class="arcade-min" id="bjMin" aria-label="свернуть">
-        <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
-      </button>
-      <h2 class="arcade-title">Bulba Jump</h2>
-      <div class="ttt-status" id="bjStatus">Доставлено: 0</div>
-      <canvas id="bjCanvas" width="420" height="640"></canvas>
-      <button class="ttt-restart" id="bjRestart">Заново</button>
-    </div>
-  </div>
-
-  <div id="bulbapacker" class="hidden">
-    <div class="arcade-frame">
-      <button class="arcade-close" id="bpClose" aria-label="закрыть">
-        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-      <button class="arcade-min" id="bpMin" aria-label="свернуть">
-        <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
-      </button>
-      <h2 class="arcade-title">Bulba Packer</h2>
-      <div class="ttt-status" id="bpStatus">Очки: 0</div>
-      <canvas id="bpCanvas" width="480" height="600"></canvas>
-      <button class="ttt-restart" id="bpRestart">Заново</button>
-    </div>
-  </div>
-
-  <div id="bulbaparking" class="hidden">
-    <div class="arcade-frame">
-      <button class="arcade-close" id="bpkClose" aria-label="закрыть">
-        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-      <button class="arcade-min" id="bpkMin" aria-label="свернуть">
-        <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
-      </button>
-      <h2 class="arcade-title">Bulba Parking</h2>
-      <div class="ttt-status" id="bpkStatus">Стрелки: газ, задний ход и руль</div>
-      <canvas id="bpkCanvas" width="480" height="640"></canvas>
-      <button class="ttt-restart" id="bpkRestart">Заново</button>
-    </div>
-  </div>
-
-  <div id="bulbaguess" class="hidden">
-    <div class="arcade-frame">
-      <button class="arcade-close" id="bgClose" aria-label="закрыть">
-        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-      <button class="arcade-min" id="bgMin" aria-label="свернуть">
-        <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
-      </button>
-      <h2 class="arcade-title">Bulba Guess</h2>
-      <div class="ttt-status" id="bgStatus">Угадай слово по смыслу</div>
-      <div class="wotd-yesterday hidden" id="bgYesterday"></div>
-      <form id="bgForm" class="bg-form" autocomplete="off">
-        <input id="bgInput" class="bg-input" type="text" placeholder="введите слово" />
-        <button class="bg-submit" type="submit" aria-label="проверить">→</button>
-      </form>
-      <div class="bg-list" id="bgList"></div>
-      <div class="bg-actions">
-        <button class="ttt-restart" id="bgGiveUp">Сдаться</button>
-        <button class="ttt-restart" id="bgRestart">Новое слово</button>
-      </div>
-      <canvas id="bgCanvas" width="300" height="380"></canvas>
-    </div>
-    <canvas id="bgConfetti"></canvas>
-  </div>
-
-  <div id="bulbawordle" class="hidden">
-    <div class="arcade-frame">
-      <button class="arcade-close" id="bwClose" aria-label="закрыть">
-        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-      <button class="arcade-min" id="bwMin" aria-label="свернуть">
-        <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
-      </button>
-      <h2 class="arcade-title">Bulba Wordle</h2>
-      <div class="ttt-status" id="bwStatus">Угадай слово из пяти букв</div>
-      <div class="wotd-yesterday hidden" id="bwYesterday"></div>
-      <input id="bwInput" class="bw-input" type="text" autocomplete="off" autocapitalize="off" />
-      <div class="bw-grid" id="bwGrid"></div>
-      <div class="bw-keyboard" id="bwKeyboard"></div>
-      <button class="ttt-restart" id="bwRestart">Новое слово</button>
-      <canvas id="bwCanvas" width="320" height="420"></canvas>
-    </div>
-    <canvas id="bwConfetti"></canvas>
-  </div>
-
-  <div id="slides" class="hidden">
-    <div class="slides-box">
-      <button class="slides-icon slides-full" id="slidesFull" aria-label="во весь экран">
-        <svg class="ic-expand" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-        <svg class="ic-compress" viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
-      </button>
-      <button class="slides-icon slides-pixel" id="slidesPixel" aria-label="пиксельный вид">
-        <svg class="ic-pixelate" viewBox="0 0 24 24"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h6v6h-6z"/></svg>
-        <svg class="ic-normal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L7 20"/></svg>
-      </button>
-      <button class="slides-icon slides-close" id="slidesClose" aria-label="закрыть">
-        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-      <button class="slides-nav prev" id="slidesPrev">‹</button>
-      <img id="slidesImg" class="slides-media" alt="слайд" />
-      <canvas id="slidesCanvas" class="slides-media"></canvas>
-      <button class="slides-nav next" id="slidesNext">›</button>
-      <div class="slides-count" id="slidesCount"></div>
-    </div>
-  </div>
-
-  <div id="auth" class="hidden">
-    <div class="auth-box">
-      <h2 id="authTitle">Вход</h2>
-      <div class="auth-tabs">
-        <button id="authTabLogin" class="auth-tab sel" type="button">Вход</button>
-        <button id="authTabRegister" class="auth-tab" type="button">Регистрация</button>
-      </div>
-      <form id="authForm" autocomplete="off">
-        <input id="authLogin" class="auth-input" type="text" placeholder="ник" />
-        <input id="authPassword" class="auth-input" type="password" placeholder="пароль" />
-        <label id="authConsentRow" class="auth-consent hidden">
-          <input id="authConsent" type="checkbox" />
-          <span>Регистрируясь, принимаю <a href="terms.html" target="_blank" rel="noopener">Пользовательское соглашение</a> и согласен с <a href="privacy.html" target="_blank" rel="noopener">обработкой данных</a></span>
-        </label>
-        <div id="authError" class="auth-error"></div>
-        <button id="authSubmit" class="auth-submit" type="submit">Войти</button>
-      </form>
-    </div>
-  </div>
-
-  <details id="hudPanel" class="hud-panel hidden">
-    <summary class="hud-toggle">☰ Меню</summary>
-    <div class="hud-body">
-      <div class="hud-group">
-        <div class="hud-label">Слово дня</div>
-        <button id="wotdGuessBtn" class="hud-btn" aria-label="слово дня guess">📅 Bulba Guess</button>
-        <button id="wotdWordleBtn" class="hud-btn" aria-label="слово дня wordle">📅 Bulba Wordle</button>
-      </div>
-      <div class="hud-group">
-        <div class="hud-label">Игра</div>
-        <button id="lbBtn" class="hud-btn" aria-label="лидерборд">🏆 Лидерборд</button>
-        <button id="modeBtn" class="hud-btn" aria-label="сменить режим">🔄 Сменить режим</button>
-      </div>
-      <div class="hud-group">
-        <div class="hud-label">Аккаунт</div>
-        <button id="logoutBtn" class="hud-btn" aria-label="выйти">🚪 Выйти</button>
-        <button id="deleteBtn" class="hud-btn hud-btn-danger" aria-label="удалить аккаунт">🗑 Удалить аккаунт</button>
+  <div id="stage">
+    <h1>🌱 Bulba Office</h1>
+    <div id="game">
+      <div id="parking" class="hidden">
+        <h2>Куда едем?</h2>
+        <p>Выбери локацию.</p>
+        <div id="parkingBtns"></div>
       </div>
     </div>
-  </details>
+    <div id="hint"><span><b>Стрелки</b> / WASD — ходить</span><span><b>Пробел</b> / <b>Enter</b> — действие</span></div>
 
-  <div id="leaderboard" class="hidden">
-    <div class="lb-box">
-      <button class="lb-close" id="lbClose" aria-label="закрыть">
-        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-      <button class="lb-nav prev" id="lbPrev" aria-label="предыдущая игра">‹</button>
-      <button class="lb-nav next" id="lbNext" aria-label="следующая игра">›</button>
-      <h2 class="lb-title" id="lbTitle">Лидерборд</h2>
-      <div class="lb-status" id="lbStatus"></div>
-      <div class="lb-list" id="lbList"></div>
+    <input id="chatInput" class="chat-input hidden" type="text" maxlength="200" autocomplete="off"
+           placeholder="Сообщение… (Enter — отправить)" />
+
+    <div id="emoteBar" class="emote-bar hidden"></div>
+
+    <div id="select" class="hidden">
+      <h2>Выбери Бульбазавра</h2>
+      <p>Им будешь управлять. С остальными можно поговорить.</p>
+      <div id="cards"></div>
     </div>
+
+    <div id="modeSelect" class="hidden">
+      <h2>Как играть?</h2>
+      <p>Выбери режим.</p>
+      <div id="modeCards"></div>
+    </div>
+
+    <div id="roleSelect" class="hidden">
+      <h2>Выбери роль</h2>
+      <p>От роли зависит скин. В мультиплеере видно других игроков.</p>
+      <div id="roleCards"></div>
+    </div>
+
+    <button id="exitBtn" class="hidden" aria-label="выйти">
+      <svg viewBox="0 0 24 24"><path d="M4 21h12"/><path d="M6 21V4a1 1 0 0 1 1.2-.98l7 1.5A1 1 0 0 1 15 5.5v15"/><circle cx="11.5" cy="12" r="1"/></svg>
+      <span id="exitLabel">Выйти</span>
+    </button>
+
+    <div id="dialogue" class="hidden">
+      <div class="dlg-frame">
+        <div class="dlg-options" id="dlgOptions"></div>
+      </div>
+    </div>
+
+    <div id="gameMenu" class="hidden">
+      <div class="dlg-frame">
+        <div class="dlg-title">Выбери игру</div>
+        <div class="dlg-options" id="gameMenuOptions"></div>
+      </div>
+    </div>
+
+    <div id="bulbajump" class="hidden">
+      <div class="arcade-frame">
+        <button class="arcade-close" id="bjClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <button class="arcade-min" id="bjMin" aria-label="свернуть">
+          <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
+        </button>
+        <h2 class="arcade-title">Bulba Jump</h2>
+        <div class="ttt-status" id="bjStatus">Доставлено: 0</div>
+        <canvas id="bjCanvas" width="420" height="640"></canvas>
+        <button class="ttt-restart" id="bjRestart">Заново</button>
+      </div>
+    </div>
+
+    <div id="bulbapacker" class="hidden">
+      <div class="arcade-frame">
+        <button class="arcade-close" id="bpClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <button class="arcade-min" id="bpMin" aria-label="свернуть">
+          <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
+        </button>
+        <h2 class="arcade-title">Bulba Packer</h2>
+        <div class="ttt-status" id="bpStatus">Очки: 0</div>
+        <canvas id="bpCanvas" width="480" height="600"></canvas>
+        <button class="ttt-restart" id="bpRestart">Заново</button>
+      </div>
+    </div>
+
+    <div id="bulbaparking" class="hidden">
+      <div class="arcade-frame">
+        <button class="arcade-close" id="bpkClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <button class="arcade-min" id="bpkMin" aria-label="свернуть">
+          <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
+        </button>
+        <h2 class="arcade-title">Bulba Parking</h2>
+        <div class="ttt-status" id="bpkStatus">Стрелки: газ, задний ход и руль</div>
+        <canvas id="bpkCanvas" width="480" height="640"></canvas>
+        <button class="ttt-restart" id="bpkRestart">Заново</button>
+      </div>
+    </div>
+
+    <div id="bulbaguess" class="hidden">
+      <div class="arcade-frame">
+        <button class="arcade-close" id="bgClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <button class="arcade-min" id="bgMin" aria-label="свернуть">
+          <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
+        </button>
+        <h2 class="arcade-title">Bulba Guess</h2>
+        <div class="ttt-status" id="bgStatus">Угадай слово по смыслу</div>
+        <div class="wotd-yesterday hidden" id="bgYesterday"></div>
+        <form id="bgForm" class="bg-form" autocomplete="off">
+          <input id="bgInput" class="bg-input" type="text" placeholder="введите слово" />
+          <button class="bg-submit" type="submit" aria-label="проверить">→</button>
+        </form>
+        <div class="bg-list" id="bgList"></div>
+        <div class="bg-actions">
+          <button class="ttt-restart" id="bgGiveUp">Сдаться</button>
+          <button class="ttt-restart" id="bgRestart">Новое слово</button>
+        </div>
+        <canvas id="bgCanvas" width="300" height="380"></canvas>
+      </div>
+      <canvas id="bgConfetti"></canvas>
+    </div>
+
+    <div id="bulbawordle" class="hidden">
+      <div class="arcade-frame">
+        <button class="arcade-close" id="bwClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <button class="arcade-min" id="bwMin" aria-label="свернуть">
+          <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
+        </button>
+        <h2 class="arcade-title">Bulba Wordle</h2>
+        <div class="ttt-status" id="bwStatus">Угадай слово из пяти букв</div>
+        <div class="wotd-yesterday hidden" id="bwYesterday"></div>
+        <input id="bwInput" class="bw-input" type="text" autocomplete="off" autocapitalize="off" />
+        <div class="bw-grid" id="bwGrid"></div>
+        <div class="bw-keyboard" id="bwKeyboard"></div>
+        <button class="ttt-restart" id="bwRestart">Новое слово</button>
+        <canvas id="bwCanvas" width="320" height="420"></canvas>
+      </div>
+      <canvas id="bwConfetti"></canvas>
+    </div>
+
+    <div id="slides" class="hidden">
+      <div class="slides-box">
+        <button class="slides-icon slides-full" id="slidesFull" aria-label="во весь экран">
+          <svg class="ic-expand" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+          <svg class="ic-compress" viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+        </button>
+        <button class="slides-icon slides-pixel" id="slidesPixel" aria-label="пиксельный вид">
+          <svg class="ic-pixelate" viewBox="0 0 24 24"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h6v6h-6z"/></svg>
+          <svg class="ic-normal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L7 20"/></svg>
+        </button>
+        <button class="slides-icon slides-close" id="slidesClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <button class="slides-nav prev" id="slidesPrev">‹</button>
+        <img id="slidesImg" class="slides-media" alt="слайд" />
+        <canvas id="slidesCanvas" class="slides-media"></canvas>
+        <button class="slides-nav next" id="slidesNext">›</button>
+        <div class="slides-count" id="slidesCount"></div>
+      </div>
+    </div>
+
+    <div id="auth" class="hidden">
+      <div class="auth-box">
+        <h2 id="authTitle">Вход</h2>
+        <div class="auth-tabs">
+          <button id="authTabLogin" class="auth-tab sel" type="button">Вход</button>
+          <button id="authTabRegister" class="auth-tab" type="button">Регистрация</button>
+        </div>
+        <form id="authForm" autocomplete="off">
+          <input id="authLogin" class="auth-input" type="text" placeholder="ник" />
+          <input id="authPassword" class="auth-input" type="password" placeholder="пароль" />
+          <label id="authConsentRow" class="auth-consent hidden">
+            <input id="authConsent" type="checkbox" />
+            <span>Регистрируясь, принимаю <a href="terms.html" target="_blank" rel="noopener">Пользовательское соглашение</a> и согласен с <a href="privacy.html" target="_blank" rel="noopener">обработкой данных</a></span>
+          </label>
+          <div id="authError" class="auth-error"></div>
+          <button id="authSubmit" class="auth-submit" type="submit">Войти</button>
+        </form>
+      </div>
+    </div>
+
+    <details id="hudPanel" class="hud-panel hidden">
+      <summary class="hud-toggle">☰ Меню</summary>
+      <div class="hud-body">
+        <div class="hud-group">
+          <div class="hud-label">Слово дня</div>
+          <button id="wotdGuessBtn" class="hud-btn" aria-label="слово дня guess">📅 Bulba Guess</button>
+          <button id="wotdWordleBtn" class="hud-btn" aria-label="слово дня wordle">📅 Bulba Wordle</button>
+        </div>
+        <div class="hud-group">
+          <div class="hud-label">Игра</div>
+          <button id="lbBtn" class="hud-btn" aria-label="лидерборд">🏆 Лидерборд</button>
+          <button id="modeBtn" class="hud-btn" aria-label="сменить режим">🔄 Сменить режим</button>
+        </div>
+        <div class="hud-group">
+          <div class="hud-label">Аккаунт</div>
+          <button id="logoutBtn" class="hud-btn" aria-label="выйти">🚪 Выйти</button>
+          <button id="deleteBtn" class="hud-btn hud-btn-danger" aria-label="удалить аккаунт">🗑 Удалить аккаунт</button>
+        </div>
+      </div>
+    </details>
+
+    <div id="leaderboard" class="hidden">
+      <div class="lb-box">
+        <button class="lb-close" id="lbClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <button class="lb-nav prev" id="lbPrev" aria-label="предыдущая игра">‹</button>
+        <button class="lb-nav next" id="lbNext" aria-label="следующая игра">›</button>
+        <h2 class="lb-title" id="lbTitle">Лидерборд</h2>
+        <div class="lb-status" id="lbStatus"></div>
+        <div class="lb-list" id="lbList"></div>
+      </div>
+    </div>
+
   </div>
 
   <script type="module" src="/src/main.ts"></script>
