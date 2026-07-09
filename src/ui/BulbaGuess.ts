@@ -1,5 +1,6 @@
 import { seedToIndex } from "../data/wotd";
 import type { DailyProgress } from "../net/api";
+import { stage } from "./orientation";
 
 interface Round {
   t: string;      // загаданное слово (нормализованное)
@@ -338,8 +339,8 @@ export class BulbaGuess {
 
   // Салют из конфетти при победе: короткий залп частиц из центра экрана.
   private launchConfetti(): void {
-    const w = (this.confetti.width = window.innerWidth);
-    const h = (this.confetti.height = window.innerHeight);
+    const w = (this.confetti.width = stage.width);
+    const h = (this.confetti.height = stage.height);
     const colors = ["#f94144", "#f8961e", "#f9c74f", "#90be6d", "#43aa8b", "#577590", "#ff70a6"];
     this.particles = [];
     const cx = w / 2;

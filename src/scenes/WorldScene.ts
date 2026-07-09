@@ -99,7 +99,6 @@ export class WorldScene extends Phaser.Scene {
   private authGate!: AuthGate;
   private leaderboard!: Leaderboard;
   private joystick: Joystick | null = null;
-  private readonly portraitMql = window.matchMedia("(orientation: portrait)");
   private activeGame: ArcadeGame | null = null;
   private playerBaseScale = 1; // исходный масштаб игрока (анимация множит на него)
   private walkPhase = 0;       // фаза шага игрока
@@ -643,16 +642,8 @@ export class WorldScene extends Phaser.Scene {
     if (this.cursors.up.isDown || this.keys.W.isDown) vy = -1;
     else if (this.cursors.down.isDown || this.keys.S.isDown) vy = 1;
     if (this.joystick && (this.joystick.vector.x !== 0 || this.joystick.vector.y !== 0)) {
-      const j = this.joystick.vector;
-      // В портрете мир повёрнут на 90° (rotate(90deg)) — компенсируем оси джойстика,
-      // чтобы «вправо» на экране двигало персонажа вправо в кадре.
-      if (this.portraitMql.matches) {
-        vx = j.y;
-        vy = -j.x;
-      } else {
-        vx = j.x;
-        vy = j.y;
-      }
+      vx = this.joystick.vector.x;
+      vy = this.joystick.vector.y;
     }
     if (vx !== 0 || vy !== 0) {
       this.player.setVelocity(vx * SPEED, vy * SPEED);

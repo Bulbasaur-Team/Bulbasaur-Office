@@ -1,5 +1,7 @@
 import { seedToIndex } from "../data/wotd";
 import type { DailyProgress } from "../net/api";
+import { isTouch } from "./TouchControls";
+import { stage } from "./orientation";
 
 const ROWS = 6;
 const COLS = 5;
@@ -200,6 +202,9 @@ export class BulbaWordle {
   }
 
   private focusInput(): void {
+    // На телефоне фокус в поле поднял бы системную клавиатуру поверх игры — там ввод
+    // идёт только через .bw-keyboard, а физические клавиши ловит onWindowKey.
+    if (isTouch()) return;
     // preventScroll — чтобы страница не дёргалась при возврате фокуса.
     this.input.focus({ preventScroll: true });
   }
@@ -278,8 +283,8 @@ export class BulbaWordle {
         const btn = document.createElement("button");
         btn.className = "bw-key" + (key === "enter" || key === "back" ? " bw-key-wide" : "");
         btn.textContent = key === "enter" ? "ВВОД" : key === "back" ? "⌫" : key;
-        // mousedown, а не click: не уводим фокус со скрытого поля ввода.
-        btn.addEventListener("mousedown", (e) => {
+        // pointerdown, а не click: не уводим фокус со скрытого поля ввода.
+        btn.addEventListener("pointerdown", (e) => {
           e.preventDefault();
           if (key === "enter") this.submit();
           else if (key === "back") this.eraseLetter();
@@ -446,8 +451,8 @@ export class BulbaWordle {
   }
 
   private launchConfetti(): void {
-    const w = (this.confetti.width = window.innerWidth);
-    const h = (this.confetti.height = window.innerHeight);
+    const w = (this.confetti.width = stage.width);
+    const h = (this.confetti.height = stage.height);
     const colors = ["#f94144", "#f8961e", "#f9c74f", "#90be6d", "#43aa8b", "#577590", "#ff70a6"];
     this.particles = [];
     const cx = w / 2;

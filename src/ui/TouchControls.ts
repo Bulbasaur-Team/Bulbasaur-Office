@@ -25,8 +25,11 @@ export class Joystick {
     this.action.className = "touch-action hidden";
     this.action.setAttribute("aria-label", "действие");
     this.action.textContent = "✦";
-    document.body.appendChild(this.wrap);
-    document.body.appendChild(this.action);
+    // Внутрь сцены, а не в body: джойстик должен поворачиваться вместе с миром,
+    // тогда «вправо» на экране = «вправо» в кадре без компенсации осей.
+    const stage = document.getElementById("stage")!;
+    stage.appendChild(this.wrap);
+    stage.appendChild(this.action);
 
     this.base.addEventListener("pointerdown", this.onDown);
     this.base.addEventListener("pointermove", this.onMove);

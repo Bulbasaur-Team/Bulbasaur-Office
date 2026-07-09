@@ -237,7 +237,24 @@
     .lb-close:hover { background: var(--accent); color: #14210f; }
     .lb-close svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
     /* HUD-панель: сгруппированные кнопки в правом верхнем углу, сворачивается по клику на шапку. */
-    .hud-panel { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); z-index: 25; width: 216px; background: var(--panel); border: 2px solid var(--accent); border-radius: 14px; box-shadow: 0 8px 28px rgba(0,0,0,.45); overflow: hidden; }
+.hud-panel {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+  z-index: 25;
+
+  width: 216px;
+  max-height: calc(100vh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+
+  background: var(--panel);
+  border: 2px solid var(--accent);
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.45);
+
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
     .hud-toggle { list-style: none; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; font-size: 15px; font-weight: bold; color: var(--text); background: rgba(122,192,122,.14); }
     .hud-toggle::-webkit-details-marker { display: none; }
     .hud-toggle::after { content: "▾"; opacity: .65; transition: transform .2s; }
