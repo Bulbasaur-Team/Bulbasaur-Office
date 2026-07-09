@@ -21,7 +21,15 @@ const WORLD: Orient = "landscape";
 
 // Логический размер сцены в CSS-пикселях: при повороте стороны меняются местами.
 // Вся вёрстка меряется от него, а не от window.innerWidth/innerHeight.
-export const stage = { width: window.innerWidth, height: window.innerHeight };
+// rotated — сцена повёрнута на 90° по часовой; экранные координаты события в
+// координаты сцены переводит screenToStage().
+export const stage = { width: window.innerWidth, height: window.innerHeight, rotated: false };
+
+// Обратное преобразование поворота сцены: локальный вектор (lx, ly) виден на экране
+// как (-ly, lx), значит из экранного (sx, sy) получаем (sy, -sx).
+export function screenToStage(sx: number, sy: number): { x: number; y: number } {
+  return stage.rotated ? { x: sy, y: -sx } : { x: sx, y: sy };
+}
 
 const listeners = new Set<() => void>();
 
@@ -46,6 +54,7 @@ function apply(): void {
   const physical: Orient = vh >= vw ? "portrait" : "landscape";
   const rotate = isTouch() && physical !== wanted();
 
+  stage.rotated = rotate;
   stage.width = rotate ? vh : vw;
   stage.height = rotate ? vw : vh;
 
@@ -65,6 +74,11 @@ export function initOrientation(): void {
   apply();
   window.addEventListener("resize", apply);
   window.addEventListener("orientationchange", () => setTimeout(apply, 200));
+  // На мобильных высота вьюпорта доезжает до финальной уже после первого кадра
+  // (сворачивается адресная строка) — иначе сцена так и осталась бы посчитанной
+  // по завышенной высоте до первого поворота телефона.
+  window.addEventListener("load", apply);
+  window.visualViewport?.addEventListener("resize", apply);
 
   // Экраны показываются/прячутся через класс hidden — следим за ним, чтобы не
   // дёргать ориентацию вручную из каждого open()/close()/minimize().

@@ -280,6 +280,17 @@
     .hud-btn-danger { border-color: #6b3535; color: #e6807a; }
     .hud-btn-danger:hover { background: #c94f4f; color: #fff; border-color: #c94f4f; }
     html.bp-560 .hud-panel { width: 176px; }
+    /* На телефоне панель занимает заметную долю короткой стороны экрана — ужимаем
+       кнопки и шапку, чтобы меню не перекрывало игру. */
+    @media (pointer: coarse) {
+      .hud-panel { width: 168px; border-radius: 12px; }
+      .hud-toggle { padding: 7px 10px; font-size: 13px; }
+      .hud-body { padding: 9px; gap: 10px; }
+      .hud-group { gap: 5px; }
+      .hud-group + .hud-group { padding-top: 9px; }
+      .hud-label { font-size: 10px; }
+      .hud-btn { padding: 7px 9px; font-size: 12px; border-radius: 8px; }
+    }
     .wotd-yesterday { font-size: 13px; opacity: .8; margin: 2px 0 6px; }
     .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 56px; border: 2px solid var(--accent); border-radius: 10px; background: rgba(38,43,51,.9); color: var(--text); font-size: 26px; cursor: pointer; }
     .lb-nav:hover { background: var(--accent); color: #14210f; }

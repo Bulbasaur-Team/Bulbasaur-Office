@@ -1,3 +1,5 @@
+import { screenToStage } from "./orientation";
+
 // Тач-управление для мобильных браузеров: виртуальный джойстик + кнопка действия
 // для мира и панель удержания кнопок для аркад. Показывается только на тач-устройствах.
 
@@ -71,8 +73,11 @@ export class Joystick {
     const r = this.base.getBoundingClientRect();
     const cx = r.left + r.width / 2;
     const cy = r.top + r.height / 2;
-    let dx = e.clientX - cx;
-    let dy = e.clientY - cy;
+    // clientX/clientY экранные, а джойстик повёрнут вместе со сценой: переводим смещение
+    // в координаты сцены — тогда и ручка едет за пальцем, и оси совпадают с осями мира.
+    const local = screenToStage(e.clientX - cx, e.clientY - cy);
+    let dx = local.x;
+    let dy = local.y;
     const dist = Math.hypot(dx, dy);
     if (dist > this.radius) {
       dx = (dx / dist) * this.radius;
