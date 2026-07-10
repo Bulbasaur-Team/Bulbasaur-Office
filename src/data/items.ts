@@ -23,17 +23,17 @@ export const ITEM_TYPES: Record<string, ItemTypeDef> = {
     drag: 0.35,
     kickMin: 520,
     kickMax: 680,
-    hopFactor: 0.45,
+    hopFactor: 0.7,
   },
   tennis: {
     texture: "item-tennis",
     file: "tennis.png",
-    radius: 12,
+    radius: 14,
     bounce: 0.85,
     drag: 0.4,
     kickMin: 560,
     kickMax: 740,
-    hopFactor: 0.6,
+    hopFactor: 0.5,
   },
 };
 

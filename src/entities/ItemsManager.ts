@@ -1,10 +1,14 @@
 import Phaser from "phaser";
 import type { PlacedItemDef } from "../data/items";
+import type { Rect } from "../scenes/LocationLoader";
 import { PhysicsItem } from "./PhysicsItem";
 import type { RemoteItemState } from "../net/realtime";
 
 const KICK_COOLDOWN_MS = 350; // не бить один мяч чаще: игрок касается его много кадров подряд
 const SYNC_INTERVAL_MS = 100; // частота стрима позиции владельцем (как у move игрока)
+const REACH_Z = 64;           // выше этой высоты мяч не достать: физика предмета плоская
+                              // (круги по x/y), без порога удар срабатывал бы по «тени»
+                              // высоко летящего мяча
 
 // Круглое препятствие для отскока: NPC или чужой игрок.
 export interface ObstacleCircle {
@@ -27,6 +31,7 @@ export interface PlayerCircle {
 // колбэки — их ставит WorldScene в мультиплеере, в одиночке они пустые.
 export class ItemsManager {
   private items = new Map<string, PhysicsItem>();
+  private physicsWalls: Rect[] = [];
   private syncAcc = 0;
 
   // Мой удар по предмету — отправить на сервер на арбитраж.
@@ -34,13 +39,12 @@ export class ItemsManager {
   // Стрим позиции предмета, которым я владею (последним ударил).
   onSync: ((itemId: string, x: number, y: number, vx: number, vy: number) => void) | null = null;
 
-  constructor(
-    private scene: Phaser.Scene,
-    private walls: Phaser.Physics.Arcade.StaticGroup,
-  ) {}
+  constructor(private scene: Phaser.Scene) {}
 
-  // Пересоздать предметы под локацию (вызывается из loadLocation, точки — из tmj).
-  load(defs: PlacedItemDef[]): void {
+  // Пересоздать предметы под локацию (вызывается из loadLocation, всё — из tmj:
+  // точки предметов из слоя items, стены для них из слоя collisions_physics).
+  load(defs: PlacedItemDef[], physicsWalls: Rect[]): void {
+    this.physicsWalls = physicsWalls;
     for (const item of this.items.values()) item.destroy();
     this.items.clear();
     for (const def of defs) {
@@ -54,8 +58,11 @@ export class ItemsManager {
     if (doSync) this.syncAcc = 0;
 
     for (const item of this.items.values()) {
-      for (const o of obstacles) item.bounceOffCircle(o.x, o.y, o.r);
-      if (player) this.interactWithPlayer(item, player);
+      // Высоко летящий мяч пролетает над головами — персонажи его не касаются.
+      if (item.height < REACH_Z) {
+        for (const o of obstacles) item.bounceOffCircle(o.x, o.y, o.r);
+        if (player) this.interactWithPlayer(item, player);
+      }
       // Стены — последними: если мяч зажат между персонажем и стеной, побеждает
       // стена (мяч не должен оказаться внутри неё даже визуально).
       this.bounceOffWalls(item);
@@ -64,11 +71,9 @@ export class ItemsManager {
     }
   }
 
-  // Стены — статичные прямоугольники из collision-слоя карты.
   private bounceOffWalls(item: PhysicsItem): void {
-    for (const wall of this.walls.getChildren()) {
-      const body = (wall as Phaser.GameObjects.GameObject & { body: Phaser.Physics.Arcade.StaticBody }).body;
-      item.bounceOffRect(body.x, body.y, body.x + body.width, body.y + body.height);
+    for (const w of this.physicsWalls) {
+      item.bounceOffRect(w.x, w.y, w.x + w.w, w.y + w.h);
     }
   }
 

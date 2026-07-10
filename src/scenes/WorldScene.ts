@@ -146,7 +146,7 @@ export class WorldScene extends Phaser.Scene {
     this.walls = this.physics.add.staticGroup();
     this.router = new KeyboardRouter();
     this.loader = new LocationLoader(this, this.walls, TARGET_H, DEPTH.doorOverlay);
-    this.items = new ItemsManager(this, this.walls);
+    this.items = new ItemsManager(this);
 
     this.bubble = new SpeechBubble(this, DEPTH.bubble);
     this.projector = new Projector(this, (slides, index) => {
@@ -487,7 +487,7 @@ export class WorldScene extends Phaser.Scene {
     this.locIndex = index;
     this.atParking = !!cfg.isParking;
 
-    const { npcs, doors, spawns, interactions, rects, items } = this.loader.load(cfg, index, this.chosen.id, this.multiplayer);
+    const { npcs, doors, spawns, interactions, rects, items, physicsWalls } = this.loader.load(cfg, index, this.chosen.id, this.multiplayer);
     this.npcs = npcs;
     this.thoughtBubbles.forEach((b) => b.destroy());
     this.thoughtTimers.forEach((t) => t.remove());
@@ -504,7 +504,7 @@ export class WorldScene extends Phaser.Scene {
     this.doors = doors;
     this.tv = interactions.get("tv") ?? null;
     this.tvRect = rects.get("tvScreen") ?? null;
-    this.items.load(items);
+    this.items.load(items, physicsWalls);
 
     // Свёрнутая игра видна на экране TV только в чилл-зоне (где задан прямоугольник экрана).
     if (this.activeGame && this.activeGame.minimized && index === LOC.chillZone && this.tvRect) {

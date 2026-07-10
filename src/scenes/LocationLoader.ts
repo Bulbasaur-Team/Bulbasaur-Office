@@ -21,6 +21,7 @@ export interface LoadedLocation {
   interactions: Map<string, Spawn>;  // интерактивные точки (слой interactions, напр. "tv")
   rects: Map<string, Rect>;          // прямоугольные объекты слоя interactions (напр. "tvScreen")
   items: PlacedItemDef[];            // физичные предметы (слой items, имя точки = тип предмета)
+  physicsWalls: Rect[];              // стены для предметов (слой collisions_physics)
 }
 
 // Строит сцену локации: фон, overlay двери, коллизии и NPC. Держит у себя список
@@ -49,9 +50,12 @@ export class LocationLoader {
     }
 
     const empty = () => new Map<string, Spawn>();
-    const { doors, spawns, interactions, rects, items } = cfg.map
+    const { doors, spawns, interactions, rects, items, physicsWalls } = cfg.map
       ? this.buildFromMap(cfg.map)
-      : { doors: empty(), spawns: empty(), interactions: empty(), rects: new Map<string, Rect>(), items: [] };
+      : {
+          doors: empty(), spawns: empty(), interactions: empty(),
+          rects: new Map<string, Rect>(), items: [], physicsWalls: [],
+        };
 
     const npcs: PlacedNpc[] = cfg.isParking || hideNpcs
       ? []
@@ -59,25 +63,30 @@ export class LocationLoader {
           .map((char) => ({ char, ...(spawns.get(char.id) ?? { x: 0, y: 0 }) }));
     for (const npc of npcs) this.addNpc(npc);
 
-    return { npcs, doors, spawns, interactions, rects, items };
+    return { npcs, doors, spawns, interactions, rects, items, physicsWalls };
   }
 
-  // Из карты Tiled: collision -> стены, doors -> двери (имя = id соседней локации),
-  // spawns -> точки персонажей (имя = id персонажа), interactions -> интерактивные
-  // объекты, items -> физичные предметы (имя = тип предмета).
+  // Из карты Tiled: collision -> стены игрока, collisions_physics -> стены предметов,
+  // doors -> двери (имя = id соседней локации), spawns -> точки персонажей (имя = id
+  // персонажа), interactions -> интерактивные объекты, items -> физичные предметы
+  // (имя = тип предмета).
   private buildFromMap(mapKey: string): {
     doors: Map<string, Spawn>;
     spawns: Map<string, Spawn>;
     interactions: Map<string, Spawn>;
     rects: Map<string, Rect>;
     items: PlacedItemDef[];
+    physicsWalls: Rect[];
   } {
     const doors = new Map<string, Spawn>();
     const spawns = new Map<string, Spawn>();
     const interactions = new Map<string, Spawn>();
     const rects = new Map<string, Rect>();
     const items: PlacedItemDef[] = [];
-    if (!this.scene.cache.tilemap.exists(mapKey)) return { doors, spawns, interactions, rects, items };
+    const physicsWalls: Rect[] = [];
+    if (!this.scene.cache.tilemap.exists(mapKey)) {
+      return { doors, spawns, interactions, rects, items, physicsWalls };
+    }
 
     const map = this.scene.make.tilemap({ key: mapKey });
 
@@ -112,7 +121,15 @@ export class LocationLoader {
       items.push({ id: `${o.name}-${o.id}`, type: o.name, x: o.x ?? 0, y: o.y ?? 0 });
     });
 
-    return { doors, spawns, interactions, rects, items };
+    // Стены для предметов — отдельный слой: геометрия отскоков может отличаться
+    // от коллизий игрока (например, мяч залетает туда, куда игроку нельзя).
+    map.getObjectLayer("collisions_physics")?.objects.forEach((o) => {
+      if (o.width && o.height) {
+        physicsWalls.push({ x: o.x ?? 0, y: o.y ?? 0, w: o.width, h: o.height });
+      }
+    });
+
+    return { doors, spawns, interactions, rects, items, physicsWalls };
   }
 
   private addNpc(npc: PlacedNpc): void {

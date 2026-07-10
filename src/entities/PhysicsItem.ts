@@ -22,6 +22,11 @@ export class PhysicsItem {
   private z = 0;  // высота над землёй
   private vz = 0; // вертикальная скорость
 
+  // Высота полёта: пока мяч выше досягаемости персонажа, бить по нему нельзя.
+  get height(): number {
+    return this.z;
+  }
+
   // Цель сетевой коррекции (не-владелец); null — коррекция не нужна.
   private netX: number | null = null;
   private netY: number | null = null;
