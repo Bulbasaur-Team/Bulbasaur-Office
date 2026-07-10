@@ -47,6 +47,14 @@ export class RemotePlayer {
     this.bubble = new SpeechBubble(scene, bubbleDepth);
   }
 
+  get x(): number {
+    return this.sprite.x;
+  }
+
+  get y(): number {
+    return this.sprite.y;
+  }
+
   // Новая цель движения (из move). Разворот применяем сразу.
   setTarget(x: number, y: number, facing: boolean): void {
     this.targetX = x;

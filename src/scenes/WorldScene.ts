@@ -32,6 +32,7 @@ import { spriteForRole } from "../data/roles";
 import { EMOTES, emojiForEmote } from "../data/emotes";
 import { Realtime, type RemoteState } from "../net/realtime";
 import { RemotePlayer } from "../entities/RemotePlayer";
+import { ItemsManager, type ObstacleCircle } from "../entities/ItemsManager";
 import { LocationLoader, type Spawn, type Rect, type PlacedNpc } from "./LocationLoader";
 import { AuthGate } from "../ui/AuthGate";
 import { Leaderboard, type LeaderboardGame } from "../ui/Leaderboard";
@@ -58,6 +59,7 @@ const WOTD_BOARD_ID: Record<string, string> = {
 
 const SPEED = 400;
 const INTERACT_DIST = 80;
+const BODY_RADIUS = 26; // радиус круга персонажа (игрок/NPC) для отскока мяча
 const CHAT_HOLD_MS = 4000; // сколько держать облачко своего чата после печати
 const EMOTE_HOLD_MS = 2500; // сколько держать свою реакцию
 const EMOTE_FONT = 30;      // размер эмодзи-реакции
@@ -83,6 +85,7 @@ export class WorldScene extends Phaser.Scene {
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private router!: KeyboardRouter;
   private loader!: LocationLoader;
+  private items!: ItemsManager;
   private dialogue!: Dialogue;
   private bubble!: SpeechBubble;
   private thoughtBubbles: ThoughtBubble[] = []; // облачко мыслей на каждый NPC текущей локации (по индексу npcs)
@@ -143,6 +146,7 @@ export class WorldScene extends Phaser.Scene {
     this.walls = this.physics.add.staticGroup();
     this.router = new KeyboardRouter();
     this.loader = new LocationLoader(this, this.walls, TARGET_H, DEPTH.doorOverlay);
+    this.items = new ItemsManager(this, this.walls);
 
     this.bubble = new SpeechBubble(this, DEPTH.bubble);
     this.projector = new Projector(this, (slides, index) => {
@@ -358,6 +362,9 @@ export class WorldScene extends Phaser.Scene {
     };
     this.startAs(me);
     this.showEmoteBar();
+    // Предметы: свои удары и стрим позиции уходят на сервер (в одиночке колбэки не заданы).
+    this.items.onKick = (itemId, kickId, x, y, vx, vy) => this.realtime.itemKick(itemId, kickId, x, y, vx, vy);
+    this.items.onSync = (itemId, x, y, vx, vy) => this.realtime.itemMove(itemId, x, y, vx, vy);
     // Чат временно отключён: поле ввода не показываем. Реакции (фиксированный набор) — есть.
     this.realtime.connect({
       onOpen: () => this.sendJoin(),
@@ -366,6 +373,9 @@ export class WorldScene extends Phaser.Scene {
       onMoved: (id, x, y, facing) => this.remotePlayers.get(id)?.setTarget(x, y, facing),
       onEmote: (id, code) => this.showRemoteEmote(id, code),
       onLeft: (id) => this.removeRemote(id),
+      onItems: (items) => this.items.applySnapshot(items),
+      onItemKicked: (itemId, kickId, x, y, vx, vy) => this.items.applyKicked(itemId, kickId, x, y, vx, vy),
+      onItemMoved: (itemId, x, y, vx, vy) => this.items.applyMoved(itemId, x, y, vx, vy),
     });
   }
 
@@ -477,7 +487,7 @@ export class WorldScene extends Phaser.Scene {
     this.locIndex = index;
     this.atParking = !!cfg.isParking;
 
-    const { npcs, doors, spawns, interactions, rects } = this.loader.load(cfg, index, this.chosen.id, this.multiplayer);
+    const { npcs, doors, spawns, interactions, rects, items } = this.loader.load(cfg, index, this.chosen.id, this.multiplayer);
     this.npcs = npcs;
     this.thoughtBubbles.forEach((b) => b.destroy());
     this.thoughtTimers.forEach((t) => t.remove());
@@ -494,6 +504,7 @@ export class WorldScene extends Phaser.Scene {
     this.doors = doors;
     this.tv = interactions.get("tv") ?? null;
     this.tvRect = rects.get("tvScreen") ?? null;
+    this.items.load(items);
 
     // Свёрнутая игра видна на экране TV только в чилл-зоне (где задан прямоугольник экрана).
     if (this.activeGame && this.activeGame.minimized && index === LOC.chillZone && this.tvRect) {
@@ -613,6 +624,7 @@ export class WorldScene extends Phaser.Scene {
     this.updatePlayerLabel();
     this.bubble.update(); // своё чат-облачко едет за игроком (если follow задан)
     for (const rp of this.remotePlayers.values()) rp.update();
+    this.updateItems(delta);
 
     // На парковке управление недоступно — работает только меню.
     if (this.atParking) {
@@ -678,6 +690,24 @@ export class WorldScene extends Phaser.Scene {
     } else {
       this.prompt.setVisible(false);
     }
+  }
+
+  // Физика предметов: отскоки от NPC и чужих игроков, удары своего игрока.
+  // Скорость игрока берётся с прошлого кадра — для направления удара этого достаточно.
+  private updateItems(delta: number): void {
+    const player = this.player.visible
+      ? {
+          x: this.player.x,
+          y: this.player.y,
+          r: BODY_RADIUS,
+          vx: this.player.body.velocity.x,
+          vy: this.player.body.velocity.y,
+        }
+      : null;
+    const obstacles: ObstacleCircle[] = [];
+    for (const npc of this.npcs) obstacles.push({ x: npc.x, y: npc.y, r: BODY_RADIUS });
+    for (const rp of this.remotePlayers.values()) obstacles.push({ x: rp.x, y: rp.y, r: BODY_RADIUS });
+    this.items.update(delta, player, obstacles);
   }
 
   // Действие по Space/Enter рядом с объектом. Приоритет: NPC → телевизор → дверь.

@@ -14,6 +14,16 @@ export interface RemoteState {
   facing: boolean;
 }
 
+// Состояние физичного предмета в комнате (приходит с сервера). Сервер знает
+// только предметы, по которым уже били: остальные стоят на точках из карты.
+export interface RemoteItemState {
+  id: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+}
+
 export interface RealtimeHandlers {
   onOpen?: () => void; // соединение открыто (в т.ч. после реконнекта) — здесь шлём join
   onSnapshot?: (players: RemoteState[]) => void;
@@ -22,6 +32,9 @@ export interface RealtimeHandlers {
   onChat?: (id: string, login: string, text: string) => void;
   onEmote?: (id: string, emote: string) => void;
   onLeft?: (id: string) => void;
+  onItems?: (items: RemoteItemState[]) => void; // снапшот предметов комнаты
+  onItemKicked?: (itemId: string, kickId: string, x: number, y: number, vx: number, vy: number) => void;
+  onItemMoved?: (itemId: string, x: number, y: number, vx: number, vy: number) => void;
 }
 
 // Клиент реалтайма мультиплеера. Токен передаётся в query (браузерный WebSocket не
@@ -64,6 +77,16 @@ export class Realtime {
     this.send({ type: "emote", emote });
   }
 
+  // Удар по предмету: сервер выбирает один из конкурентных ударов и рассылает itemKicked.
+  itemKick(itemId: string, kickId: string, x: number, y: number, vx: number, vy: number): void {
+    this.send({ type: "itemKick", itemId, kickId, x, y, vx, vy });
+  }
+
+  // Стрим позиции предмета владельцем (последним ударившим).
+  itemMove(itemId: string, x: number, y: number, vx: number, vy: number): void {
+    this.send({ type: "itemMove", itemId, x, y, vx, vy });
+  }
+
   private open(): void {
     const token = getToken() ?? "";
     const ws = new WebSocket(`${WS_BASE}?token=${encodeURIComponent(token)}`);
@@ -83,6 +106,9 @@ export class Realtime {
       case "chat": this.handlers.onChat?.(msg.id, msg.login, msg.text); break;
       case "emote": this.handlers.onEmote?.(msg.id, msg.emote); break;
       case "left": this.handlers.onLeft?.(msg.id); break;
+      case "items": this.handlers.onItems?.(msg.items); break;
+      case "itemKicked": this.handlers.onItemKicked?.(msg.itemId, msg.kickId, msg.x, msg.y, msg.vx, msg.vy); break;
+      case "itemMoved": this.handlers.onItemMoved?.(msg.itemId, msg.x, msg.y, msg.vx, msg.vy); break;
     }
   }
 

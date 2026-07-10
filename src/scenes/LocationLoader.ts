@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { CHARACTERS, type Character } from "../data/characters";
 import type { LocationDef } from "../data/locations";
+import { ITEM_TYPES, type PlacedItemDef } from "../data/items";
 import { spriteScale } from "../entities/sprites";
 
 export type Spawn = { x: number; y: number };
@@ -19,6 +20,7 @@ export interface LoadedLocation {
   spawns: Map<string, Spawn>;        // точки появления персонажей (слой spawns, ключ — id персонажа)
   interactions: Map<string, Spawn>;  // интерактивные точки (слой interactions, напр. "tv")
   rects: Map<string, Rect>;          // прямоугольные объекты слоя interactions (напр. "tvScreen")
+  items: PlacedItemDef[];            // физичные предметы (слой items, имя точки = тип предмета)
 }
 
 // Строит сцену локации: фон, overlay двери, коллизии и NPC. Держит у себя список
@@ -47,9 +49,9 @@ export class LocationLoader {
     }
 
     const empty = () => new Map<string, Spawn>();
-    const { doors, spawns, interactions, rects } = cfg.map
+    const { doors, spawns, interactions, rects, items } = cfg.map
       ? this.buildFromMap(cfg.map)
-      : { doors: empty(), spawns: empty(), interactions: empty(), rects: new Map<string, Rect>() };
+      : { doors: empty(), spawns: empty(), interactions: empty(), rects: new Map<string, Rect>(), items: [] };
 
     const npcs: PlacedNpc[] = cfg.isParking || hideNpcs
       ? []
@@ -57,22 +59,25 @@ export class LocationLoader {
           .map((char) => ({ char, ...(spawns.get(char.id) ?? { x: 0, y: 0 }) }));
     for (const npc of npcs) this.addNpc(npc);
 
-    return { npcs, doors, spawns, interactions, rects };
+    return { npcs, doors, spawns, interactions, rects, items };
   }
 
   // Из карты Tiled: collision -> стены, doors -> двери (имя = id соседней локации),
-  // spawns -> точки персонажей (имя = id персонажа), interactions -> интерактивные объекты.
+  // spawns -> точки персонажей (имя = id персонажа), interactions -> интерактивные
+  // объекты, items -> физичные предметы (имя = тип предмета).
   private buildFromMap(mapKey: string): {
     doors: Map<string, Spawn>;
     spawns: Map<string, Spawn>;
     interactions: Map<string, Spawn>;
     rects: Map<string, Rect>;
+    items: PlacedItemDef[];
   } {
     const doors = new Map<string, Spawn>();
     const spawns = new Map<string, Spawn>();
     const interactions = new Map<string, Spawn>();
     const rects = new Map<string, Rect>();
-    if (!this.scene.cache.tilemap.exists(mapKey)) return { doors, spawns, interactions, rects };
+    const items: PlacedItemDef[] = [];
+    if (!this.scene.cache.tilemap.exists(mapKey)) return { doors, spawns, interactions, rects, items };
 
     const map = this.scene.make.tilemap({ key: mapKey });
 
@@ -100,7 +105,14 @@ export class LocationLoader {
       }
     });
 
-    return { doors, spawns, interactions, rects };
+    // Предметы: id объекта Tiled стабилен и уникален в пределах карты — из него
+    // строится id предмета, общий для всех клиентов и сервера.
+    map.getObjectLayer("items")?.objects.forEach((o) => {
+      if (!ITEM_TYPES[o.name]) return;
+      items.push({ id: `${o.name}-${o.id}`, type: o.name, x: o.x ?? 0, y: o.y ?? 0 });
+    });
+
+    return { doors, spawns, interactions, rects, items };
   }
 
   private addNpc(npc: PlacedNpc): void {

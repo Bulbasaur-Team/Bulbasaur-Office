@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { ALL_SPRITES, SPRITE_FILES } from "../entities/sprites";
 import { LOCATIONS } from "../data/locations";
+import { ITEM_TYPES } from "../data/items";
 import { publicPath } from "../publicPath";
 
 export class BootScene extends Phaser.Scene {
@@ -32,6 +33,10 @@ export class BootScene extends Phaser.Scene {
 
     for (const key of ALL_SPRITES) {
       this.load.image(key, publicPath(`assets/${SPRITE_FILES[key]}`));
+    }
+
+    for (const def of Object.values(ITEM_TYPES)) {
+      this.load.image(def.texture, publicPath(`assets/items/${def.file}`));
     }
   }
 
