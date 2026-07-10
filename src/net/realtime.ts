@@ -87,6 +87,7 @@ export interface RealtimeHandlers {
   onPokerState?: (state: PokerStateView) => void;
   onPokerClosed?: () => void;
   onPokerError?: (message: string) => void;
+  onAchievement?: (code: string, title: string, description: string, image: string) => void; // выдана ачивка
 }
 
 // Клиент реалтайма мультиплеера. Токен передаётся в query (браузерный WebSocket не
@@ -197,6 +198,7 @@ export class Realtime {
       case "pokerState": this.handlers.onPokerState?.(msg); break;
       case "pokerClosed": this.handlers.onPokerClosed?.(); break;
       case "pokerError": this.handlers.onPokerError?.(msg.message); break;
+      case "achievement": this.handlers.onAchievement?.(msg.code, msg.title, msg.description, msg.image); break;
     }
   }
 

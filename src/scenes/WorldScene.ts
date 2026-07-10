@@ -37,19 +37,21 @@ import { ItemsManager, type ObstacleCircle } from "../entities/ItemsManager";
 import { LocationLoader, type Spawn, type Rect, type PlacedNpc } from "./LocationLoader";
 import { AuthGate } from "../ui/AuthGate";
 import { Leaderboard, type LeaderboardGame } from "../ui/Leaderboard";
+import { Achievements } from "../ui/Achievements";
+import { AchievementPopup } from "../ui/AchievementPopup";
 import { Joystick, isTouch } from "../ui/TouchControls";
 import * as api from "../net/api";
 
 // Мини-игры для лидерборда: порядок листания, заголовок и формат значения.
 const GAMES: LeaderboardGame[] = [
+  // Отдельные лидерборды слова дня (по числу попыток, меньше — лучше).
+  { id: "wotd-bulbaguess", code: "bulbaguess", daily: true, title: "Слово дня: Bulba Guess", format: (v) => v + " поп." },
+  { id: "wotd-bulbawordle", code: "bulbawordle", daily: true, title: "Слово дня: Bulba Wordle", format: (v) => v + " поп." },
   { id: "bulbajump", title: "Bulba Jump", format: (v) => String(v) },
   { id: "bulbapacker", title: "Bulba Packer", format: (v) => String(v) },
   { id: "bulbaparking", title: "Bulba Parking", format: (v) => (v / 1000).toFixed(1) + " с" },
   { id: "bulbaguess", title: "Bulba Guess", format: (v) => v + " поп." },
   { id: "bulbawordle", title: "Bulba Wordle", format: (v) => v + " слов" },
-  // Отдельные лидерборды слова дня (по числу попыток, меньше — лучше).
-  { id: "wotd-bulbaguess", code: "bulbaguess", daily: true, title: "Слово дня: Bulba Guess", format: (v) => v + " поп." },
-  { id: "wotd-bulbawordle", code: "bulbawordle", daily: true, title: "Слово дня: Bulba Wordle", format: (v) => v + " поп." },
 ];
 
 // Соответствие базовой игры её id в списке дневных лидербордов.
@@ -103,6 +105,8 @@ export class WorldScene extends Phaser.Scene {
   private poker!: PlanningPoker;
   private authGate!: AuthGate;
   private leaderboard!: Leaderboard;
+  private achievements!: Achievements;
+  private achievementPopup!: AchievementPopup;
   private joystick: Joystick | null = null;
   private activeGame: ArcadeGame | null = null;
   private playerBaseScale = 1; // исходный масштаб игрока (анимация множит на него)
@@ -196,6 +200,9 @@ export class WorldScene extends Phaser.Scene {
     // По завершении партии игра отдаёт результат — отправляем его и показываем лидерборд.
     this.leaderboard = new Leaderboard(GAMES);
     document.getElementById("lbBtn")!.onclick = () => void this.leaderboard.open();
+    this.achievements = new Achievements();
+    this.achievementPopup = new AchievementPopup();
+    document.getElementById("achBtn")!.onclick = () => void this.achievements.open();
     document.getElementById("logoutBtn")!.onclick = () => {
       api.logout();
       window.location.reload();
@@ -404,6 +411,7 @@ export class WorldScene extends Phaser.Scene {
       onPokerState: (state) => this.poker.onState(state),
       onPokerClosed: () => this.poker.onClosed(),
       onPokerError: (message) => this.poker.onError(message),
+      onAchievement: (_code, title, description, image) => this.achievementPopup.show(title, description, image),
     });
   }
 

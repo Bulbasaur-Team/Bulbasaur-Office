@@ -91,6 +91,25 @@ export function fetchDailyProgress(gameId: string): Promise<DailyProgress> {
   return authedJson<DailyProgress>(`/api/wotd/${gameId}/progress`);
 }
 
+// Ачивки: весь каталог с признаком «получена» и счётчиком полученных.
+export interface Achievement {
+  code: string;
+  title: string;
+  description: string;
+  image: string;
+  owned: boolean;
+}
+
+export interface Achievements {
+  achievements: Achievement[];
+  owned: number;
+  total: number;
+}
+
+export function fetchAchievements(): Promise<Achievements> {
+  return authedJson<Achievements>(`/api/achievements`);
+}
+
 export function saveDailyProgress(gameId: string, state: DailyProgress): Promise<DailyProgress> {
   return authedJson<DailyProgress>(`/api/wotd/${gameId}/progress`, {
     method: "PUT",
