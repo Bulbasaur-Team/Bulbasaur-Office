@@ -31,6 +31,7 @@ import type { RoleDef } from "../data/roles";
 import { spriteForRole } from "../data/roles";
 import { EMOTES, emojiForEmote } from "../data/emotes";
 import { Realtime, type RemoteState } from "../net/realtime";
+import { PlanningPoker } from "../ui/PlanningPoker";
 import { RemotePlayer } from "../entities/RemotePlayer";
 import { ItemsManager, type ObstacleCircle } from "../entities/ItemsManager";
 import { LocationLoader, type Spawn, type Rect, type PlacedNpc } from "./LocationLoader";
@@ -99,6 +100,7 @@ export class WorldScene extends Phaser.Scene {
   private bulbaGuess!: BulbaGuess;
   private bulbaWordle!: BulbaWordle;
   private tvScreen!: TvScreen;
+  private poker!: PlanningPoker;
   private authGate!: AuthGate;
   private leaderboard!: Leaderboard;
   private joystick: Joystick | null = null;
@@ -229,6 +231,23 @@ export class WorldScene extends Phaser.Scene {
 
     this.gameMenu = new GameMenu((id) => this.openGame(id));
 
+    // Planning poker (только мультиплеер): модалка шлёт команды в реалтайм,
+    // ответы сервера роутятся в неё из handlers в startAsRole.
+    this.poker = new PlanningPoker({
+      list: () => this.realtime.pokerList(),
+      create: (name) => this.realtime.pokerCreate(name),
+      join: (roomId) => this.realtime.pokerJoin(roomId),
+      leave: () => this.realtime.pokerLeave(),
+      addTask: (title) => this.realtime.pokerAddTask(title),
+      vote: (value) => this.realtime.pokerVote(value),
+      finish: () => this.realtime.pokerFinish(),
+      close: () => this.realtime.pokerClose(),
+    });
+    document.getElementById("pokerBtn")!.onclick = () => {
+      (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
+      this.poker.open();
+    };
+
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.keys = this.input.keyboard!.addKeys("W,A,S,D") as Record<string, Phaser.Input.Keyboard.Key>;
 
@@ -238,6 +257,7 @@ export class WorldScene extends Phaser.Scene {
     // (диалог, выбор игры, парковка). Выход в дверь и взаимодействие с NPC/TV
     // разбираются в update() — там Space и Enter равноценны.
     this.router.register(this.slides);
+    this.router.register(this.poker);
     this.router.register(this.dialogue);
     this.router.register(this.gameMenu);
     this.router.register(this.menu);
@@ -362,12 +382,16 @@ export class WorldScene extends Phaser.Scene {
     };
     this.startAs(me);
     this.showEmoteBar();
+    document.getElementById("workGroup")!.classList.remove("hidden");
     // Предметы: свои удары и стрим позиции уходят на сервер (в одиночке колбэки не заданы).
     this.items.onKick = (itemId, kickId, x, y, vx, vy) => this.realtime.itemKick(itemId, kickId, x, y, vx, vy);
     this.items.onSync = (itemId, x, y, vx, vy) => this.realtime.itemMove(itemId, x, y, vx, vy);
     // Чат временно отключён: поле ввода не показываем. Реакции (фиксированный набор) — есть.
     this.realtime.connect({
-      onOpen: () => this.sendJoin(),
+      onOpen: () => {
+        this.sendJoin();
+        this.poker.onReconnect();
+      },
       onSnapshot: (players) => this.onSnapshot(players),
       onJoined: (player) => this.addRemote(player),
       onMoved: (id, x, y, facing) => this.remotePlayers.get(id)?.setTarget(x, y, facing),
@@ -376,6 +400,10 @@ export class WorldScene extends Phaser.Scene {
       onItems: (items) => this.items.applySnapshot(items),
       onItemKicked: (itemId, kickId, x, y, vx, vy) => this.items.applyKicked(itemId, kickId, x, y, vx, vy),
       onItemMoved: (itemId, x, y, vx, vy) => this.items.applyMoved(itemId, x, y, vx, vy),
+      onPokerRooms: (rooms) => this.poker.onRooms(rooms),
+      onPokerState: (state) => this.poker.onState(state),
+      onPokerClosed: () => this.poker.onClosed(),
+      onPokerError: (message) => this.poker.onError(message),
     });
   }
 
@@ -539,7 +567,8 @@ export class WorldScene extends Phaser.Scene {
       (this.bulbaParking.isOpen && !this.bulbaParking.minimized) ||
       (this.bulbaGuess.isOpen && !this.bulbaGuess.minimized) ||
       (this.bulbaWordle.isOpen && !this.bulbaWordle.minimized) ||
-      this.leaderboard.isOpen
+      this.leaderboard.isOpen ||
+      this.poker.isOpen
     );
   }
 

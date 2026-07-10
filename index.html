@@ -235,6 +235,73 @@
     #slides.maximized .slides-nav.next { right: 14px; }
     #slides.maximized .slides-count { position: absolute; bottom: 12px; }
 
+    /* Planning Poker */
+    #poker { position: fixed; inset: 0; z-index: 40; background: rgba(8,10,14,.82); display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .poker-box {
+      position: relative; width: min(860px, calc(var(--sw) * .92)); max-height: calc(var(--sh) - 48px);
+      overflow-y: auto; border: 3px solid var(--accent); border-radius: 16px; padding: 24px 28px;
+      display: flex; flex-direction: column; gap: 14px; box-shadow: 0 12px 44px rgba(0,0,0,.55);
+      background: linear-gradient(rgba(15,18,23,.86), rgba(15,18,23,.86)), url("assets/planning-poker-background.png") center / cover, var(--panel);
+    }
+    #poker.maximized { padding: 0; }
+    #poker.maximized .poker-box { width: var(--sw); height: var(--sh); max-height: none; border: none; border-radius: 0; }
+    .poker-full-btn { position: absolute; top: 10px; left: 10px; }
+    .poker-close-btn { position: absolute; top: 10px; right: 10px; }
+    .poker-full-btn .ic-compress { display: none; }
+    #poker.maximized .poker-full-btn .ic-expand { display: none; }
+    #poker.maximized .poker-full-btn .ic-compress { display: block; }
+    .poker-title { margin: 4px 0 0; text-align: center; }
+    .poker-error { min-height: 18px; color: #e6807a; font-size: 14px; text-align: center; }
+    #pokerLobby, #pokerRoomView { display: flex; flex-direction: column; gap: 14px; }
+    .poker-rooms { display: flex; flex-direction: column; gap: 8px; max-height: calc(var(--sh) * .4); overflow-y: auto; }
+    .poker-empty { text-align: center; opacity: .7; font-size: 14px; padding: 12px 0; }
+    .poker-room-btn {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      background: rgba(38,43,51,.85); border: 2px solid var(--accent); border-radius: 12px;
+      padding: 12px 16px; color: var(--text); font-family: inherit; font-size: 15px; cursor: pointer; transition: .12s;
+    }
+    .poker-room-btn:hover { background: var(--accent); color: #14210f; }
+    .poker-room-title { font-weight: bold; }
+    .poker-room-meta { font-size: 12px; opacity: .75; }
+    .poker-form { display: flex; gap: 8px; justify-content: center; }
+    .poker-input { flex: 1; max-width: 380px; background: #f4f1e8; border: 2px solid var(--accent); border-radius: 10px; padding: 9px 14px; color: #1b1f24; font-family: inherit; font-size: 15px; }
+    .poker-input:focus { outline: none; border-color: #8fd06b; }
+    .poker-btn { background: var(--accent); border: 2px solid #5aa05a; border-radius: 10px; padding: 9px 16px; color: #14210f; font-family: inherit; font-size: 14px; font-weight: bold; cursor: pointer; }
+    .poker-btn:hover { filter: brightness(1.08); }
+    .poker-btn-danger { background: transparent; border-color: #6b3535; color: #e6807a; }
+    .poker-btn-danger:hover { background: #c94f4f; border-color: #c94f4f; color: #fff; filter: none; }
+    .poker-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-right: 88px; }
+    .poker-room-name { font-size: 18px; font-weight: bold; }
+    .poker-timer { font-size: 13px; opacity: .8; white-space: nowrap; }
+    .poker-done { display: flex; flex-direction: column; gap: 4px; max-height: calc(var(--sh) * .22); overflow-y: auto; }
+    .poker-done-row { display: flex; justify-content: space-between; gap: 12px; border: 1px solid #353c46; border-radius: 8px; padding: 6px 12px; font-size: 14px; background: rgba(38,43,51,.6); }
+    .poker-done-avg { font-weight: bold; }
+    .poker-current { text-align: center; font-size: 17px; font-weight: bold; min-height: 22px; }
+    .poker-cards { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; min-height: 128px; }
+    .poker-slot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .poker-card {
+      width: 76px; height: 104px; border: 2px solid var(--accent); border-radius: 10px;
+      background: #f4f1e8; color: #1b1f24; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 2px;
+    }
+    .poker-card-val { font-size: 22px; font-weight: bold; }
+    .poker-card-back { background: repeating-linear-gradient(45deg, #5aa05a 0 8px, #4c8c4c 8px 16px); }
+    .poker-card-empty { background: transparent; border-style: dashed; opacity: .45; }
+    .poker-login { font-size: 12px; opacity: .85; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .poker-result { text-align: center; font-size: 16px; min-height: 20px; }
+    .poker-hand { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .poker-hand-card {
+      width: 54px; height: 76px; border: 2px solid var(--accent); border-radius: 8px;
+      background: #f4f1e8; color: #1b1f24; font-family: inherit; font-size: 20px; font-weight: bold;
+      cursor: pointer; transition: .12s;
+    }
+    .poker-hand-card:hover { transform: translateY(-3px); }
+    .poker-hand-card.sel { background: var(--accent); border-color: #5aa05a; transform: translateY(-6px); }
+    .poker-admin { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    html.bp-640 .poker-box { padding: 16px 12px; }
+    html.bp-640 .poker-card { width: 60px; height: 84px; }
+    html.bp-640 .poker-hand-card { width: 44px; height: 62px; font-size: 17px; }
+
     /* Авторизация */
     #auth { position: fixed; inset: 0; z-index: 60; background: rgba(15,18,23,.97); display: flex; align-items: center; justify-content: center; padding: 20px; }
     .auth-box { background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 26px 30px; width: min(360px, calc(var(--sw) * .9)); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
@@ -538,6 +605,10 @@
     <details id="hudPanel" class="hud-panel hidden">
       <summary class="hud-toggle">☰ Меню</summary>
       <div class="hud-body">
+        <div id="workGroup" class="hud-group hidden">
+          <div class="hud-label">Работа</div>
+          <button id="pokerBtn" class="hud-btn" aria-label="planning poker">🃏 Planning Poker</button>
+        </div>
         <div class="hud-group">
           <div class="hud-label">Слово дня</div>
           <button id="wotdGuessBtn" class="hud-btn" aria-label="слово дня guess">📅 Bulba Guess</button>
@@ -555,6 +626,43 @@
         </div>
       </div>
     </details>
+
+    <div id="poker" class="hidden">
+      <div class="poker-box">
+        <button class="slides-icon poker-full-btn" id="pokerFull" aria-label="во весь экран">
+          <svg class="ic-expand" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+          <svg class="ic-compress" viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+        </button>
+        <button class="slides-icon poker-close-btn" id="pokerClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <div class="poker-error" id="pokerError"></div>
+        <div id="pokerLobby">
+          <h2 class="poker-title">Planning Poker</h2>
+          <div class="poker-rooms" id="pokerRooms"></div>
+          <form id="pokerCreateForm" class="poker-form" autocomplete="off">
+            <input id="pokerName" class="poker-input" type="text" maxlength="60" value="Planning Poker WDM" />
+            <button class="poker-btn" type="submit">Создать комнату</button>
+          </form>
+        </div>
+        <div id="pokerRoomView" class="hidden">
+          <div class="poker-head">
+            <div class="poker-room-name" id="pokerRoomName"></div>
+            <div class="poker-timer" id="pokerTimer"></div>
+          </div>
+          <div class="poker-done" id="pokerDone"></div>
+          <div class="poker-current" id="pokerCurrent"></div>
+          <div class="poker-cards" id="pokerCards"></div>
+          <div class="poker-result" id="pokerResult"></div>
+          <div class="poker-hand" id="pokerHand"></div>
+          <div class="poker-admin" id="pokerAdmin"></div>
+          <form id="pokerTaskForm" class="poker-form hidden" autocomplete="off">
+            <input id="pokerTaskTitle" class="poker-input" type="text" maxlength="200" placeholder="Название задачи" />
+            <button class="poker-btn" type="submit">Начать голосование</button>
+          </form>
+        </div>
+      </div>
+    </div>
 
     <div id="leaderboard" class="hidden">
       <div class="lb-box">

@@ -24,6 +24,54 @@ export interface RemoteItemState {
   vy: number;
 }
 
+// Активная покер-комната в лобби.
+export interface PokerRoomSummary {
+  id: string;
+  name: string;
+  adminLogin: string;
+  participants: number;
+}
+
+export interface PokerParticipantView {
+  login: string;
+  role: string;
+  admin: boolean;
+  voted: boolean;
+}
+
+// Вскрытый голос (после завершения голосования).
+export interface PokerVoteView {
+  login: string;
+  role: string;
+  value: string;
+}
+
+export interface PokerCurrentView {
+  title: string;
+  revealed: boolean;
+  average: number | null;
+  recommended: number | null;
+  votes: PokerVoteView[];
+}
+
+export interface PokerDoneTaskView {
+  title: string;
+  average: number | null;
+  recommended: number | null;
+}
+
+// Полное состояние покер-комнаты (персонализировано сервером: isAdmin, myVote).
+export interface PokerStateView {
+  id: string;
+  name: string;
+  isAdmin: boolean;
+  remainingMs: number;
+  myVote: string | null;
+  participants: PokerParticipantView[];
+  current: PokerCurrentView | null;
+  tasks: PokerDoneTaskView[];
+}
+
 export interface RealtimeHandlers {
   onOpen?: () => void; // соединение открыто (в т.ч. после реконнекта) — здесь шлём join
   onSnapshot?: (players: RemoteState[]) => void;
@@ -35,6 +83,10 @@ export interface RealtimeHandlers {
   onItems?: (items: RemoteItemState[]) => void; // снапшот предметов комнаты
   onItemKicked?: (itemId: string, kickId: string, x: number, y: number, vx: number, vy: number) => void;
   onItemMoved?: (itemId: string, x: number, y: number, vx: number, vy: number) => void;
+  onPokerRooms?: (rooms: PokerRoomSummary[]) => void;
+  onPokerState?: (state: PokerStateView) => void;
+  onPokerClosed?: () => void;
+  onPokerError?: (message: string) => void;
 }
 
 // Клиент реалтайма мультиплеера. Токен передаётся в query (браузерный WebSocket не
@@ -87,6 +139,38 @@ export class Realtime {
     this.send({ type: "itemMove", itemId, x, y, vx, vy });
   }
 
+  pokerList(): void {
+    this.send({ type: "pokerList" });
+  }
+
+  pokerCreate(name: string): void {
+    this.send({ type: "pokerCreate", name });
+  }
+
+  pokerJoin(roomId: string): void {
+    this.send({ type: "pokerJoin", roomId });
+  }
+
+  pokerLeave(): void {
+    this.send({ type: "pokerLeave" });
+  }
+
+  pokerAddTask(title: string): void {
+    this.send({ type: "pokerAddTask", title });
+  }
+
+  pokerVote(value: string): void {
+    this.send({ type: "pokerVote", value });
+  }
+
+  pokerFinish(): void {
+    this.send({ type: "pokerFinish" });
+  }
+
+  pokerClose(): void {
+    this.send({ type: "pokerClose" });
+  }
+
   private open(): void {
     const token = getToken() ?? "";
     const ws = new WebSocket(`${WS_BASE}?token=${encodeURIComponent(token)}`);
@@ -109,6 +193,10 @@ export class Realtime {
       case "items": this.handlers.onItems?.(msg.items); break;
       case "itemKicked": this.handlers.onItemKicked?.(msg.itemId, msg.kickId, msg.x, msg.y, msg.vx, msg.vy); break;
       case "itemMoved": this.handlers.onItemMoved?.(msg.itemId, msg.x, msg.y, msg.vx, msg.vy); break;
+      case "pokerRooms": this.handlers.onPokerRooms?.(msg.rooms); break;
+      case "pokerState": this.handlers.onPokerState?.(msg); break;
+      case "pokerClosed": this.handlers.onPokerClosed?.(); break;
+      case "pokerError": this.handlers.onPokerError?.(msg.message); break;
     }
   }
 
