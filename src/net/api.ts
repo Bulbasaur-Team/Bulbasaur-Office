@@ -91,13 +91,15 @@ export function fetchDailyProgress(gameId: string): Promise<DailyProgress> {
   return authedJson<DailyProgress>(`/api/wotd/${gameId}/progress`);
 }
 
-// Ачивки: весь каталог с признаком «получена» и счётчиком полученных.
+// Ачивки: весь каталог с признаком «получена», редкостью и счётчиком полученных.
+// Сервер отдаёт список отсортированным по редкости (сначала самые распространённые).
 export interface Achievement {
   code: string;
   title: string;
   description: string;
   image: string;
   owned: boolean;
+  percent: number; // процент игроков, у которых есть ачивка
 }
 
 export interface Achievements {
@@ -108,6 +110,67 @@ export interface Achievements {
 
 export function fetchAchievements(): Promise<Achievements> {
   return authedJson<Achievements>(`/api/achievements`);
+}
+
+// Ачивки другого игрока (для сообщества).
+export function fetchPlayerAchievements(login: string): Promise<Achievements> {
+  return authedJson<Achievements>(`/api/achievements/${encodeURIComponent(login)}`);
+}
+
+// Сообщество: игроки в порядке регистрации; role == null — роль ещё не выбрана.
+export interface CommunityPlayer {
+  login: string;
+  role: string | null;
+  owned: number;
+}
+
+export interface Community {
+  players: CommunityPlayer[];
+  totalAchievements: number;
+}
+
+export function fetchCommunity(): Promise<Community> {
+  return authedJson<Community>(`/api/community`);
+}
+
+// Профиль: сохранённая роль (null — игрок ещё не выбирал Бульбазавра).
+export interface Profile {
+  login: string;
+  role: string | null;
+}
+
+export function fetchProfile(): Promise<Profile> {
+  return authedJson<Profile>(`/api/account/profile`);
+}
+
+export async function saveRole(role: string): Promise<void> {
+  await authedVoid(`/api/account/role`, {
+    method: "PUT",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  await authedVoid(`/api/account/password`, {
+    method: "POST",
+    body: JSON.stringify({ oldPassword, newPassword }),
+  });
+}
+
+// Как authedJson, но для эндпоинтов без тела ответа (204).
+async function authedVoid(path: string, init: RequestInit): Promise<void> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getToken() ?? ""}`,
+    },
+  });
+  if (res.status === 401 || res.status === 403) {
+    logout();
+    throw new Error("Сессия истекла — войдите заново");
+  }
+  if (!res.ok) throw new Error(await errorMessage(res));
 }
 
 export function saveDailyProgress(gameId: string, state: DailyProgress): Promise<DailyProgress> {

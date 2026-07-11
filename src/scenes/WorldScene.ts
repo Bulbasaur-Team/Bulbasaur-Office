@@ -28,7 +28,7 @@ import { showCharacterSelect } from "../ui/CharacterSelect";
 import { showModeSelect } from "../ui/ModeSelect";
 import { showRoleSelect } from "../ui/RoleSelect";
 import type { RoleDef } from "../data/roles";
-import { spriteForRole } from "../data/roles";
+import { ROLES, spriteForRole } from "../data/roles";
 import { EMOTES, emojiForEmote } from "../data/emotes";
 import { Realtime, type RemoteState } from "../net/realtime";
 import { PlanningPoker } from "../ui/PlanningPoker";
@@ -39,6 +39,8 @@ import { AuthGate } from "../ui/AuthGate";
 import { Leaderboard, type LeaderboardGame } from "../ui/Leaderboard";
 import { Achievements } from "../ui/Achievements";
 import { AchievementPopup } from "../ui/AchievementPopup";
+import { Community } from "../ui/Community";
+import { PasswordChange } from "../ui/PasswordChange";
 import { Joystick, isTouch } from "../ui/TouchControls";
 import * as api from "../net/api";
 
@@ -55,6 +57,10 @@ const GAMES: LeaderboardGame[] = [
 ];
 
 // Соответствие базовой игры её id в списке дневных лидербордов.
+// Флаг в sessionStorage: после «Сменить режим» показать экран выбора режима,
+// который при обычном входе пропускается (по умолчанию — мультиплеер).
+const PICK_MODE_KEY = "bulba_pick_mode";
+
 const WOTD_BOARD_ID: Record<string, string> = {
   bulbaguess: "wotd-bulbaguess",
   bulbawordle: "wotd-bulbawordle",
@@ -107,6 +113,8 @@ export class WorldScene extends Phaser.Scene {
   private leaderboard!: Leaderboard;
   private achievements!: Achievements;
   private achievementPopup!: AchievementPopup;
+  private community!: Community;
+  private passwordChange!: PasswordChange;
   private joystick: Joystick | null = null;
   private activeGame: ArcadeGame | null = null;
   private playerBaseScale = 1; // исходный масштаб игрока (анимация множит на него)
@@ -203,13 +211,35 @@ export class WorldScene extends Phaser.Scene {
     this.achievements = new Achievements();
     this.achievementPopup = new AchievementPopup();
     document.getElementById("achBtn")!.onclick = () => void this.achievements.open();
+    this.community = new Community((login) => void this.achievements.open(login));
+    document.getElementById("communityBtn")!.onclick = () => void this.community.open();
+    this.passwordChange = new PasswordChange();
+    document.getElementById("passBtn")!.onclick = () => {
+      (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
+      this.passwordChange.open();
+    };
+    // Сменить Бульбазавра: тот же экран выбора роли; после сохранения — перезагрузка,
+    // чтобы чисто применить новый скин (как при смене режима).
+    document.getElementById("roleBtn")!.onclick = () => {
+      (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
+      showRoleSelect((role) => {
+        api.saveRole(role.id).then(
+          () => window.location.reload(),
+          (e) => console.error("Не удалось сохранить роль:", e),
+        );
+      });
+    };
     document.getElementById("logoutBtn")!.onclick = () => {
       api.logout();
       window.location.reload();
     };
-    // Сменить режим: перезагрузка (токен в localStorage сохраняется) возвращает к
-    // выбору режима и чисто рвёт мультиплеерное соединение/состояние.
-    document.getElementById("modeBtn")!.onclick = () => window.location.reload();
+    // Сменить режим: перезагрузка (токен в localStorage сохраняется) чисто рвёт
+    // мультиплеерное соединение/состояние; флаг заставляет показать выбор режима,
+    // который при обычном входе пропускается.
+    document.getElementById("modeBtn")!.onclick = () => {
+      sessionStorage.setItem(PICK_MODE_KEY, "1");
+      window.location.reload();
+    };
     document.getElementById("deleteBtn")!.onclick = () => void this.deleteAccount();
     document.getElementById("wotdGuessBtn")!.onclick = () => void this.openDailyGame("bulbaguess");
     document.getElementById("wotdWordleBtn")!.onclick = () => void this.openDailyGame("bulbawordle");
@@ -284,15 +314,42 @@ export class WorldScene extends Phaser.Scene {
     // Ввод чата (мультиплеер): stopPropagation, чтобы клавиши не уходили в управление миром.
     this.chatInput.addEventListener("keydown", (e) => this.onChatKey(e));
 
-    // Сначала вход/регистрация, затем выбор режима: одиночная (персонаж) или мультиплеер (роль).
+    // Сначала вход/регистрация. Режим по умолчанию — мультиплеер; экран выбора режима
+    // показывается только после кнопки «Сменить режим» (по флагу в sessionStorage).
     this.authGate = new AuthGate();
-    const chooseMode = () =>
-      showModeSelect((mode) => {
-        if (mode === "single") showCharacterSelect(CHARACTERS, (chosen) => this.startAs(chosen));
-        else showRoleSelect((role) => this.startAsRole(role));
-      });
-    if (api.isAuthenticated()) chooseMode();
-    else void this.authGate.open().then(chooseMode);
+    const start = () => {
+      if (sessionStorage.getItem(PICK_MODE_KEY)) {
+        sessionStorage.removeItem(PICK_MODE_KEY);
+        showModeSelect((mode) => {
+          if (mode === "single") showCharacterSelect(CHARACTERS, (chosen) => this.startAs(chosen));
+          else void this.startMultiplayer();
+        });
+      } else {
+        void this.startMultiplayer();
+      }
+    };
+    if (api.isAuthenticated()) start();
+    else void this.authGate.open().then(start);
+  }
+
+  // Старт мультиплеера: сохранённая роль — сразу в игру; нет роли (первый вход) —
+  // экран выбора, выбор запоминается на сервере.
+  private async startMultiplayer(): Promise<void> {
+    let savedRole: RoleDef | undefined;
+    try {
+      const profile = await api.fetchProfile();
+      savedRole = ROLES.find((r) => r.id === profile.role);
+    } catch (e) {
+      console.error("Не удалось получить профиль:", e);
+    }
+    if (savedRole) {
+      this.startAsRole(savedRole);
+      return;
+    }
+    showRoleSelect((role) => {
+      api.saveRole(role.id).catch((e) => console.error("Не удалось сохранить роль:", e));
+      this.startAsRole(role);
+    });
   }
 
   // Отправить результат мини-игры на сервер и показать лидерборд.
@@ -356,7 +413,10 @@ export class WorldScene extends Phaser.Scene {
     // Без fromId — игрок встанет на точку своего персонажа из слоя spawns.
     this.loadLocation(0);
     this.started = true;
-    document.getElementById("hudPanel")!.classList.remove("hidden");
+    const hudPanel = document.getElementById("hudPanel") as HTMLDetailsElement;
+    hudPanel.classList.remove("hidden");
+    // На ПК меню сразу развёрнуто; на тач-устройствах — свёрнуто, чтобы не занимать экран.
+    if (!isTouch()) hudPanel.open = true;
   }
 
   // Удалить аккаунт: подтверждение, запрос на сервер, затем выход и перезагрузка.
@@ -576,6 +636,9 @@ export class WorldScene extends Phaser.Scene {
       (this.bulbaGuess.isOpen && !this.bulbaGuess.minimized) ||
       (this.bulbaWordle.isOpen && !this.bulbaWordle.minimized) ||
       this.leaderboard.isOpen ||
+      this.achievements.isOpen ||
+      this.community.isOpen ||
+      this.passwordChange.isOpen ||
       this.poker.isOpen
     );
   }

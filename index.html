@@ -347,6 +347,28 @@
     .ach-name { font-size: 12px; line-height: 1.2; }
     .ach-card.ach-locked .ach-img { filter: grayscale(1) brightness(.55); }
     .ach-card.ach-locked .ach-name { opacity: .6; }
+    .ach-pct { font-size: 11px; opacity: .65; }
+    /* Редкая ачивка (владеет < 10% игроков): пульсирующая золотая рамка, как в Steam. */
+    .ach-card.ach-rare { border-color: #d9a441; animation: achRare 1.6s ease-in-out infinite; }
+    @keyframes achRare {
+      0%, 100% { box-shadow: 0 0 4px 1px rgba(217,164,65,.35); }
+      50% { box-shadow: 0 0 10px 3px rgba(217,164,65,.75); }
+    }
+
+    /* Сообщество */
+    #community { position: fixed; inset: 0; z-index: 70; background: rgba(8,10,14,.85); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .comm-box { position: relative; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 22px 26px; width: min(480px, calc(var(--sw) * .92)); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
+    .comm-list { display: flex; flex-direction: column; gap: 6px; max-height: calc(var(--sh) * .6); overflow-y: auto; }
+    .comm-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid #353c46; border-radius: 8px; }
+    .comm-avatar { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; flex: 0 0 auto; }
+    .comm-login { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .comm-ach-btn { background: transparent; border: 2px solid var(--accent); border-radius: 8px; padding: 6px 10px; color: var(--text); font-family: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+    .comm-ach-btn:hover { background: var(--accent); color: #14210f; }
+
+    /* Смена пароля */
+    #passChange { position: fixed; inset: 0; z-index: 70; background: rgba(8,10,14,.85); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    #passChange .auth-box { position: relative; }
+    #passForm { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 
     /* Попап получения ачивки */
     #achPopup { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 90; display: flex; align-items: center; gap: 12px; background: var(--panel); border: 3px solid var(--accent); border-radius: 14px; padding: 12px 18px; box-shadow: 0 12px 44px rgba(0,0,0,.55); max-width: min(360px, calc(var(--sw) * .9)); }
@@ -638,10 +660,13 @@
           <div class="hud-label">Игра</div>
           <button id="lbBtn" class="hud-btn" aria-label="лидерборд">🏆 Лидерборд</button>
           <button id="achBtn" class="hud-btn" aria-label="мои ачивки">🎖 Мои ачивки</button>
+          <button id="communityBtn" class="hud-btn" aria-label="сообщество">👥 Сообщество</button>
           <button id="modeBtn" class="hud-btn" aria-label="сменить режим">🔄 Сменить режим</button>
         </div>
         <div class="hud-group">
           <div class="hud-label">Аккаунт</div>
+          <button id="roleBtn" class="hud-btn" aria-label="сменить бульбазавра">🦖 Сменить Бульбазавра</button>
+          <button id="passBtn" class="hud-btn" aria-label="сменить пароль">🔑 Сменить пароль</button>
           <button id="logoutBtn" class="hud-btn" aria-label="выйти">🚪 Выйти</button>
           <button id="deleteBtn" class="hud-btn hud-btn-danger" aria-label="удалить аккаунт">🗑 Удалить аккаунт</button>
         </div>
@@ -703,7 +728,7 @@
         <button class="lb-close" id="achClose" aria-label="закрыть">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
-        <h2 class="lb-title">Мои ачивки</h2>
+        <h2 class="lb-title" id="achTitle">Мои ачивки</h2>
         <div class="ach-count" id="achCount"></div>
         <div class="lb-status" id="achStatus"></div>
         <div class="ach-grid" id="achGrid"></div>
@@ -711,6 +736,33 @@
     </div>
 
     <div id="achPopup" class="hidden"></div>
+
+    <div id="community" class="hidden">
+      <div class="comm-box">
+        <button class="lb-close" id="commClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <h2 class="lb-title">Сообщество</h2>
+        <div class="lb-status" id="commStatus"></div>
+        <div class="comm-list" id="commList"></div>
+      </div>
+    </div>
+
+    <div id="passChange" class="hidden">
+      <div class="auth-box">
+        <button class="lb-close" id="passClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <h2>Сменить пароль</h2>
+        <form id="passForm" autocomplete="off">
+          <input id="passOld" class="auth-input" type="password" placeholder="старый пароль" />
+          <input id="passNew" class="auth-input" type="password" placeholder="новый пароль" />
+          <input id="passRepeat" class="auth-input" type="password" placeholder="новый пароль ещё раз" />
+          <div id="passError" class="auth-error"></div>
+          <button id="passSubmit" class="auth-submit" type="submit">Сменить пароль</button>
+        </form>
+      </div>
+    </div>
 
   </div>
 

@@ -1,12 +1,19 @@
-import { fetchAchievements, type Achievement } from "../net/api";
+import { fetchAchievements, fetchPlayerAchievements, type Achievement } from "../net/api";
 import { publicPath } from "../publicPath";
 
-// Окно «Мои ачивки»: сетка достижений. Полученные — обычная картинка, неполученные —
-// в сером фильтре. Сверху счётчик «Получено X/Y ачивок». Закрывается по кнопке или Esc.
+// Ачивка редкая, если ею владеет меньше этого процента игроков. Подсвечиваем рамкой
+// только полученные редкие — неполученные выглядят как обычные заблокированные.
+const RARE_PERCENT = 5;
+
+// Окно ачивок: сетка достижений, отсортированная по редкости (сервер отдаёт от самых
+// распространённых к самым редким). Полученные — обычная картинка, неполученные — в сером
+// фильтре, у каждой процент игроков-владельцев. Без аргумента показывает свои («Мои ачивки»),
+// с логином — чужие (из сообщества). Закрывается по кнопке или Esc.
 export class Achievements {
   isOpen = false;
 
   private root = document.getElementById("achievements")!;
+  private titleEl = document.getElementById("achTitle")!;
   private countEl = document.getElementById("achCount")!;
   private statusEl = document.getElementById("achStatus")!;
   private gridEl = document.getElementById("achGrid")!;
@@ -15,15 +22,16 @@ export class Achievements {
     document.getElementById("achClose")!.onclick = () => this.close();
   }
 
-  async open(): Promise<void> {
+  async open(login?: string): Promise<void> {
     this.isOpen = true;
     this.root.classList.remove("hidden");
     window.addEventListener("keydown", this.onKey, true);
+    this.titleEl.textContent = login ? `Ачивки ${login}` : "Мои ачивки";
     this.gridEl.innerHTML = "";
     this.countEl.textContent = "";
     this.statusEl.textContent = "Загрузка...";
     try {
-      const data = await fetchAchievements();
+      const data = login ? await fetchPlayerAchievements(login) : await fetchAchievements();
       this.statusEl.textContent = "";
       this.countEl.textContent = `Получено ${data.owned}/${data.total} ачивок`;
       for (const achievement of data.achievements) {
@@ -43,6 +51,7 @@ export class Achievements {
   private card(achievement: Achievement): HTMLDivElement {
     const card = document.createElement("div");
     card.className = "ach-card" + (achievement.owned ? "" : " ach-locked");
+    if (achievement.owned && achievement.percent < RARE_PERCENT) card.classList.add("ach-rare");
 
     const img = document.createElement("img");
     img.className = "ach-img";
@@ -53,7 +62,11 @@ export class Achievements {
     name.className = "ach-name";
     name.textContent = achievement.title;
 
-    card.append(img, name);
+    const pct = document.createElement("div");
+    pct.className = "ach-pct";
+    pct.textContent = `${achievement.percent.toFixed(1)}%`;
+
+    card.append(img, name, pct);
     card.title = achievement.description;
     return card;
   }
