@@ -52,7 +52,7 @@ const GAMES: LeaderboardGame[] = [
   { id: "bulbajump", title: "Bulba Jump", format: (v) => String(v) },
   { id: "bulbapacker", title: "Bulba Packer", format: (v) => String(v) },
   { id: "bulbaparking", title: "Bulba Parking", format: (v) => (v / 1000).toFixed(1) + " с" },
-  { id: "bulbaguess", title: "Bulba Guess", format: (v) => v + " поп." },
+  { id: "bulbaguess", title: "Bulba Guess", format: (v) => v + " слов" },
   { id: "bulbawordle", title: "Bulba Wordle", format: (v) => v + " слов" },
 ];
 

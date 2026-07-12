@@ -310,7 +310,8 @@ export class BulbaGuess {
         // иначе GET за топом обгоняет PUT прогресса и игрока ещё нет в выборке.
         void Promise.resolve(this.persistDaily(true)).then(() => this.reportDaily(this.dailyAttempts));
       } else {
-        this.finish(this.guesses().length);
+        // Лидерборд накопительный (всего угаданных слов) — за победу засчитывается 1 слово.
+        this.finish(1);
       }
     } else {
       this.statusEl.textContent = `Попыток: ${count()}`;
