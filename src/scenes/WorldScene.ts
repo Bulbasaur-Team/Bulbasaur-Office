@@ -146,6 +146,7 @@ export class WorldScene extends Phaser.Scene {
   private tvRect: Rect | null = null;            // прямоугольник экрана TV из карты (объект "tvScreen")
   private ancestorsRect: Rect | null = null;     // прямоугольник стены с портретами предков (объект "ancestors")
   private printerRect: Rect | null = null;       // прямоугольник принтера с логами в дата-центре (объект "printer")
+  private pokerRect: Rect | null = null;         // прямоугольник столов для Planning Poker в дата-центре (объект "poker")
   private menu!: LocationMenu;
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
   private exitLabel = document.getElementById("exitLabel") as HTMLSpanElement;
@@ -610,6 +611,7 @@ export class WorldScene extends Phaser.Scene {
     this.tvRect = rects.get("tvScreen") ?? null;
     this.ancestorsRect = rects.get("ancestors") ?? null;
     this.printerRect = rects.get("printer") ?? null;
+    this.pokerRect = rects.get("poker") ?? null;
     this.items.load(items, physicsWalls);
 
     // Свёрнутая игра видна на экране TV только в чилл-зоне (где задан прямоугольник экрана).
@@ -811,6 +813,12 @@ export class WorldScene extends Phaser.Scene {
         this.printerRect.x + this.printerRect.w / 2,
         this.printerRect.y + this.printerRect.h,
       );
+    } else if (this.pokerRect && this.nearRect(this.pokerRect)) {
+      this.showPrompt(
+        "Пробел / Enter — сыграть в Planning Poker",
+        this.pokerRect.x + this.pokerRect.w / 2,
+        this.pokerRect.y + this.pokerRect.h,
+      );
     } else {
       this.prompt.setVisible(false);
     }
@@ -854,6 +862,10 @@ export class WorldScene extends Phaser.Scene {
     }
     if (this.printerRect && this.nearRect(this.printerRect)) {
       void this.logs.open();
+      return true;
+    }
+    if (this.pokerRect && this.nearRect(this.pokerRect)) {
+      this.poker.open();
       return true;
     }
     if (this.currentExit) {
