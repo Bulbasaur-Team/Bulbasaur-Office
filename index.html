@@ -370,6 +370,13 @@
     #passChange .auth-box { position: relative; }
     #passForm { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 
+    #ancestors { position: fixed; inset: 0; z-index: 70; background: rgba(8,10,14,.85); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .lore-box { position: relative; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 22px 26px; width: min(560px, calc(var(--sw) * .92)); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
+    .lore-text { max-height: calc(var(--sh) * .62); overflow-y: auto; margin-top: 10px; line-height: 1.55; font-size: 15px; }
+    .lore-text p { margin: 0 0 12px; }
+    .lore-text p:last-child { margin-bottom: 0; }
+    .lore-text strong { color: var(--accent); }
+
     /* Попап получения ачивки */
     #achPopup { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 90; display: flex; align-items: center; gap: 12px; background: var(--panel); border: 3px solid var(--accent); border-radius: 14px; padding: 12px 18px; box-shadow: 0 12px 44px rgba(0,0,0,.55); max-width: min(360px, calc(var(--sw) * .9)); }
     #achPopup.ach-popup-in { animation: achPopupIn .35s ease-out; }
@@ -761,6 +768,16 @@
           <div id="passError" class="auth-error"></div>
           <button id="passSubmit" class="auth-submit" type="submit">Сменить пароль</button>
         </form>
+      </div>
+    </div>
+
+    <div id="ancestors" class="hidden">
+      <div class="lore-box">
+        <button class="lb-close" id="ancestorsClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <h2 class="lb-title">Предки Бульбазавров</h2>
+        <div class="lore-text" id="ancestorsText"></div>
       </div>
     </div>
 

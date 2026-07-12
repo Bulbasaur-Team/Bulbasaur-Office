@@ -41,6 +41,7 @@ import { Achievements } from "../ui/Achievements";
 import { AchievementPopup } from "../ui/AchievementPopup";
 import { Community } from "../ui/Community";
 import { PasswordChange } from "../ui/PasswordChange";
+import { Ancestors } from "../ui/Ancestors";
 import { Joystick, isTouch } from "../ui/TouchControls";
 import * as api from "../net/api";
 
@@ -115,6 +116,7 @@ export class WorldScene extends Phaser.Scene {
   private achievementPopup!: AchievementPopup;
   private community!: Community;
   private passwordChange!: PasswordChange;
+  private ancestors!: Ancestors;
   private joystick: Joystick | null = null;
   private activeGame: ArcadeGame | null = null;
   private playerBaseScale = 1; // исходный масштаб игрока (анимация множит на него)
@@ -140,6 +142,7 @@ export class WorldScene extends Phaser.Scene {
   private doors: Map<string, Spawn> = new Map(); // двери текущей локации (ключ — id соседней локации)
   private tv: Spawn | null = null;               // точка телевизора в текущей локации, если есть
   private tvRect: Rect | null = null;            // прямоугольник экрана TV из карты (объект "tvScreen")
+  private ancestorsRect: Rect | null = null;     // прямоугольник стены с портретами предков (объект "ancestors")
   private menu!: LocationMenu;
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
   private exitLabel = document.getElementById("exitLabel") as HTMLSpanElement;
@@ -214,6 +217,7 @@ export class WorldScene extends Phaser.Scene {
     this.community = new Community((login) => void this.achievements.open(login));
     document.getElementById("communityBtn")!.onclick = () => void this.community.open();
     this.passwordChange = new PasswordChange();
+    this.ancestors = new Ancestors();
     document.getElementById("passBtn")!.onclick = () => {
       (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
       this.passwordChange.open();
@@ -600,6 +604,7 @@ export class WorldScene extends Phaser.Scene {
     this.doors = doors;
     this.tv = interactions.get("tv") ?? null;
     this.tvRect = rects.get("tvScreen") ?? null;
+    this.ancestorsRect = rects.get("ancestors") ?? null;
     this.items.load(items, physicsWalls);
 
     // Свёрнутая игра видна на экране TV только в чилл-зоне (где задан прямоугольник экрана).
@@ -639,6 +644,7 @@ export class WorldScene extends Phaser.Scene {
       this.achievements.isOpen ||
       this.community.isOpen ||
       this.passwordChange.isOpen ||
+      this.ancestors.isOpen ||
       this.poker.isOpen
     );
   }
@@ -787,6 +793,12 @@ export class WorldScene extends Phaser.Scene {
           ? "Пробел / Enter — продолжить игру"
           : "Пробел / Enter — выбрать игру";
       this.showPrompt(label, this.tv.x, this.tv.y);
+    } else if (this.ancestorsRect && this.nearRect(this.ancestorsRect)) {
+      this.showPrompt(
+        "Пробел / Enter — прочитать",
+        this.ancestorsRect.x + this.ancestorsRect.w / 2,
+        this.ancestorsRect.y + this.ancestorsRect.h,
+      );
     } else {
       this.prompt.setVisible(false);
     }
@@ -822,6 +834,10 @@ export class WorldScene extends Phaser.Scene {
     if (this.tv && this.near(this.tv)) {
       if (this.activeGame && this.activeGame.minimized) this.expandGame();
       else this.gameMenu.open();
+      return true;
+    }
+    if (this.ancestorsRect && this.nearRect(this.ancestorsRect)) {
+      this.ancestors.open();
       return true;
     }
     if (this.currentExit) {
@@ -884,6 +900,13 @@ export class WorldScene extends Phaser.Scene {
 
   private near(p: Spawn): boolean {
     return Phaser.Math.Distance.Between(this.player.x, this.player.y, p.x, p.y) < INTERACT_DIST;
+  }
+
+  // Расстояние от игрока до ближайшей точки прямоугольника (0, если игрок внутри).
+  private nearRect(r: Rect): boolean {
+    const dx = Math.max(r.x - this.player.x, 0, this.player.x - (r.x + r.w));
+    const dy = Math.max(r.y - this.player.y, 0, this.player.y - (r.y + r.h));
+    return Math.hypot(dx, dy) < INTERACT_DIST;
   }
 
   private showPrompt(text: string, x: number, y: number): void {
