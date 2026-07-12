@@ -377,6 +377,10 @@
     .lore-text p:last-child { margin-bottom: 0; }
     .lore-text strong { color: var(--accent); }
 
+    #logs { position: fixed; inset: 0; z-index: 70; background: rgba(8,10,14,.85); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .logs-box { position: relative; background: #0d1016; border: 3px solid var(--accent); border-radius: 12px; padding: 18px 20px; width: min(860px, calc(var(--sw) * .94)); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
+    .logs-out { margin: 8px 0 0; max-height: calc(var(--sh) * .66); overflow: auto; font-family: "SF Mono", "Consolas", "Menlo", monospace; font-size: 12px; line-height: 1.5; color: #8fbf8f; white-space: pre; background: #05070a; border: 1px solid #1c2530; border-radius: 8px; padding: 12px 14px; }
+
     /* Попап получения ачивки */
     #achPopup { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 90; display: flex; align-items: center; gap: 12px; background: var(--panel); border: 3px solid var(--accent); border-radius: 14px; padding: 12px 18px; box-shadow: 0 12px 44px rgba(0,0,0,.55); max-width: min(360px, calc(var(--sw) * .9)); }
     #achPopup.ach-popup-in { animation: achPopupIn .35s ease-out; }
@@ -778,6 +782,17 @@
         </button>
         <h2 class="lb-title">Предки Бульбазавров</h2>
         <div class="lore-text" id="ancestorsText"></div>
+      </div>
+    </div>
+
+    <div id="logs" class="hidden">
+      <div class="logs-box">
+        <button class="lb-close" id="logsClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <h2 class="lb-title">Логи Бульба Офиса</h2>
+        <div class="lb-status" id="logsStatus"></div>
+        <pre class="logs-out" id="logsOut"></pre>
       </div>
     </div>
 

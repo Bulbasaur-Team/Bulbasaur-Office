@@ -133,6 +133,15 @@ export function fetchCommunity(): Promise<Community> {
   return authedJson<Community>(`/api/community`);
 }
 
+// Логи Бульба Офиса (принтер в дата-центре): последние 500 строк событий.
+export interface Logs {
+  lines: string[];
+}
+
+export function fetchLogs(): Promise<Logs> {
+  return authedJson<Logs>(`/api/logs`);
+}
+
 // Профиль: сохранённая роль (null — игрок ещё не выбирал Бульбазавра).
 export interface Profile {
   login: string;

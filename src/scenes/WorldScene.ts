@@ -42,6 +42,7 @@ import { AchievementPopup } from "../ui/AchievementPopup";
 import { Community } from "../ui/Community";
 import { PasswordChange } from "../ui/PasswordChange";
 import { Ancestors } from "../ui/Ancestors";
+import { Logs } from "../ui/Logs";
 import { Joystick, isTouch } from "../ui/TouchControls";
 import * as api from "../net/api";
 
@@ -117,6 +118,7 @@ export class WorldScene extends Phaser.Scene {
   private community!: Community;
   private passwordChange!: PasswordChange;
   private ancestors!: Ancestors;
+  private logs!: Logs;
   private joystick: Joystick | null = null;
   private activeGame: ArcadeGame | null = null;
   private playerBaseScale = 1; // исходный масштаб игрока (анимация множит на него)
@@ -143,6 +145,7 @@ export class WorldScene extends Phaser.Scene {
   private tv: Spawn | null = null;               // точка телевизора в текущей локации, если есть
   private tvRect: Rect | null = null;            // прямоугольник экрана TV из карты (объект "tvScreen")
   private ancestorsRect: Rect | null = null;     // прямоугольник стены с портретами предков (объект "ancestors")
+  private printerRect: Rect | null = null;       // прямоугольник принтера с логами в дата-центре (объект "printer")
   private menu!: LocationMenu;
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
   private exitLabel = document.getElementById("exitLabel") as HTMLSpanElement;
@@ -218,6 +221,7 @@ export class WorldScene extends Phaser.Scene {
     document.getElementById("communityBtn")!.onclick = () => void this.community.open();
     this.passwordChange = new PasswordChange();
     this.ancestors = new Ancestors();
+    this.logs = new Logs();
     document.getElementById("passBtn")!.onclick = () => {
       (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
       this.passwordChange.open();
@@ -605,6 +609,7 @@ export class WorldScene extends Phaser.Scene {
     this.tv = interactions.get("tv") ?? null;
     this.tvRect = rects.get("tvScreen") ?? null;
     this.ancestorsRect = rects.get("ancestors") ?? null;
+    this.printerRect = rects.get("printer") ?? null;
     this.items.load(items, physicsWalls);
 
     // Свёрнутая игра видна на экране TV только в чилл-зоне (где задан прямоугольник экрана).
@@ -645,6 +650,7 @@ export class WorldScene extends Phaser.Scene {
       this.community.isOpen ||
       this.passwordChange.isOpen ||
       this.ancestors.isOpen ||
+      this.logs.isOpen ||
       this.poker.isOpen
     );
   }
@@ -799,6 +805,12 @@ export class WorldScene extends Phaser.Scene {
         this.ancestorsRect.x + this.ancestorsRect.w / 2,
         this.ancestorsRect.y + this.ancestorsRect.h,
       );
+    } else if (this.printerRect && this.nearRect(this.printerRect)) {
+      this.showPrompt(
+        "Пробел / Enter — посмотреть логи",
+        this.printerRect.x + this.printerRect.w / 2,
+        this.printerRect.y + this.printerRect.h,
+      );
     } else {
       this.prompt.setVisible(false);
     }
@@ -838,6 +850,10 @@ export class WorldScene extends Phaser.Scene {
     }
     if (this.ancestorsRect && this.nearRect(this.ancestorsRect)) {
       this.ancestors.open();
+      return true;
+    }
+    if (this.printerRect && this.nearRect(this.printerRect)) {
+      void this.logs.open();
       return true;
     }
     if (this.currentExit) {
