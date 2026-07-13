@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import { spriteScale, type SpriteKey } from "./sprites";
 import { SpeechBubble } from "../ui/SpeechBubble";
+import { ITEM_TYPES } from "../data/items";
+import { ITEM_TOP_DEPTH } from "./PhysicsItem";
 
 const LERP = 0.2; // доля пути к целевой позиции за кадр — сглаживает рывки между move
 const CHAT_HOLD_MS = 4000; // сколько держать облачко чата после печати
@@ -15,9 +17,10 @@ export class RemotePlayer {
   private bubble: SpeechBubble;
   private targetX: number;
   private targetY: number;
+  private held: Phaser.GameObjects.Image | null = null; // предмет в лапах, рисуется по центру спрайта
 
   constructor(
-    scene: Phaser.Scene,
+    private scene: Phaser.Scene,
     sprite: SpriteKey,
     login: string,
     x: number,
@@ -77,17 +80,33 @@ export class RemotePlayer {
     }), EMOTE_FONT);
   }
 
+  // Предмет в лапах: type — ключ ITEM_TYPES, null — руки пусты.
+  setHeldItem(type: string | null): void {
+    this.held?.destroy();
+    this.held = null;
+    const def = type ? ITEM_TYPES[type] : undefined;
+    if (!def) return;
+    const texW = this.scene.textures.get(def.texture).getSourceImage().width;
+    this.held = this.scene.add
+      .image(this.sprite.x, this.sprite.y, def.texture)
+      .setScale((def.radius * 2) / texW)
+      // Глубина — как у своего игрока: чашка поверх всего мира, мяч просто поверх персонажей.
+      .setDepth(def.alwaysOnTop ? ITEM_TOP_DEPTH : 1_000_000);
+  }
+
   update(): void {
     this.sprite.x += (this.targetX - this.sprite.x) * LERP;
     this.sprite.y += (this.targetY - this.sprite.y) * LERP;
     this.sprite.setDepth(this.sprite.y);
     this.label.setPosition(this.sprite.x, this.sprite.y - this.targetH * 0.7).setDepth(this.sprite.y);
+    this.held?.setPosition(this.sprite.x, this.sprite.y);
     this.bubble.update();
   }
 
   destroy(): void {
     this.sprite.destroy();
     this.label.destroy();
+    this.held?.destroy();
     this.bubble.destroy();
   }
 }

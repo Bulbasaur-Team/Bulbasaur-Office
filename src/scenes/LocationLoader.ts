@@ -22,6 +22,7 @@ export interface LoadedLocation {
   rects: Map<string, Rect>;          // прямоугольные объекты слоя interactions (напр. "tvScreen")
   items: PlacedItemDef[];            // физичные предметы (слой items, имя точки = тип предмета)
   physicsWalls: Rect[];              // стены для предметов (слой collisions_physics)
+  tableRects: Rect[];                // столы для чашки кофе (слой tables)
 }
 
 // Строит сцену локации: фон, overlay двери, коллизии и NPC. Держит у себя список
@@ -50,11 +51,11 @@ export class LocationLoader {
     }
 
     const empty = () => new Map<string, Spawn>();
-    const { doors, spawns, interactions, rects, items, physicsWalls } = cfg.map
+    const { doors, spawns, interactions, rects, items, physicsWalls, tableRects } = cfg.map
       ? this.buildFromMap(cfg.map)
       : {
           doors: empty(), spawns: empty(), interactions: empty(),
-          rects: new Map<string, Rect>(), items: [], physicsWalls: [],
+          rects: new Map<string, Rect>(), items: [], physicsWalls: [], tableRects: [],
         };
 
     const npcs: PlacedNpc[] = cfg.isParking || hideNpcs
@@ -63,7 +64,7 @@ export class LocationLoader {
           .map((char) => ({ char, ...(spawns.get(char.id) ?? { x: 0, y: 0 }) }));
     for (const npc of npcs) this.addNpc(npc);
 
-    return { npcs, doors, spawns, interactions, rects, items, physicsWalls };
+    return { npcs, doors, spawns, interactions, rects, items, physicsWalls, tableRects };
   }
 
   // Из карты Tiled: collision -> стены игрока, collisions_physics -> стены предметов,
@@ -77,6 +78,7 @@ export class LocationLoader {
     rects: Map<string, Rect>;
     items: PlacedItemDef[];
     physicsWalls: Rect[];
+    tableRects: Rect[];
   } {
     const doors = new Map<string, Spawn>();
     const spawns = new Map<string, Spawn>();
@@ -84,8 +86,9 @@ export class LocationLoader {
     const rects = new Map<string, Rect>();
     const items: PlacedItemDef[] = [];
     const physicsWalls: Rect[] = [];
+    const tableRects: Rect[] = [];
     if (!this.scene.cache.tilemap.exists(mapKey)) {
-      return { doors, spawns, interactions, rects, items, physicsWalls };
+      return { doors, spawns, interactions, rects, items, physicsWalls, tableRects };
     }
 
     const map = this.scene.make.tilemap({ key: mapKey });
@@ -129,7 +132,13 @@ export class LocationLoader {
       }
     });
 
-    return { doors, spawns, interactions, rects, items, physicsWalls };
+    // Места под чашку кофе (по одной на объект). Принимаем и точки, и прямоугольники:
+    // точка — это место нулевого размера, чашка встаёт ровно в неё.
+    map.getObjectLayer("tables")?.objects.forEach((o) => {
+      tableRects.push({ x: o.x ?? 0, y: o.y ?? 0, w: o.width ?? 0, h: o.height ?? 0 });
+    });
+
+    return { doors, spawns, interactions, rects, items, physicsWalls, tableRects };
   }
 
   private addNpc(npc: PlacedNpc): void {

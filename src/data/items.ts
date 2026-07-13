@@ -12,6 +12,11 @@ export interface ItemTypeDef {
   kickMin: number;   // минимальная скорость после удара, px/с
   kickMax: number;   // максимальная скорость после удара, px/с
   hopFactor: number; // доля силы удара, уходящая в вертикальный прыжок
+  kickable: boolean; // можно ли пинать (мячи — да, чашка кофе — нет)
+  grabbable: boolean; // можно ли хватать и носить с собой
+  tableOnly?: boolean; // ставить можно только на стол (слой tables) — для чашки кофе
+  ttlMs?: number;    // время жизни предмета, после чего он исчезает (чашка кофе)
+  alwaysOnTop?: boolean; // рисовать поверх всего мира, включая overlay локации (чашка кофе)
 }
 
 export const ITEM_TYPES: Record<string, ItemTypeDef> = {
@@ -24,6 +29,8 @@ export const ITEM_TYPES: Record<string, ItemTypeDef> = {
     kickMin: 520,
     kickMax: 680,
     hopFactor: 0.7,
+    kickable: true,
+    grabbable: false,
   },
   tennis: {
     texture: "item-tennis",
@@ -34,6 +41,35 @@ export const ITEM_TYPES: Record<string, ItemTypeDef> = {
     kickMin: 560,
     kickMax: 740,
     hopFactor: 0.5,
+    kickable: true,
+    grabbable: true,
+  },
+  basketball: {
+    texture: "item-basketball",
+    file: "basketball.png",
+    radius: 30,
+    bounce: 0.75,
+    drag: 0.3,
+    kickMin: 480,
+    kickMax: 640,
+    hopFactor: 0.8,
+    kickable: true,
+    grabbable: true,
+  },
+  coffee: {
+    texture: "item-coffee",
+    file: "coffee.png",
+    radius: 16,
+    bounce: 0,
+    drag: 0.9,
+    kickMin: 0,
+    kickMax: 0,
+    hopFactor: 0,
+    kickable: false,
+    grabbable: true,
+    tableOnly: true,
+    ttlMs: 30 * 60 * 1000,
+    alwaysOnTop: true,
   },
 };
 

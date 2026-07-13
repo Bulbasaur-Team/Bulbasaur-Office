@@ -147,6 +147,7 @@ export class WorldScene extends Phaser.Scene {
   private ancestorsRect: Rect | null = null;     // прямоугольник стены с портретами предков (объект "ancestors")
   private printerRect: Rect | null = null;       // прямоугольник принтера с логами в дата-центре (объект "printer")
   private pokerRect: Rect | null = null;         // прямоугольник столов для Planning Poker в дата-центре (объект "poker")
+  private coffeeRect: Rect | null = null;        // выдача чашки кофе на кухне чилл-зоны (объект "coffee")
   private menu!: LocationMenu;
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
   private exitLabel = document.getElementById("exitLabel") as HTMLSpanElement;
@@ -459,9 +460,14 @@ export class WorldScene extends Phaser.Scene {
     this.startAs(me);
     this.showEmoteBar();
     document.getElementById("workGroup")!.classList.remove("hidden");
-    // Предметы: свои удары и стрим позиции уходят на сервер (в одиночке колбэки не заданы).
+    // Предметы: удары, стрим позиции, захват/бросок/постановка уходят на сервер
+    // (в одиночке колбэки не заданы — предметы живут только локально).
     this.items.onKick = (itemId, kickId, x, y, vx, vy) => this.realtime.itemKick(itemId, kickId, x, y, vx, vy);
     this.items.onSync = (itemId, x, y, vx, vy) => this.realtime.itemMove(itemId, x, y, vx, vy);
+    this.items.onGrab = (itemId, itemType) => this.realtime.itemGrab(itemId, itemType);
+    this.items.onDrop = (itemId, itemType, x, y) => this.realtime.itemDrop(itemId, itemType, x, y);
+    this.items.onPlace = (itemId, itemType, table, x, y) => this.realtime.itemPlace(itemId, itemType, table, x, y);
+    this.items.onGone = (itemId) => this.realtime.itemGone(itemId);
     // Чат временно отключён: поле ввода не показываем. Реакции (фиксированный набор) — есть.
     this.realtime.connect({
       onOpen: () => {
@@ -476,6 +482,16 @@ export class WorldScene extends Phaser.Scene {
       onItems: (items) => this.items.applySnapshot(items),
       onItemKicked: (itemId, kickId, x, y, vx, vy) => this.items.applyKicked(itemId, kickId, x, y, vx, vy),
       onItemMoved: (itemId, x, y, vx, vy) => this.items.applyMoved(itemId, x, y, vx, vy),
+      onItemDropped: (itemId, itemType, x, y) => this.items.applyDropped(itemId, itemType, x, y),
+      onPlacedItems: (items) => this.items.applyPlacedSnapshot(items),
+      onItemPlaced: (item) => this.items.applyPlaced(item),
+      onItemRemoved: (itemId) => this.items.applyRemoved(itemId),
+      onItemHeld: (id, itemId, itemType) => {
+        // Предмет уехал в лапы другого игрока — из мира его убираем, рисует его он сам.
+        this.items.applyHeldByOther(itemId);
+        this.remotePlayers.get(id)?.setHeldItem(itemType);
+      },
+      onItemReleased: (id) => this.remotePlayers.get(id)?.setHeldItem(null),
       onPokerRooms: (rooms) => this.poker.onRooms(rooms),
       onPokerState: (state) => this.poker.onState(state),
       onPokerClosed: () => this.poker.onClosed(),
@@ -528,13 +544,16 @@ export class WorldScene extends Phaser.Scene {
     // На парковке ходить нельзя — это экран-меню, чужих аватаров там не показываем.
     if (this.atParking) return;
     this.remotePlayers.get(player.id)?.destroy();
-    this.remotePlayers.set(
-      player.id,
-      new RemotePlayer(
-        this, spriteForRole(player.role), player.login,
-        player.x, player.y, player.facing, TARGET_H, DEPTH.bubble,
-      ),
+    const remote = new RemotePlayer(
+      this, spriteForRole(player.role), player.login,
+      player.x, player.y, player.facing, TARGET_H, DEPTH.bubble,
     );
+    this.remotePlayers.set(player.id, remote);
+    // Пришёл с предметом в лапах — рисуем его и убираем этот предмет из мира.
+    if (player.heldItemType) {
+      remote.setHeldItem(player.heldItemType);
+      if (player.heldItemId) this.items.applyHeldByOther(player.heldItemId);
+    }
   }
 
   private removeRemote(id: string): void {
@@ -592,7 +611,7 @@ export class WorldScene extends Phaser.Scene {
     this.locIndex = index;
     this.atParking = !!cfg.isParking;
 
-    const { npcs, doors, spawns, interactions, rects, items, physicsWalls } = this.loader.load(cfg, index, this.chosen.id, this.multiplayer);
+    const { npcs, doors, spawns, interactions, rects, items, physicsWalls, tableRects } = this.loader.load(cfg, index, this.chosen.id, this.multiplayer);
     this.npcs = npcs;
     this.thoughtBubbles.forEach((b) => b.destroy());
     this.thoughtTimers.forEach((t) => t.remove());
@@ -612,7 +631,8 @@ export class WorldScene extends Phaser.Scene {
     this.ancestorsRect = rects.get("ancestors") ?? null;
     this.printerRect = rects.get("printer") ?? null;
     this.pokerRect = rects.get("poker") ?? null;
-    this.items.load(items, physicsWalls);
+    this.coffeeRect = rects.get("coffee") ?? null;
+    this.items.load(items, physicsWalls, tableRects, cfg.id);
 
     // Свёрнутая игра видна на экране TV только в чилл-зоне (где задан прямоугольник экрана).
     if (this.activeGame && this.activeGame.minimized && index === LOC.chillZone && this.tvRect) {
@@ -793,7 +813,16 @@ export class WorldScene extends Phaser.Scene {
 
     // Только подсказки: сами действия по Space/Enter выполняет консьюмер роутера
     // (tryInteract) — так клавиша, закрывшая меню, не срабатывает повторно в мире.
-    if (this.nearest) {
+    const carrying = this.items.carrying();
+    if (carrying && !this.items.carriedIsCoffee()) {
+      this.showPrompt("Пробел / Enter — бросить предмет", this.player.x, this.player.y);
+    } else if (carrying && this.items.canPlaceCarried(this.player.x, this.player.y)) {
+      // Чашку подсказываем только у свободного места на столе: в остальных точках её
+      // поставить некуда, и Space/Enter уходит дальше по цепочке взаимодействий.
+      this.showPrompt("Пробел / Enter — поставить чашку", this.player.x, this.player.y);
+    } else if (!carrying && this.items.grabbableNear(this.player.x, this.player.y)) {
+      this.showPrompt("Пробел / Enter — взять предмет", this.player.x, this.player.y);
+    } else if (this.nearest) {
       this.showPrompt("Пробел / Enter — поговорить", this.nearest.x, this.nearest.y);
     } else if (this.tv && this.near(this.tv)) {
       const label =
@@ -819,6 +848,12 @@ export class WorldScene extends Phaser.Scene {
         this.pokerRect.x + this.pokerRect.w / 2,
         this.pokerRect.y + this.pokerRect.h,
       );
+    } else if (this.coffeeRect && !carrying && this.nearRect(this.coffeeRect)) {
+      this.showPrompt(
+        "Пробел / Enter — получить чашку кофе",
+        this.coffeeRect.x + this.coffeeRect.w / 2,
+        this.coffeeRect.y + this.coffeeRect.h,
+      );
     } else {
       this.prompt.setVisible(false);
     }
@@ -840,11 +875,34 @@ export class WorldScene extends Phaser.Scene {
     for (const npc of this.npcs) obstacles.push({ x: npc.x, y: npc.y, r: BODY_RADIUS });
     for (const rp of this.remotePlayers.values()) obstacles.push({ x: rp.x, y: rp.y, r: BODY_RADIUS });
     this.items.update(delta, player, obstacles);
+    this.items.carry(this.player.x, this.player.y);
   }
 
-  // Действие по Space/Enter рядом с объектом. Приоритет: NPC → телевизор → дверь.
-  // Опирается на nearest/tv/currentExit, которые обновляет update() каждый кадр.
+  // Действие по Space/Enter рядом с объектом. Приоритет: предмет в лапах (поставить) →
+  // взять предмет → NPC → телевизор → стена предков → принтер → покер → выдача кофе → дверь.
+  // Взятие идёт раньше стационарных объектов: иначе чашку, стоящую на столе покера, было
+  // бы не поднять — тем же пробелом открывался бы покер.
   private tryInteract(): boolean {
+    // В лапах уже что-то есть.
+    if (this.items.carrying()) {
+      // У двери — уходим в соседнюю локацию вместе с предметом.
+      if (this.currentExit) {
+        this.triggerExit();
+        return true;
+      }
+      if (this.items.carriedIsCoffee()) {
+        // Чашку можно поставить только на свободное место на столе рядом; иначе не
+        // мешаем другим действиям (можно, например, донести кофе до двери).
+        if (this.items.releaseCarried(this.player.x, this.player.y, this.player.flipX)) return true;
+      } else {
+        // Мяч бросаем где угодно.
+        this.items.releaseCarried(this.player.x, this.player.y, this.player.flipX);
+        return true;
+      }
+    }
+    if (this.items.grabNear(this.player.x, this.player.y)) {
+      return true;
+    }
     if (this.nearest) {
       this.talking = this.nearest;
       this.thoughtBubbles[this.npcs.indexOf(this.nearest)]?.hide();
@@ -866,6 +924,11 @@ export class WorldScene extends Phaser.Scene {
     }
     if (this.pokerRect && this.nearRect(this.pokerRect)) {
       this.poker.open();
+      return true;
+    }
+    // Занятые лапы — кофемашина молчит, и клавиша уходит дальше (например, в дверь).
+    if (this.coffeeRect && this.nearRect(this.coffeeRect)
+        && this.items.giveCoffee(this.player.x, this.player.y)) {
       return true;
     }
     if (this.currentExit) {

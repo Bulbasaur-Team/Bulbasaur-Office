@@ -5,6 +5,7 @@ const WS_BASE = import.meta.env.VITE_WS_URL ?? "ws://localhost:8080/ws";
 const RECONNECT_DELAY = 1000;
 
 // Состояние чужого игрока в комнате (то, что приходит с сервера).
+// heldItemType — предмет в его лапах (null — руки пусты).
 export interface RemoteState {
   id: string;
   login: string;
@@ -12,6 +13,18 @@ export interface RemoteState {
   x: number;
   y: number;
   facing: boolean;
+  heldItemId: string | null;
+  heldItemType: string | null;
+}
+
+// Предмет, стоящий на столе (виден всем в локации). expiresAt — epoch ms.
+export interface RemotePlacedItem {
+  id: string;
+  type: string;
+  tableIndex: number;
+  x: number;
+  y: number;
+  expiresAt: number;
 }
 
 // Состояние физичного предмета в комнате (приходит с сервера). Сервер знает
@@ -83,6 +96,12 @@ export interface RealtimeHandlers {
   onItems?: (items: RemoteItemState[]) => void; // снапшот предметов комнаты
   onItemKicked?: (itemId: string, kickId: string, x: number, y: number, vx: number, vy: number) => void;
   onItemMoved?: (itemId: string, x: number, y: number, vx: number, vy: number) => void;
+  onItemDropped?: (itemId: string, itemType: string, x: number, y: number) => void; // предмет бросили на пол
+  onPlacedItems?: (items: RemotePlacedItem[]) => void;          // снапшот предметов на столах
+  onItemPlaced?: (item: RemotePlacedItem) => void;              // кто-то поставил предмет на стол
+  onItemRemoved?: (itemId: string) => void;                     // предмет убрали со стола
+  onItemHeld?: (id: string, itemId: string, itemType: string) => void; // игрок взял предмет в лапы
+  onItemReleased?: (id: string) => void;                        // игрок освободил лапы
   onPokerRooms?: (rooms: PokerRoomSummary[]) => void;
   onPokerState?: (state: PokerStateView) => void;
   onPokerClosed?: () => void;
@@ -140,6 +159,26 @@ export class Realtime {
     this.send({ type: "itemMove", itemId, x, y, vx, vy });
   }
 
+  // Взял предмет в лапы: остальные нарисуют его на мне и уберут из мира.
+  itemGrab(itemId: string, itemType: string): void {
+    this.send({ type: "itemGrab", itemId, itemType });
+  }
+
+  // Бросил мяч на пол — он замирает в этой точке у всех.
+  itemDrop(itemId: string, itemType: string, x: number, y: number): void {
+    this.send({ type: "itemDrop", itemId, itemType, x, y });
+  }
+
+  // Поставил чашку на стол (место tableIndex из слоя tables).
+  itemPlace(itemId: string, itemType: string, tableIndex: number, x: number, y: number): void {
+    this.send({ type: "itemPlace", itemId, itemType, tableIndex, x, y });
+  }
+
+  // У предмета в лапах вышел срок (чашка кофе) — руки свободны.
+  itemGone(itemId: string): void {
+    this.send({ type: "itemGone", itemId });
+  }
+
   pokerList(): void {
     this.send({ type: "pokerList" });
   }
@@ -194,6 +233,12 @@ export class Realtime {
       case "items": this.handlers.onItems?.(msg.items); break;
       case "itemKicked": this.handlers.onItemKicked?.(msg.itemId, msg.kickId, msg.x, msg.y, msg.vx, msg.vy); break;
       case "itemMoved": this.handlers.onItemMoved?.(msg.itemId, msg.x, msg.y, msg.vx, msg.vy); break;
+      case "itemDropped": this.handlers.onItemDropped?.(msg.itemId, msg.itemType, msg.x, msg.y); break;
+      case "placedItems": this.handlers.onPlacedItems?.(msg.items); break;
+      case "itemPlaced": this.handlers.onItemPlaced?.(msg.item); break;
+      case "itemRemoved": this.handlers.onItemRemoved?.(msg.itemId); break;
+      case "itemHeld": this.handlers.onItemHeld?.(msg.id, msg.itemId, msg.itemType); break;
+      case "itemReleased": this.handlers.onItemReleased?.(msg.id); break;
       case "pokerRooms": this.handlers.onPokerRooms?.(msg.rooms); break;
       case "pokerState": this.handlers.onPokerState?.(msg); break;
       case "pokerClosed": this.handlers.onPokerClosed?.(); break;
