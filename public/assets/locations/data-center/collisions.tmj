@@ -987,10 +987,22 @@
                  "width":346.924983104303,
                  "x":884.208154989863,
                  "y":193.737328227078
+                }, 
+                {
+                 "height":69.15948176495,
+                 "id":142,
+                 "name":"computer",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":92.2126423532666,
+                 "x":82.5303149061736,
+                 "y":403.430310295542
                 }],
          "opacity":1,
          "type":"objectgroup",
-         "visible":false,
+         "visible":true,
          "x":0,
          "y":0
         }, 
@@ -1402,7 +1414,7 @@
          "y":0
         }],
  "nextlayerid":7,
- "nextobjectid":141,
+ "nextobjectid":143,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",

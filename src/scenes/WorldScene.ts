@@ -43,6 +43,8 @@ import { Community } from "../ui/Community";
 import { PasswordChange } from "../ui/PasswordChange";
 import { Ancestors } from "../ui/Ancestors";
 import { Logs } from "../ui/Logs";
+import { Computer } from "../ui/Computer";
+import { computerEnabled, embedded } from "../embed";
 import { Joystick, isTouch } from "../ui/TouchControls";
 import * as api from "../net/api";
 
@@ -119,6 +121,7 @@ export class WorldScene extends Phaser.Scene {
   private passwordChange!: PasswordChange;
   private ancestors!: Ancestors;
   private logs!: Logs;
+  private computer!: Computer;
   private joystick: Joystick | null = null;
   private activeGame: ArcadeGame | null = null;
   private playerBaseScale = 1; // исходный масштаб игрока (анимация множит на него)
@@ -148,6 +151,7 @@ export class WorldScene extends Phaser.Scene {
   private printerRect: Rect | null = null;       // прямоугольник принтера с логами в дата-центре (объект "printer")
   private pokerRect: Rect | null = null;         // прямоугольник столов для Planning Poker в дата-центре (объект "poker")
   private coffeeRect: Rect | null = null;        // выдача чашки кофе на кухне чилл-зоны (объект "coffee")
+  private computerRect: Rect | null = null;      // ретро-ПК в дата-центре (объект "computer")
   private menu!: LocationMenu;
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
   private exitLabel = document.getElementById("exitLabel") as HTMLSpanElement;
@@ -224,6 +228,7 @@ export class WorldScene extends Phaser.Scene {
     this.passwordChange = new PasswordChange();
     this.ancestors = new Ancestors();
     this.logs = new Logs();
+    this.computer = new Computer();
     document.getElementById("passBtn")!.onclick = () => {
       (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
       this.passwordChange.open();
@@ -328,7 +333,10 @@ export class WorldScene extends Phaser.Scene {
     // показывается только после кнопки «Сменить режим» (по флагу в sessionStorage).
     this.authGate = new AuthGate();
     const start = () => {
-      if (sessionStorage.getItem(PICK_MODE_KEY)) {
+      // Игра внутри компьютера — всегда одиночная, выбор режима там не предлагается.
+      if (embedded) {
+        showCharacterSelect(CHARACTERS, (chosen) => this.startAs(chosen));
+      } else if (sessionStorage.getItem(PICK_MODE_KEY)) {
         sessionStorage.removeItem(PICK_MODE_KEY);
         showModeSelect((mode) => {
           if (mode === "single") showCharacterSelect(CHARACTERS, (chosen) => this.startAs(chosen));
@@ -423,6 +431,9 @@ export class WorldScene extends Phaser.Scene {
     // Без fromId — игрок встанет на точку своего персонажа из слоя spawns.
     this.loadLocation(0);
     this.started = true;
+    // Внутри компьютера меню не показываем совсем: мини-игр там нет, а лидерборд, ачивки
+    // и настройки аккаунта — дело внешней игры.
+    if (embedded) return;
     const hudPanel = document.getElementById("hudPanel") as HTMLDetailsElement;
     hudPanel.classList.remove("hidden");
     // На ПК меню сразу развёрнуто; на тач-устройствах — свёрнуто, чтобы не занимать экран.
@@ -626,12 +637,17 @@ export class WorldScene extends Phaser.Scene {
       }),
     );
     this.doors = doors;
-    this.tv = interactions.get("tv") ?? null;
+    // Внутри компьютера мини-игры, Planning Poker и логи отключены — телевизор, стол
+    // покера и принтер остаются частью декорации.
+    this.tv = embedded ? null : interactions.get("tv") ?? null;
     this.tvRect = rects.get("tvScreen") ?? null;
     this.ancestorsRect = rects.get("ancestors") ?? null;
-    this.printerRect = rects.get("printer") ?? null;
-    this.pokerRect = rects.get("poker") ?? null;
+    this.printerRect = embedded ? null : rects.get("printer") ?? null;
+    this.pokerRect = embedded ? null : rects.get("poker") ?? null;
     this.coffeeRect = rects.get("coffee") ?? null;
+    // На последнем уровне вложенности компьютер — просто предмет обстановки: так рекурсия
+    // обрывается (см. embed.ts).
+    this.computerRect = computerEnabled ? rects.get("computer") ?? null : null;
     this.items.load(items, physicsWalls, tableRects, cfg.id);
 
     // Свёрнутая игра видна на экране TV только в чилл-зоне (где задан прямоугольник экрана).
@@ -673,6 +689,7 @@ export class WorldScene extends Phaser.Scene {
       this.passwordChange.isOpen ||
       this.ancestors.isOpen ||
       this.logs.isOpen ||
+      this.computer.isOpen ||
       this.poker.isOpen
     );
   }
@@ -848,6 +865,12 @@ export class WorldScene extends Phaser.Scene {
         this.pokerRect.x + this.pokerRect.w / 2,
         this.pokerRect.y + this.pokerRect.h,
       );
+    } else if (this.computerRect && this.nearRect(this.computerRect)) {
+      this.showPrompt(
+        "Пробел / Enter — включить компьютер",
+        this.computerRect.x + this.computerRect.w / 2,
+        this.computerRect.y + this.computerRect.h,
+      );
     } else if (this.coffeeRect && !carrying && this.nearRect(this.coffeeRect)) {
       this.showPrompt(
         "Пробел / Enter — получить чашку кофе",
@@ -879,7 +902,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // Действие по Space/Enter рядом с объектом. Приоритет: предмет в лапах (поставить) →
-  // взять предмет → NPC → телевизор → стена предков → принтер → покер → выдача кофе → дверь.
+  // взять предмет → NPC → телевизор → стена предков → принтер → покер → компьютер →
+  // выдача кофе → дверь.
   // Взятие идёт раньше стационарных объектов: иначе чашку, стоящую на столе покера, было
   // бы не поднять — тем же пробелом открывался бы покер.
   private tryInteract(): boolean {
@@ -924,6 +948,10 @@ export class WorldScene extends Phaser.Scene {
     }
     if (this.pokerRect && this.nearRect(this.pokerRect)) {
       this.poker.open();
+      return true;
+    }
+    if (this.computerRect && this.nearRect(this.computerRect)) {
+      this.computer.open();
       return true;
     }
     // Занятые лапы — кофемашина молчит, и клавиша уходит дальше (например, в дверь).
