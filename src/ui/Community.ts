@@ -49,6 +49,10 @@ export class Community {
     avatar.src = publicPath(`assets/${SPRITE_FILES[spriteForRole(player.role ?? "")]}`);
     avatar.alt = player.login;
 
+    const dot = document.createElement("span");
+    dot.className = player.online ? "comm-dot comm-dot-online" : "comm-dot";
+    dot.title = player.online ? "В сети" : "Не в сети";
+
     const login = document.createElement("span");
     login.className = "comm-login";
     login.textContent = player.login;
@@ -61,7 +65,7 @@ export class Community {
       this.onShowAchievements(player.login);
     };
 
-    row.append(avatar, login, achBtn);
+    row.append(avatar, dot, login, achBtn);
     return row;
   }
 

@@ -117,11 +117,13 @@ export function fetchPlayerAchievements(login: string): Promise<Achievements> {
   return authedJson<Achievements>(`/api/achievements/${encodeURIComponent(login)}`);
 }
 
-// Сообщество: игроки в порядке регистрации; role == null — роль ещё не выбрана.
+// Сообщество: игроки в порядке регистрации; role == null — роль ещё не выбрана;
+// online — игрок сейчас в игре (есть открытое соединение).
 export interface CommunityPlayer {
   login: string;
   role: string | null;
   owned: number;
+  online: boolean;
 }
 
 export interface Community {
