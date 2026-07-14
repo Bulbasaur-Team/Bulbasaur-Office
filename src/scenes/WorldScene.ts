@@ -6,7 +6,9 @@ import { Dialogue } from "../ui/Dialogue";
 import { SpeechBubble } from "../ui/SpeechBubble";
 import { ThoughtBubble } from "../ui/ThoughtBubble";
 import { SlideViewer } from "../ui/SlideViewer";
+import { SlidePicker } from "../ui/SlidePicker";
 import { Projector } from "../ui/Projector";
+import { slidePathsByOwnerId } from "../ui/slides";
 import { LocationMenu } from "../ui/LocationMenu";
 import { GameMenu } from "../ui/GameMenu";
 import { BulbaJump } from "../ui/BulbaJump";
@@ -105,7 +107,12 @@ export class WorldScene extends Phaser.Scene {
   private thoughtBubbles: ThoughtBubble[] = []; // облачко мыслей на каждый NPC текущей локации (по индексу npcs)
   private thoughtTimers: Phaser.Time.TimerEvent[] = []; // персональный таймер проверки на каждый NPC
   private slides!: SlideViewer;
+  private slidePicker!: SlidePicker;
   private projector!: Projector;
+  private projectorOn = false;              // включён ли проектор (walk-up / мультиплеер)
+  private projectorOwnerId: string | null = null;
+  private projectorIndex = 0;
+  private projectorFromDialogue = false;    // сюжетный показ из диалога с NPC
   private gameMenu!: GameMenu;
   private bulbaJump!: BulbaJump;
   private bulbaPacker!: BulbaPacker;
@@ -155,6 +162,7 @@ export class WorldScene extends Phaser.Scene {
   private pokerRect: Rect | null = null;         // прямоугольник столов для Planning Poker в дата-центре (объект "poker")
   private coffeeRect: Rect | null = null;        // выдача чашки кофе на кухне чилл-зоны (объект "coffee")
   private computerRect: Rect | null = null;      // ретро-ПК в дата-центре (объект "computer")
+  private projectorRect: Rect | null = null;     // зона проектора в главном офисе (объект "projector")
   private menu!: LocationMenu;
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
   private exitLabel = document.getElementById("exitLabel") as HTMLSpanElement;
@@ -182,18 +190,30 @@ export class WorldScene extends Phaser.Scene {
       this.dialogue.paused = true;
       this.slides.open(slides, index);
     });
-    this.slides = new SlideViewer((index) => {
-      this.dialogue.paused = false;
-      this.projector.setIndex(index);
-    });
+    this.slides = new SlideViewer(
+      (index) => {
+        this.projectorIndex = index;
+        this.projector.setIndex(index);
+        if (this.multiplayer && this.projectorOn) this.realtime.projectorIndex(index);
+      },
+      () => {
+        this.dialogue.paused = false;
+      },
+    );
+    this.slidePicker = new SlidePicker((owner) => this.turnProjectorOn(owner.id));
     this.dialogue = new Dialogue({
       onSay: (text) => {
         if (this.talking) this.bubble.show(text, this.talking.x, this.talking.y - TARGET_H / 2);
       },
-      onShowSlides: (npc) => this.projector.show(npc),
+      onShowSlides: (npc) => {
+        this.projectorFromDialogue = true;
+        this.projector.show(npc);
+      },
       onClose: () => {
         this.bubble.hide();
-        this.projector.hide();
+        // Сюжетный показ не трогает общее состояние проектора.
+        if (this.projectorFromDialogue && !this.projectorOn) this.projector.hide();
+        this.projectorFromDialogue = false;
       },
     });
 
@@ -314,6 +334,7 @@ export class WorldScene extends Phaser.Scene {
     // разбираются в update() — там Space и Enter равноценны.
     this.router.register(this.slides);
     this.router.register(this.poker);
+    this.router.register(this.slidePicker);
     this.router.register(this.dialogue);
     this.router.register(this.gameMenu);
     this.router.register(this.menu);
@@ -511,6 +532,7 @@ export class WorldScene extends Phaser.Scene {
       onPokerState: (state) => this.poker.onState(state),
       onPokerClosed: () => this.poker.onClosed(),
       onPokerError: (message) => this.poker.onError(message),
+      onProjectorState: (state) => this.applyProjectorState(state.on, state.ownerId, state.index),
       onAchievement: (_code, title, description, image) => this.achievementPopup.show(title, description, image),
     });
   }
@@ -653,7 +675,16 @@ export class WorldScene extends Phaser.Scene {
     // На последнем уровне вложенности компьютер — просто предмет обстановки: так рекурсия
     // обрывается (см. embed.ts).
     this.computerRect = computerEnabled ? rects.get("computer") ?? null : null;
+    this.projectorRect = rects.get("projector") ?? null;
     this.items.load(items, physicsWalls, tableRects, cfg.id);
+    // Вне главного офиса общий проектор не рисуем; при возврате стейт придёт по WS
+    // (или останется локальным в одиночке, если ещё не выключали).
+    if (!this.projectorRect && this.projectorOn) {
+      this.projector.hide();
+    } else if (this.projectorRect && this.projectorOn && this.projectorOwnerId) {
+      const paths = slidePathsByOwnerId(this.projectorOwnerId);
+      if (paths) this.projector.showDeck(paths, this.projectorIndex);
+    }
 
     // Свёрнутая игра видна на экране TV только в чилл-зоне (где задан прямоугольник экрана).
     if (this.activeGame && this.activeGame.minimized && index === LOC.chillZone && this.tvRect) {
@@ -696,7 +727,9 @@ export class WorldScene extends Phaser.Scene {
       this.logs.isOpen ||
       this.monitoring.isOpen ||
       this.computer.isOpen ||
-      this.poker.isOpen
+      this.poker.isOpen ||
+      this.slidePicker.isOpen ||
+      this.slides.isOpen
     );
   }
 
@@ -845,6 +878,15 @@ export class WorldScene extends Phaser.Scene {
       this.showPrompt("Пробел / Enter — поставить чашку", this.player.x, this.player.y);
     } else if (!carrying && this.items.grabbableNear(this.player.x, this.player.y)) {
       this.showPrompt("Пробел / Enter — взять предмет", this.player.x, this.player.y);
+    } else if (this.projectorRect && this.nearRect(this.projectorRect)) {
+      const label = this.projectorOn
+        ? "Пробел / Enter — выключить проектор"
+        : "Пробел / Enter — включить проектор";
+      this.showPrompt(
+        label,
+        this.projectorRect.x + this.projectorRect.w / 2,
+        this.projectorRect.y + this.projectorRect.h,
+      );
     } else if (this.nearest) {
       this.showPrompt("Пробел / Enter — поговорить", this.nearest.x, this.nearest.y);
     } else if (this.tv && this.near(this.tv)) {
@@ -939,6 +981,11 @@ export class WorldScene extends Phaser.Scene {
     if (this.items.grabNear(this.player.x, this.player.y)) {
       return true;
     }
+    if (this.projectorRect && this.nearRect(this.projectorRect)) {
+      if (this.projectorOn) this.turnProjectorOff();
+      else this.slidePicker.open();
+      return true;
+    }
     if (this.nearest) {
       this.talking = this.nearest;
       this.thoughtBubbles[this.npcs.indexOf(this.nearest)]?.hide();
@@ -1030,6 +1077,52 @@ export class WorldScene extends Phaser.Scene {
     this.playerLabel.setVisible(this.player.visible);
     if (this.player.visible) {
       this.playerLabel.setPosition(this.player.x, this.player.y - TARGET_H * 0.7);
+    }
+  }
+
+  private turnProjectorOn(ownerId: string): void {
+    if (this.multiplayer) {
+      this.realtime.projectorOn(ownerId);
+      return;
+    }
+    this.applyProjectorState(true, ownerId, 0);
+  }
+
+  private turnProjectorOff(): void {
+    if (this.multiplayer) {
+      this.realtime.projectorOff();
+      return;
+    }
+    this.applyProjectorState(false, null, 0);
+  }
+
+  private applyProjectorState(on: boolean, ownerId: string | null, index: number): void {
+    if (!on || !ownerId) {
+      this.projectorOn = false;
+      this.projectorOwnerId = null;
+      this.projectorIndex = 0;
+      this.projectorFromDialogue = false;
+      this.projector.hide();
+      if (this.slides.isOpen) this.slides.close();
+      return;
+    }
+    const paths = slidePathsByOwnerId(ownerId);
+    if (!paths) return;
+
+    const sameDeck = this.projectorOn && this.projectorOwnerId === ownerId;
+    this.projectorOn = true;
+    this.projectorOwnerId = ownerId;
+    this.projectorIndex = index;
+    this.projectorFromDialogue = false;
+
+    if (this.locIndex === LOC.mainOffice) {
+      if (sameDeck) this.projector.setIndex(index);
+      else this.projector.showDeck(paths, index);
+    }
+
+    if (this.slides.isOpen) {
+      if (sameDeck) this.slides.syncIndex(index);
+      else this.slides.syncDeck(paths, index);
     }
   }
 

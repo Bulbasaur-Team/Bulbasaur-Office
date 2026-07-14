@@ -28,18 +28,25 @@ export class Projector {
     this.setVisible(false);
   }
 
+  /** Сюжетный показ слайдов NPC (локально, без мультиплеерного синка). */
   show(npc: Character): void {
-    this.slides = slidePaths(npc);
-    this.index = 0;
+    this.showDeck(slidePaths(npc), 0);
+  }
+
+  showDeck(slides: string[], index = 0): void {
+    this.slides = slides;
+    this.index = Math.max(0, Math.min(index, Math.max(0, slides.length - 1)));
     this.load();
     this.setVisible(true);
   }
 
   hide(): void {
     this.setVisible(false);
+    this.slides = [];
+    this.index = 0;
   }
 
-  // Синхронизация со страницей, выбранной в полноэкранном просмотре.
+  // Синхронизация со страницей, открытой в полноэкранном просмотре / с сервера.
   setIndex(index: number): void {
     if (index === this.index || index < 0 || index >= this.slides.length) return;
     this.index = index;
@@ -53,6 +60,7 @@ export class Projector {
   }
 
   private load(): void {
+    if (this.slides.length === 0) return;
     const token = ++this.loadToken;
     const img = new Image();
     img.onload = () => {

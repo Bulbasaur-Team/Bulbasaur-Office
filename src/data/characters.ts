@@ -30,7 +30,7 @@ export const CHARACTERS: Character[] = [
       "Надо ещё что-то прикольное придумать для Bulba Office"
     ] },
 
-  { id: "artur", name: "Артурозавр", sprite: "dev", roleLabel: "программист", areaLabel: "Ноутбуки", slideCount: 3,
+  { id: "artur", name: "Артурозавр", sprite: "dev", roleLabel: "программист", areaLabel: "Ноутбуки", slideCount: 0,
     lines: {
       greet: "Здарова. Кофе будешь? Я только что сварил.",
       who: "Артурозавр. Фронтенд, бэкенд, фуллстек-фотосинтез.",
@@ -44,7 +44,7 @@ export const CHARACTERS: Character[] = [
       "Надо кофейку бахнуть."
     ] },
 
-  { id: "fedya", name: "Федязавр", sprite: "dev", roleLabel: "программист", areaLabel: "Ноутбуки", faceRight: true, slideCount: 3,
+  { id: "fedya", name: "Федязавр", sprite: "dev", roleLabel: "программист", areaLabel: "Ноутбуки", faceRight: true, slideCount: 0,
     lines: {
       greet: "Тссс, я в потоке.",
       who: "Федязавр, отвечаю за интеграции с логистикой.",
@@ -72,7 +72,7 @@ export const CHARACTERS: Character[] = [
       "Сейчас бы фо с зеленью.",
     ] },
 
-  { id: "dima", name: "Димозавр", sprite: "qa", roleLabel: "тестировщик", areaLabel: "Кладовая", slideCount: 3,
+  { id: "dima", name: "Димозавр", sprite: "qa", roleLabel: "тестировщик", areaLabel: "Кладовая", slideCount: 0,
     lines: {
       greet: "Стой! Этот билд уже проверяли?",
       who: "Димозавр, тестировщик. Ломаю то, что вы собрали, пока не сломается красиво.",
@@ -87,7 +87,7 @@ export const CHARACTERS: Character[] = [
       "В августе надо поехать на Лидбир!"
     ] },
 
-  { id: "timur", name: "Тимурозавр", sprite: "qa", roleLabel: "тестировщик", areaLabel: "Коридор", slideCount: 3,
+  { id: "timur", name: "Тимурозавр", sprite: "qa", roleLabel: "тестировщик", areaLabel: "Коридор", slideCount: 0,
     lines: {
       greet: "Секунду, дописываю баг-репорт.",
       who: "Тимурозавр, тестировщик. Если что-то можно сломать — я уже сломал.",
@@ -101,7 +101,7 @@ export const CHARACTERS: Character[] = [
       "Надо кофейку бахнуть.",
     ] },
 
-  { id: "anya", name: "Анязавр", sprite: "designer", roleLabel: "дизайнер", areaLabel: "Кабинет дизайнера", slideCount: 3,
+  { id: "anya", name: "Анязавр", sprite: "designer", roleLabel: "дизайнер", areaLabel: "Кабинет дизайнера", slideCount: 0,
     lines: {
       greet: "Только не говори, что нужно «просто подвинуть кнопочку».",
       who: "Анязавр, дизайнер. Делаю так, чтобы было красиво и удобно.",
@@ -130,7 +130,7 @@ export const CHARACTERS: Character[] = [
       "Надо кофейку бахнуть."
     ] },
 
-  { id: "kirill", name: "Кириллозавр", sprite: "owner", roleLabel: "продакт-оунер", areaLabel: "Совещательная", slideCount: 3,
+  { id: "kirill", name: "Кириллозавр", sprite: "owner", roleLabel: "продакт-оунер", areaLabel: "Совещательная", slideCount: 0,
     lines: {
       greet: "О, как раз кстати — у меня для тебя пара задачек в бэклоге.",
       who: "Кириллозавр, продакт-оунер. Решаю, что мы делаем и зачем.",
@@ -145,7 +145,7 @@ export const CHARACTERS: Character[] = [
       "Завтра турнир по теннису..."
     ] },
 
-  { id: "yuri", name: "Юрозавр", sprite: "analyst", roleLabel: "аналитик", areaLabel: "Совещательная", slideCount: 3,
+  { id: "yuri", name: "Юрозавр", sprite: "analyst", roleLabel: "аналитик", areaLabel: "Совещательная", slideCount: 0,
     lines: {
       greet: "Секунду, доформулирую мысль…",
       who: "Юрозавр, аналитик. Превращаю хаос доставок в красивые графики.",

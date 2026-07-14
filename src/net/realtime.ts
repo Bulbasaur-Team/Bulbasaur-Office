@@ -85,6 +85,13 @@ export interface PokerStateView {
   tasks: PokerDoneTaskView[];
 }
 
+/** Состояние проектора в локации (владелец колоды — id персонажа). */
+export interface ProjectorStateView {
+  on: boolean;
+  ownerId: string | null;
+  index: number;
+}
+
 export interface RealtimeHandlers {
   onOpen?: () => void; // соединение открыто (в т.ч. после реконнекта) — здесь шлём join
   onSnapshot?: (players: RemoteState[]) => void;
@@ -106,6 +113,7 @@ export interface RealtimeHandlers {
   onPokerState?: (state: PokerStateView) => void;
   onPokerClosed?: () => void;
   onPokerError?: (message: string) => void;
+  onProjectorState?: (state: ProjectorStateView) => void;
   onAchievement?: (code: string, title: string, description: string, image: string) => void; // выдана ачивка
 }
 
@@ -211,6 +219,18 @@ export class Realtime {
     this.send({ type: "pokerClose" });
   }
 
+  projectorOn(ownerId: string): void {
+    this.send({ type: "projectorOn", ownerId });
+  }
+
+  projectorOff(): void {
+    this.send({ type: "projectorOff" });
+  }
+
+  projectorIndex(index: number): void {
+    this.send({ type: "projectorIndex", index });
+  }
+
   private open(): void {
     const token = getToken() ?? "";
     const ws = new WebSocket(`${WS_BASE}?token=${encodeURIComponent(token)}`);
@@ -243,6 +263,13 @@ export class Realtime {
       case "pokerState": this.handlers.onPokerState?.(msg); break;
       case "pokerClosed": this.handlers.onPokerClosed?.(); break;
       case "pokerError": this.handlers.onPokerError?.(msg.message); break;
+      case "projectorState":
+        this.handlers.onProjectorState?.({
+          on: !!msg.on,
+          ownerId: msg.ownerId ?? null,
+          index: msg.index ?? 0,
+        });
+        break;
       case "achievement": this.handlers.onAchievement?.(msg.code, msg.title, msg.description, msg.image); break;
     }
   }

@@ -16,8 +16,12 @@ export class SlideViewer implements KeyConsumer {
 
   private slides: string[] = [];
   private index = 0;
+  private suppressIndexNotify = false;
 
-  constructor(private onClose: (index: number) => void) {
+  constructor(
+    private onIndexChange: (index: number) => void,
+    private onClose: () => void,
+  ) {
     document.getElementById("slidesClose")!.onclick = () => this.close();
     this.prevBtn.onclick = () => this.go(-1);
     this.nextBtn.onclick = () => this.go(1);
@@ -39,6 +43,23 @@ export class SlideViewer implements KeyConsumer {
     this.root.classList.remove("hidden");
   }
 
+  /** Подтянуть индекс с проектора/сервера, не шлём onIndexChange обратно. */
+  syncIndex(index: number): void {
+    if (!this.isOpen || index === this.index || index < 0 || index >= this.slides.length) return;
+    this.suppressIndexNotify = true;
+    this.index = index;
+    this.render();
+    this.suppressIndexNotify = false;
+  }
+
+  /** Сменить колоду (тот же viewer) при удалённом включении проектора. */
+  syncDeck(slides: string[], index: number): void {
+    if (!this.isOpen) return;
+    this.slides = slides;
+    this.index = Math.max(0, Math.min(index, Math.max(0, slides.length - 1)));
+    this.render();
+  }
+
   // Свои слайды не загрузились — значит их нет в директории, показываем образцы.
   private fallbackToSample(): void {
     if (this.slides === SAMPLE_SLIDES) return;
@@ -52,7 +73,7 @@ export class SlideViewer implements KeyConsumer {
     this.isOpen = false;
     this.root.classList.remove("maximized", "pixel");
     this.root.classList.add("hidden");
-    this.onClose(this.index);
+    this.onClose();
   }
 
   private go(d: number): void {
@@ -60,6 +81,7 @@ export class SlideViewer implements KeyConsumer {
     if (next < 0 || next >= this.slides.length) return;
     this.index = next;
     this.render();
+    if (!this.suppressIndexNotify) this.onIndexChange(this.index);
   }
 
   private render(): void {

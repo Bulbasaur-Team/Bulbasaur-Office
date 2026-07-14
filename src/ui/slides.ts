@@ -1,7 +1,7 @@
-import type { Character } from "../data/characters";
+import { CHARACTERS, type Character } from "../data/characters";
 import { publicPath } from "../publicPath";
 
-// Запасные слайды — показываются, если у персонажа нет ни одного своего файла.
+// Запасные слайды — показываются в сюжетном диалоге с NPC, если своих файлов нет.
 export const SAMPLE_SLIDES = [
   publicPath("assets/slides/sample_1.png"),
   publicPath("assets/slides/sample_2.png"),
@@ -15,4 +15,11 @@ export function slidePaths(npc: Character): string[] {
   return Array.from({ length: npc.slideCount }, (_, i) =>
     publicPath(`assets/slides/${npc.id}_${i + 1}.png`),
   );
+}
+
+/** Пути по id владельца колоды (для синка проектора). null — неизвестный / без слайдов. */
+export function slidePathsByOwnerId(ownerId: string): string[] | null {
+  const owner = CHARACTERS.find((c) => c.id === ownerId);
+  if (!owner || owner.slideCount <= 0) return null;
+  return slidePaths(owner);
 }
