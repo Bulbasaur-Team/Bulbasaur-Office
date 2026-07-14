@@ -43,6 +43,7 @@ import { Community } from "../ui/Community";
 import { PasswordChange } from "../ui/PasswordChange";
 import { Ancestors } from "../ui/Ancestors";
 import { Logs } from "../ui/Logs";
+import { Monitoring } from "../ui/Monitoring";
 import { Computer } from "../ui/Computer";
 import { computerEnabled, embedded } from "../embed";
 import { Joystick, isTouch } from "../ui/TouchControls";
@@ -121,6 +122,7 @@ export class WorldScene extends Phaser.Scene {
   private passwordChange!: PasswordChange;
   private ancestors!: Ancestors;
   private logs!: Logs;
+  private monitoring!: Monitoring;
   private computer!: Computer;
   private joystick: Joystick | null = null;
   private activeGame: ArcadeGame | null = null;
@@ -149,6 +151,7 @@ export class WorldScene extends Phaser.Scene {
   private tvRect: Rect | null = null;            // прямоугольник экрана TV из карты (объект "tvScreen")
   private ancestorsRect: Rect | null = null;     // прямоугольник стены с портретами предков (объект "ancestors")
   private printerRect: Rect | null = null;       // прямоугольник принтера с логами в дата-центре (объект "printer")
+  private monitorRect: Rect | null = null;       // мониторы с графиками в комнате мониторинга (объект "monitor")
   private pokerRect: Rect | null = null;         // прямоугольник столов для Planning Poker в дата-центре (объект "poker")
   private coffeeRect: Rect | null = null;        // выдача чашки кофе на кухне чилл-зоны (объект "coffee")
   private computerRect: Rect | null = null;      // ретро-ПК в дата-центре (объект "computer")
@@ -228,6 +231,7 @@ export class WorldScene extends Phaser.Scene {
     this.passwordChange = new PasswordChange();
     this.ancestors = new Ancestors();
     this.logs = new Logs();
+    this.monitoring = new Monitoring();
     this.computer = new Computer();
     document.getElementById("passBtn")!.onclick = () => {
       (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
@@ -643,6 +647,7 @@ export class WorldScene extends Phaser.Scene {
     this.tvRect = rects.get("tvScreen") ?? null;
     this.ancestorsRect = rects.get("ancestors") ?? null;
     this.printerRect = embedded ? null : rects.get("printer") ?? null;
+    this.monitorRect = embedded ? null : rects.get("monitor") ?? null;
     this.pokerRect = embedded ? null : rects.get("poker") ?? null;
     this.coffeeRect = rects.get("coffee") ?? null;
     // На последнем уровне вложенности компьютер — просто предмет обстановки: так рекурсия
@@ -689,6 +694,7 @@ export class WorldScene extends Phaser.Scene {
       this.passwordChange.isOpen ||
       this.ancestors.isOpen ||
       this.logs.isOpen ||
+      this.monitoring.isOpen ||
       this.computer.isOpen ||
       this.poker.isOpen
     );
@@ -859,6 +865,12 @@ export class WorldScene extends Phaser.Scene {
         this.printerRect.x + this.printerRect.w / 2,
         this.printerRect.y + this.printerRect.h,
       );
+    } else if (this.monitorRect && this.nearRect(this.monitorRect)) {
+      this.showPrompt(
+        "Пробел / Enter — посмотреть графики",
+        this.monitorRect.x + this.monitorRect.w / 2,
+        this.monitorRect.y + this.monitorRect.h,
+      );
     } else if (this.pokerRect && this.nearRect(this.pokerRect)) {
       this.showPrompt(
         "Пробел / Enter — сыграть в Planning Poker",
@@ -902,8 +914,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // Действие по Space/Enter рядом с объектом. Приоритет: предмет в лапах (поставить) →
-  // взять предмет → NPC → телевизор → стена предков → принтер → покер → компьютер →
-  // выдача кофе → дверь.
+  // взять предмет → NPC → телевизор → стена предков → принтер → мониторы → покер →
+  // компьютер → выдача кофе → дверь.
   // Взятие идёт раньше стационарных объектов: иначе чашку, стоящую на столе покера, было
   // бы не поднять — тем же пробелом открывался бы покер.
   private tryInteract(): boolean {
@@ -944,6 +956,10 @@ export class WorldScene extends Phaser.Scene {
     }
     if (this.printerRect && this.nearRect(this.printerRect)) {
       void this.logs.open();
+      return true;
+    }
+    if (this.monitorRect && this.nearRect(this.monitorRect)) {
+      void this.monitoring.open();
       return true;
     }
     if (this.pokerRect && this.nearRect(this.pokerRect)) {

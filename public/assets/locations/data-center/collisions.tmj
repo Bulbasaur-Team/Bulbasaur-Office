@@ -999,6 +999,18 @@
                  "width":92.2126423532666,
                  "x":82.5303149061736,
                  "y":403.430310295542
+                }, 
+                {
+                 "height":130,
+                 "id":143,
+                 "name":"monitor",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":370,
+                 "x":980,
+                 "y":410
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -1414,7 +1426,7 @@
          "y":0
         }],
  "nextlayerid":7,
- "nextobjectid":143,
+ "nextobjectid":144,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",

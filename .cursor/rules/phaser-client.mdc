@@ -1,0 +1,29 @@
+---
+description: Phaser-клиент Bulba Office — структура, стек, соглашения по коду
+globs: "**/*.{ts,html}"
+alwaysApply: false
+---
+
+# Клиент: Phaser + DOM
+
+Стек: Phaser 3, TypeScript (`strict`), Vite, npm. Без React/Vue/CSS-фреймворков.
+
+## Куда класть код
+
+- `src/scenes/` — сцены (мир в `WorldScene`, загрузка карт в `LocationLoader`)
+- `src/ui/` — DOM-модалки/контроллеры и Phaser HUD
+- `src/entities/` — игроки, предметы, спрайты
+- `src/net/` — единственная граница с бэкендом
+- `src/data/` — каталоги (локации, персонажи, роли, предметы)
+- `public/assets/` — пиксель-ассеты; пути через `publicPath()`
+- Разметка оверлеев и общий CSS — в `index.html` (CSS-переменные `--accent` и т.д.)
+
+## Соглашения
+
+- Относительные импорты (алиасов нет).
+- Геометрия/двери/interaction — в Tiled (`.tmj`); в `locations.ts` только топология и ключи ассетов.
+- Клавиатура через `KeyboardRouter` / `KeyConsumer` — не давать Phaser двигать игрока, когда фокус в инпуте.
+- Новая мини-игра: пункт в меню игр + разметка/CSS в `index.html` + открытие в `WorldScene`.
+- Новый предмет: `ITEM_TYPES` + PNG + точки в Tiled.
+- Проверка: `npm run build` (`tsc --noEmit` + vite). ESLint/тестов нет.
+- Пиксель-арт: `pixelArt: true`, без сглаживания. Не тащи сторонние UI-kit.

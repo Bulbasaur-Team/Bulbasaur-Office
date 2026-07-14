@@ -1,0 +1,14 @@
+---
+description: Контент и карты — Tiled, каталоги data, ассеты
+globs: "{src/data/**,public/assets/**,README.md}"
+alwaysApply: false
+---
+
+# Контент и карты
+
+- Карты: `public/assets/locations/<id>/` — `background.png`, `overlay.png`, `collisions.tmj`
+- Interaction-типы из Tiled (`tv`, `printer`, `poker`, `coffee`, `computer`, …) уже вяжутся в `WorldScene` — новые типы нужно явно подключить
+- ID локаций: kebab-case (`main-office`, `chill-zone`)
+- Роли/эмоты: коды как на бэке (`DEV`, `DEV_FE`, `WAVE`, …)
+- Слайды NPC: `public/assets/slides/`; тексты персонажей — `src/data/characters.ts`
+- README.md — гайд по правке карт/контента; при расхождении с кодом верь коду

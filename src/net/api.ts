@@ -144,6 +144,24 @@ export function fetchLogs(): Promise<Logs> {
   return authedJson<Logs>(`/api/logs`);
 }
 
+// Метрики офиса (мониторы в дата-центре): 5‑минутные бакеты за ~48 часов.
+export interface OfficeMetricsPoint {
+  t: string;
+  online: number;
+  tennisKicks: number;
+  volleyballKicks: number;
+  coffeeCups: number;
+}
+
+export interface OfficeMetrics {
+  bucketMinutes: number;
+  points: OfficeMetricsPoint[];
+}
+
+export function fetchOfficeMetrics(): Promise<OfficeMetrics> {
+  return authedJson<OfficeMetrics>(`/api/metrics`);
+}
+
 // Профиль: сохранённая роль (null — игрок ещё не выбирал Бульбазавра).
 export interface Profile {
   login: string;

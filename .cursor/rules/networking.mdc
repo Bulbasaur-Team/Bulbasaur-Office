@@ -1,0 +1,14 @@
+---
+description: Сеть клиента — REST (fetch) и WebSocket, JWT
+globs: "src/net/**/*.ts"
+alwaysApply: false
+---
+
+# Сеть клиента
+
+- REST: `src/net/api.ts` — `fetch`, base `VITE_API_URL` || `http://localhost:8080`
+- WS: `src/net/realtime.ts` — `VITE_WS_URL` || `ws://localhost:8080/ws`, токен в `?token=`
+- JWT: `localStorage` ключи `bulba_token`, `bulba_login`; на 401/403 — logout
+- Не добавляй axios/React Query. Новые эндпоинты — хелперы рядом с существующими `authedJson` / `authedVoid`
+- Сообщения WS — JSON с полем `type`; держи контракт синхронным с серверным `infra/ws`
+- Пользовательские ошибки — по-русски (как сейчас в `api.ts`)

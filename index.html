@@ -416,6 +416,31 @@
     .logs-box { position: relative; background: #0d1016; border: 3px solid var(--accent); border-radius: 12px; padding: 18px 20px; width: min(860px, calc(var(--sw) * .94)); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
     .logs-out { margin: 8px 0 0; max-height: calc(var(--sh) * .66); overflow: auto; font-family: "SF Mono", "Consolas", "Menlo", monospace; font-size: 12px; line-height: 1.5; color: #8fbf8f; white-space: pre; background: #05070a; border: 1px solid #1c2530; border-radius: 8px; padding: 12px 14px; }
 
+    /* Мониторинг / Grafana-панели в дата-центре */
+    #monitoring { position: fixed; inset: 0; z-index: 70; background: rgba(8,10,14,.88); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .mon-box { position: relative; background: #111217; border: 2px solid #2c3235; border-radius: 4px; padding: 16px 18px 14px; width: min(920px, calc(var(--sw) * .94)); box-shadow: 0 0 0 1px #ff780a55, 0 16px 48px rgba(0,0,0,.65); }
+    .mon-box::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, #ff780a, #f2cc0c 40%, #73bf69); border-radius: 4px 4px 0 0; }
+    .mon-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; padding-right: 36px; }
+    .mon-title { margin: 0; font-size: 16px; font-weight: 600; color: #d8d9da; letter-spacing: .02em; }
+    .mon-meta { font-size: 11px; color: #8e8e8e; font-family: "SF Mono", "Consolas", "Menlo", monospace; white-space: nowrap; }
+    .mon-status { min-height: 16px; font-size: 13px; color: #8e8e8e; margin-bottom: 6px; }
+    .mon-panel { background: #181b1f; border: 1px solid #2c3235; border-radius: 2px; padding: 10px 12px 8px; }
+    .mon-panel-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+    .mon-panel-title h3 { margin: 0; font-size: 13px; font-weight: 500; color: #c7c7c7; }
+    .mon-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; color: #9fa0a2; }
+    .mon-legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .mon-legend i { width: 10px; height: 3px; border-radius: 1px; display: inline-block; }
+    .mon-canvas-wrap { width: 100%; height: min(360px, calc(var(--sh) * .48)); position: relative; }
+    #monCanvas { width: 100%; height: 100%; display: block; }
+    .mon-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; font-size: 11px; color: #6e6e6e; font-family: "SF Mono", "Consolas", "Menlo", monospace; }
+    .mon-dots { display: flex; gap: 6px; }
+    .mon-dots i { width: 7px; height: 7px; border-radius: 50%; background: #2c3235; }
+    .mon-dots i.on { background: #ff780a; }
+    #monitoring .lb-close { top: 8px; right: 8px; width: 32px; height: 32px; border-radius: 2px; border: 1px solid #2c3235; background: #181b1f; }
+    #monitoring .lb-close:hover { background: #ff780a; color: #111217; border-color: #ff780a; }
+    #monitoring .lb-nav { border-color: #2c3235; background: #181b1f; color: #d8d9da; border-radius: 2px; }
+    #monitoring .lb-nav:hover { background: #ff780a; color: #111217; border-color: #ff780a; }
+
     /* Попап получения ачивки */
     #achPopup { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 90; display: flex; align-items: center; gap: 12px; background: var(--panel); border: 3px solid var(--accent); border-radius: 14px; padding: 12px 18px; box-shadow: 0 12px 44px rgba(0,0,0,.55); max-width: min(360px, calc(var(--sw) * .9)); }
     #achPopup.ach-popup-in { animation: achPopupIn .35s ease-out; }
@@ -828,6 +853,35 @@
         <h2 class="lb-title">Логи Бульба Офиса</h2>
         <div class="lb-status" id="logsStatus"></div>
         <pre class="logs-out" id="logsOut"></pre>
+      </div>
+    </div>
+
+    <div id="monitoring" class="hidden">
+      <div class="mon-box">
+        <button class="lb-close" id="monClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <button class="lb-nav prev" id="monPrev" aria-label="предыдущий график">‹</button>
+        <button class="lb-nav next" id="monNext" aria-label="следующий график">›</button>
+        <div class="mon-header">
+          <h2 class="mon-title" id="monTitle">Мониторинг</h2>
+          <div class="mon-meta" id="monMeta">last 48h · 5m</div>
+        </div>
+        <div class="mon-status" id="monStatus"></div>
+        <div class="mon-panel">
+          <div class="mon-panel-title">
+            <h3 id="monPanelTitle">Бульбазавры онлайн</h3>
+            <div class="mon-legend" id="monLegend"></div>
+          </div>
+          <div class="mon-canvas-wrap">
+            <canvas id="monCanvas"></canvas>
+          </div>
+        </div>
+        <div class="mon-footer">
+          <span id="monPage">1 / 3</span>
+          <div class="mon-dots" id="monDots"><i class="on"></i><i></i><i></i></div>
+          <span>← → листай · Esc закрыть</span>
+        </div>
       </div>
     </div>
 
