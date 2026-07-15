@@ -1686,7 +1686,7 @@
                  "width":102.113681805199,
                  "x":204.58440445587,
                  "y":589.117395029991
-                },
+                }, 
                 {
                  "height":90,
                  "id":656,
@@ -1698,6 +1698,54 @@
                  "width":100,
                  "x":1270,
                  "y":555
+                }, 
+                {
+                 "height":58.0478715780421,
+                 "id":662,
+                 "name":"laptop4",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":66.6475562562706,
+                 "x":361.903396875448,
+                 "y":235.77468826143
+                }, 
+                {
+                 "height":52.3147484592232,
+                 "id":663,
+                 "name":"laptop2",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":68.7974774258278,
+                 "x":354.736992976924,
+                 "y":108.929339257561
+                }, 
+                {
+                 "height":37.9819406621757,
+                 "id":664,
+                 "name":"laptop1",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":67.364196646123,
+                 "x":209.258993836893,
+                 "y":135.445033682098
+                }, 
+                {
+                 "height":41.5651426114376,
+                 "id":665,
+                 "name":"laptop3",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":59.4811523577469,
+                 "x":207.825713057188,
+                 "y":255.840619177297
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -1706,7 +1754,7 @@
          "y":0
         }],
  "nextlayerid":10,
- "nextobjectid":657,
+ "nextobjectid":666,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",

@@ -48,6 +48,7 @@ import { Ancestors } from "../ui/Ancestors";
 import { Logs } from "../ui/Logs";
 import { Monitoring } from "../ui/Monitoring";
 import { Computer } from "../ui/Computer";
+import { Laptop } from "../ui/Laptop";
 import { computerEnabled, embedded } from "../embed";
 import { Joystick, isTouch } from "../ui/TouchControls";
 import * as api from "../net/api";
@@ -134,6 +135,7 @@ export class WorldScene extends Phaser.Scene {
   private logs!: Logs;
   private monitoring!: Monitoring;
   private computer!: Computer;
+  private laptop!: Laptop;
   private joystick: Joystick | null = null;
   private activeGame: ArcadeGame | null = null;
   private playerBaseScale = 1; // исходный масштаб игрока (анимация множит на него)
@@ -165,6 +167,7 @@ export class WorldScene extends Phaser.Scene {
   private pokerRect: Rect | null = null;         // прямоугольник столов для Planning Poker в дата-центре (объект "poker")
   private coffeeRect: Rect | null = null;        // выдача чашки кофе на кухне чилл-зоны (объект "coffee")
   private computerRect: Rect | null = null;      // ретро-ПК в дата-центре (объект "computer")
+  private laptopRects: Rect[] = [];              // ноутбуки в главном офисе (laptop1..laptop4)
   private projectorRect: Rect | null = null;     // зона проектора в главном офисе (объект "projector")
   private easelRect: Rect | null = null;         // мольберт Bulba Colors в главном офисе (объект "easel")
   private menu!: LocationMenu;
@@ -258,6 +261,7 @@ export class WorldScene extends Phaser.Scene {
     this.logs = new Logs();
     this.monitoring = new Monitoring();
     this.computer = new Computer();
+    this.laptop = new Laptop();
     document.getElementById("passBtn")!.onclick = () => {
       (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
       this.passwordChange.open();
@@ -681,6 +685,9 @@ export class WorldScene extends Phaser.Scene {
     // На последнем уровне вложенности компьютер — просто предмет обстановки: так рекурсия
     // обрывается (см. embed.ts).
     this.computerRect = computerEnabled ? rects.get("computer") ?? null : null;
+    this.laptopRects = ["laptop1", "laptop2", "laptop3", "laptop4"]
+      .map((name) => rects.get(name))
+      .filter((r): r is Rect => !!r);
     this.projectorRect = rects.get("projector") ?? null;
     this.easelRect = rects.get("easel") ?? null;
     this.items.load(items, physicsWalls, tableRects, cfg.id);
@@ -735,6 +742,7 @@ export class WorldScene extends Phaser.Scene {
       this.logs.isOpen ||
       this.monitoring.isOpen ||
       this.computer.isOpen ||
+      this.laptop.isOpen ||
       this.poker.isOpen ||
       this.slidePicker.isOpen ||
       this.slides.isOpen
@@ -901,52 +909,66 @@ export class WorldScene extends Phaser.Scene {
         this.easelRect.x + this.easelRect.w / 2,
         this.easelRect.y + this.easelRect.h,
       );
-    } else if (this.nearest) {
-      this.showPrompt("Пробел / Enter — поговорить", this.nearest.x, this.nearest.y);
-    } else if (this.tv && this.near(this.tv)) {
-      const label =
-        this.activeGame && this.activeGame.minimized
-          ? "Пробел / Enter — продолжить игру"
-          : "Пробел / Enter — выбрать игру";
-      this.showPrompt(label, this.tv.x, this.tv.y);
-    } else if (this.ancestorsRect && this.nearRect(this.ancestorsRect)) {
-      this.showPrompt(
-        "Пробел / Enter — прочитать",
-        this.ancestorsRect.x + this.ancestorsRect.w / 2,
-        this.ancestorsRect.y + this.ancestorsRect.h,
-      );
-    } else if (this.printerRect && this.nearRect(this.printerRect)) {
-      this.showPrompt(
-        "Пробел / Enter — посмотреть логи",
-        this.printerRect.x + this.printerRect.w / 2,
-        this.printerRect.y + this.printerRect.h,
-      );
-    } else if (this.monitorRect && this.nearRect(this.monitorRect)) {
-      this.showPrompt(
-        "Пробел / Enter — посмотреть графики",
-        this.monitorRect.x + this.monitorRect.w / 2,
-        this.monitorRect.y + this.monitorRect.h,
-      );
-    } else if (this.pokerRect && this.nearRect(this.pokerRect)) {
-      this.showPrompt(
-        "Пробел / Enter — сыграть в Planning Poker",
-        this.pokerRect.x + this.pokerRect.w / 2,
-        this.pokerRect.y + this.pokerRect.h,
-      );
-    } else if (this.computerRect && this.nearRect(this.computerRect)) {
-      this.showPrompt(
-        "Пробел / Enter — включить компьютер",
-        this.computerRect.x + this.computerRect.w / 2,
-        this.computerRect.y + this.computerRect.h,
-      );
-    } else if (this.coffeeRect && !carrying && this.nearRect(this.coffeeRect)) {
-      this.showPrompt(
-        "Пробел / Enter — получить чашку кофе",
-        this.coffeeRect.x + this.coffeeRect.w / 2,
-        this.coffeeRect.y + this.coffeeRect.h,
-      );
     } else {
-      this.prompt.setVisible(false);
+      // У столов с ноутбуками зона NPC и ноутбука пересекаются — берём то, что ближе.
+      const nearLaptop = this.nearestLaptop();
+      const laptopDist = nearLaptop ? this.distToRect(nearLaptop) : Infinity;
+      const npcDist = this.nearest
+        ? Phaser.Math.Distance.Between(this.player.x, this.player.y, this.nearest.x, this.nearest.y)
+        : Infinity;
+      if (nearLaptop && laptopDist <= npcDist) {
+        this.showPrompt(
+          "Пробел / Enter — включить компьютер",
+          nearLaptop.x + nearLaptop.w / 2,
+          nearLaptop.y + nearLaptop.h,
+        );
+      } else if (this.nearest) {
+        this.showPrompt("Пробел / Enter — поговорить", this.nearest.x, this.nearest.y);
+      } else if (this.tv && this.near(this.tv)) {
+        const label =
+          this.activeGame && this.activeGame.minimized
+            ? "Пробел / Enter — продолжить игру"
+            : "Пробел / Enter — выбрать игру";
+        this.showPrompt(label, this.tv.x, this.tv.y);
+      } else if (this.ancestorsRect && this.nearRect(this.ancestorsRect)) {
+        this.showPrompt(
+          "Пробел / Enter — прочитать",
+          this.ancestorsRect.x + this.ancestorsRect.w / 2,
+          this.ancestorsRect.y + this.ancestorsRect.h,
+        );
+      } else if (this.printerRect && this.nearRect(this.printerRect)) {
+        this.showPrompt(
+          "Пробел / Enter — посмотреть логи",
+          this.printerRect.x + this.printerRect.w / 2,
+          this.printerRect.y + this.printerRect.h,
+        );
+      } else if (this.monitorRect && this.nearRect(this.monitorRect)) {
+        this.showPrompt(
+          "Пробел / Enter — посмотреть графики",
+          this.monitorRect.x + this.monitorRect.w / 2,
+          this.monitorRect.y + this.monitorRect.h,
+        );
+      } else if (this.pokerRect && this.nearRect(this.pokerRect)) {
+        this.showPrompt(
+          "Пробел / Enter — сыграть в Planning Poker",
+          this.pokerRect.x + this.pokerRect.w / 2,
+          this.pokerRect.y + this.pokerRect.h,
+        );
+      } else if (this.computerRect && this.nearRect(this.computerRect)) {
+        this.showPrompt(
+          "Пробел / Enter — включить компьютер",
+          this.computerRect.x + this.computerRect.w / 2,
+          this.computerRect.y + this.computerRect.h,
+        );
+      } else if (this.coffeeRect && !carrying && this.nearRect(this.coffeeRect)) {
+        this.showPrompt(
+          "Пробел / Enter — получить чашку кофе",
+          this.coffeeRect.x + this.coffeeRect.w / 2,
+          this.coffeeRect.y + this.coffeeRect.h,
+        );
+      } else {
+        this.prompt.setVisible(false);
+      }
     }
   }
 
@@ -970,8 +992,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // Действие по Space/Enter рядом с объектом. Приоритет: предмет в лапах (поставить) →
-  // взять предмет → проектор → мольберт → NPC → телевизор → стена предков → принтер →
-  // мониторы → покер → компьютер → выдача кофе → дверь.
+  // взять предмет → проектор → мольберт → ноутбук/NPC (кто ближе) → телевизор →
+  // стена предков → принтер → мониторы → покер → компьютер → выдача кофе → дверь.
   // Взятие идёт раньше стационарных объектов: иначе чашку, стоящую на столе покера, было
   // бы не поднять — тем же пробелом открывался бы покер.
   private tryInteract(): boolean {
@@ -1004,11 +1026,22 @@ export class WorldScene extends Phaser.Scene {
       this.bulbaColors.open();
       return true;
     }
-    if (this.nearest) {
-      this.talking = this.nearest;
-      this.thoughtBubbles[this.npcs.indexOf(this.nearest)]?.hide();
-      this.dialogue.open(this.nearest.char);
-      return true;
+    {
+      const nearLaptop = this.nearestLaptop();
+      const laptopDist = nearLaptop ? this.distToRect(nearLaptop) : Infinity;
+      const npcDist = this.nearest
+        ? Phaser.Math.Distance.Between(this.player.x, this.player.y, this.nearest.x, this.nearest.y)
+        : Infinity;
+      if (nearLaptop && laptopDist <= npcDist) {
+        this.laptop.open();
+        return true;
+      }
+      if (this.nearest) {
+        this.talking = this.nearest;
+        this.thoughtBubbles[this.npcs.indexOf(this.nearest)]?.hide();
+        this.dialogue.open(this.nearest.char);
+        return true;
+      }
     }
     if (this.tv && this.near(this.tv)) {
       if (this.activeGame && this.activeGame.minimized) this.expandGame();
@@ -1149,10 +1182,28 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // Расстояние от игрока до ближайшей точки прямоугольника (0, если игрок внутри).
-  private nearRect(r: Rect): boolean {
+  private distToRect(r: Rect): number {
     const dx = Math.max(r.x - this.player.x, 0, this.player.x - (r.x + r.w));
     const dy = Math.max(r.y - this.player.y, 0, this.player.y - (r.y + r.h));
-    return Math.hypot(dx, dy) < INTERACT_DIST;
+    return Math.hypot(dx, dy);
+  }
+
+  private nearRect(r: Rect): boolean {
+    return this.distToRect(r) < INTERACT_DIST;
+  }
+
+  // Ближайший ноутбук в радиусе взаимодействия, либо null.
+  private nearestLaptop(): Rect | null {
+    let best: Rect | null = null;
+    let bestDist = INTERACT_DIST;
+    for (const r of this.laptopRects) {
+      const d = this.distToRect(r);
+      if (d < bestDist) {
+        bestDist = d;
+        best = r;
+      }
+    }
+    return best;
   }
 
   private showPrompt(text: string, x: number, y: number): void {
