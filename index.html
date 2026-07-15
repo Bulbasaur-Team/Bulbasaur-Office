@@ -128,7 +128,7 @@
     /* Полноэкранное окно игры */
     /* safe center — второй строкой: если окно игры выше экрана, верх не уезжает
        за край (иначе flex-центрирование делает его недоступным для скролла). */
-    #bulbajump, #bulbapacker, #bulbaparking, #bulbaguess, #bulbawordle { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; align-items: safe center; justify-content: center; padding: 24px; overflow: auto; }
+    #bulbajump, #bulbapacker, #bulbaparking, #bulbaguess, #bulbawordle, #bulbacolors { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; align-items: safe center; justify-content: center; padding: 24px; overflow: auto; }
     #bjCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 420 / 640; }
     #bpCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(600px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 600; }
     #bpkCanvas { background: #26303a; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 640; }
@@ -144,6 +144,22 @@
     .ttt-restart { background: var(--panel); border: 2px solid var(--accent); border-radius: 12px; padding: 8px 22px; color: var(--text); font-family: inherit; font-size: 15px; font-weight: bold; cursor: pointer; }
     .ttt-restart:hover { background: var(--accent); color: #14210f; }
     .bg-actions { display: flex; gap: 10px; }
+
+    /* Bulba Colors */
+    .bc-hud { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; width: min(360px, calc(var(--sw) * .8)); }
+    .bc-timer-wrap { font-size: 16px; opacity: .9; }
+    .bc-timer { font-weight: bold; font-variant-numeric: tabular-nums; }
+    .bc-timer.bc-urgent { color: #ff8a7a; }
+    .bc-ref-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .bc-label { font-size: 14px; opacity: .75; }
+    .bc-swatch { border: 3px solid var(--accent); border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+    #bcRef { width: 120px; height: 120px; }
+    .bc-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: min(280px, calc(var(--sw) * .72)); }
+    .bc-opt { width: 100%; aspect-ratio: 1; border: 3px solid #2a313a; border-radius: 12px; cursor: pointer; padding: 0; transition: transform .1s, border-color .1s; }
+    .bc-opt:hover:not(:disabled) { transform: translateY(-2px); border-color: var(--accent); }
+    .bc-opt:disabled { cursor: default; }
+    .bc-opt.bc-wrong { border-color: #e85d5d; box-shadow: 0 0 0 2px #e85d5d55; }
+    .bc-opt.bc-right { border-color: #8fd06b; box-shadow: 0 0 0 2px #8fd06b55; }
 
     /* Bulba Guess */
     #bgCanvas { display: none; }
@@ -497,7 +513,9 @@
        а сцена может быть повёрнута на 90°). Классы ставит orientation.ts. */
     html.bp-640 h1 { font-size: 16px; margin: 6px 0 2px; }
     html.bp-640 #game canvas { border-width: 2px; }
-    html.bp-640 :is(#bulbajump, #bulbapacker, #bulbaparking, #bulbaguess, #bulbawordle, #slides) { padding: 10px; }
+    html.bp-640 :is(#bulbajump, #bulbapacker, #bulbaparking, #bulbaguess, #bulbawordle, #bulbacolors, #slides) { padding: 10px; }
+    html.bp-640 #bcRef { width: 96px; height: 96px; }
+    html.bp-640 .bc-options { gap: 10px; width: min(240px, calc(var(--sw) * .78)); }
     html.bp-640 .arcade-frame { padding: 16px 14px; gap: 10px; }
     html.bp-640 .arcade-title { font-size: 18px; }
     /* Кнопки окна вынесены за рамку на -16px — на узком экране убираем их внутрь. */
@@ -685,6 +703,31 @@
         <canvas id="bwCanvas" width="320" height="420"></canvas>
       </div>
       <canvas id="bwConfetti"></canvas>
+    </div>
+
+    <div id="bulbacolors" class="hidden">
+      <div class="arcade-frame">
+        <button class="arcade-close" id="bcClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <h2 class="arcade-title">Bulba Colors</h2>
+        <div class="bc-hud">
+          <div class="ttt-status" id="bcStatus">Очки: 0 · выбери такой же оттенок</div>
+          <div class="bc-timer-wrap"><span class="bc-timer" id="bcTimer">30.0</span> с</div>
+        </div>
+        <div class="bc-ref-wrap">
+          <div class="bc-label">Референс</div>
+          <div class="bc-swatch" id="bcRef" role="img" aria-label="цвет-референс"></div>
+        </div>
+        <div class="bc-label">Варианты (1–4)</div>
+        <div class="bc-options" id="bcOptions">
+          <button type="button" class="bc-opt" aria-label="вариант 1"></button>
+          <button type="button" class="bc-opt" aria-label="вариант 2"></button>
+          <button type="button" class="bc-opt" aria-label="вариант 3"></button>
+          <button type="button" class="bc-opt" aria-label="вариант 4"></button>
+        </div>
+        <button class="ttt-restart hidden" id="bcRestart">Заново</button>
+      </div>
     </div>
 
     <div id="slides" class="hidden">

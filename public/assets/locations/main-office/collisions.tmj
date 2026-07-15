@@ -1686,6 +1686,18 @@
                  "width":102.113681805199,
                  "x":204.58440445587,
                  "y":589.117395029991
+                },
+                {
+                 "height":90,
+                 "id":656,
+                 "name":"easel",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":100,
+                 "x":1270,
+                 "y":555
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -1694,7 +1706,7 @@
          "y":0
         }],
  "nextlayerid":10,
- "nextobjectid":656,
+ "nextobjectid":657,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",

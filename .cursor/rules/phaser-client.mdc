@@ -23,7 +23,7 @@ alwaysApply: false
 - Относительные импорты (алиасов нет).
 - Геометрия/двери/interaction — в Tiled (`.tmj`); в `locations.ts` только топология и ключи ассетов.
 - Клавиатура через `KeyboardRouter` / `KeyConsumer` — не давать Phaser двигать игрока, когда фокус в инпуте.
-- Новая мини-игра: пункт в меню игр + разметка/CSS в `index.html` + открытие в `WorldScene`.
+- Новая мини-игра: разметка/CSS в `index.html` + UI-класс + открытие в `WorldScene` (из TV-меню и/или объекта на карте) + код в `GameId` на сервере.
 - Новый предмет: `ITEM_TYPES` + PNG + точки в Tiled.
 - Проверка: `npm run build` (`tsc --noEmit` + vite). ESLint/тестов нет.
 - Пиксель-арт: `pixelArt: true`, без сглаживания. Не тащи сторонние UI-kit.

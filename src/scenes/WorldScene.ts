@@ -16,6 +16,7 @@ import { BulbaPacker } from "../ui/BulbaPacker";
 import { BulbaParking } from "../ui/BulbaParking";
 import { BulbaGuess } from "../ui/BulbaGuess";
 import { BulbaWordle } from "../ui/BulbaWordle";
+import { BulbaColors } from "../ui/BulbaColors";
 import { TvScreen } from "../ui/TvScreen";
 
 // Запущенная игра, которую можно свернуть на экран TV и развернуть обратно.
@@ -59,6 +60,7 @@ const GAMES: LeaderboardGame[] = [
   { id: "bulbajump", title: "Bulba Jump", format: (v) => String(v) },
   { id: "bulbapacker", title: "Bulba Packer", format: (v) => String(v) },
   { id: "bulbaparking", title: "Bulba Parking", format: (v) => (v / 1000).toFixed(1) + " с" },
+  { id: "bulbacolors", title: "Bulba Colors", format: (v) => String(v) },
   { id: "bulbaguess", title: "Bulba Guess", format: (v) => v + " слов" },
   { id: "bulbawordle", title: "Bulba Wordle", format: (v) => v + " слов" },
 ];
@@ -119,6 +121,7 @@ export class WorldScene extends Phaser.Scene {
   private bulbaParking!: BulbaParking;
   private bulbaGuess!: BulbaGuess;
   private bulbaWordle!: BulbaWordle;
+  private bulbaColors!: BulbaColors;
   private tvScreen!: TvScreen;
   private poker!: PlanningPoker;
   private authGate!: AuthGate;
@@ -163,6 +166,7 @@ export class WorldScene extends Phaser.Scene {
   private coffeeRect: Rect | null = null;        // выдача чашки кофе на кухне чилл-зоны (объект "coffee")
   private computerRect: Rect | null = null;      // ретро-ПК в дата-центре (объект "computer")
   private projectorRect: Rect | null = null;     // зона проектора в главном офисе (объект "projector")
+  private easelRect: Rect | null = null;         // мольберт Bulba Colors в главном офисе (объект "easel")
   private menu!: LocationMenu;
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
   private exitLabel = document.getElementById("exitLabel") as HTMLSpanElement;
@@ -234,6 +238,7 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaParking = new BulbaParking();
     this.bulbaGuess = new BulbaGuess();
     this.bulbaWordle = new BulbaWordle();
+    this.bulbaColors = new BulbaColors();
     this.tvScreen = new TvScreen(this, () => this.expandGame());
     // Свернуть из любой игры -> показать мини-версию на экране TV.
     for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaGuess, this.bulbaWordle]) {
@@ -287,6 +292,7 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaParking.onGameOver = (v) => this.reportScore("bulbaparking", v);
     this.bulbaGuess.onGameOver = (v) => this.reportScore("bulbaguess", v);
     this.bulbaWordle.onGameOver = (v) => this.reportScore("bulbawordle", v);
+    this.bulbaColors.onGameOver = (v) => this.reportScore("bulbacolors", v);
     this.bulbaGuess.onDailyOver = () => void this.showDailyBoard("bulbaguess");
     this.bulbaWordle.onDailyOver = () => void this.showDailyBoard("bulbawordle");
     // Возвращаем промис (а не void): игра ждёт подтверждения сохранения перед показом
@@ -676,6 +682,7 @@ export class WorldScene extends Phaser.Scene {
     // обрывается (см. embed.ts).
     this.computerRect = computerEnabled ? rects.get("computer") ?? null : null;
     this.projectorRect = rects.get("projector") ?? null;
+    this.easelRect = rects.get("easel") ?? null;
     this.items.load(items, physicsWalls, tableRects, cfg.id);
     // Вне главного офиса общий проектор не рисуем; при возврате стейт придёт по WS
     // (или останется локальным в одиночке, если ещё не выключали).
@@ -719,6 +726,7 @@ export class WorldScene extends Phaser.Scene {
       (this.bulbaParking.isOpen && !this.bulbaParking.minimized) ||
       (this.bulbaGuess.isOpen && !this.bulbaGuess.minimized) ||
       (this.bulbaWordle.isOpen && !this.bulbaWordle.minimized) ||
+      this.bulbaColors.isOpen ||
       this.leaderboard.isOpen ||
       this.achievements.isOpen ||
       this.community.isOpen ||
@@ -887,6 +895,12 @@ export class WorldScene extends Phaser.Scene {
         this.projectorRect.x + this.projectorRect.w / 2,
         this.projectorRect.y + this.projectorRect.h,
       );
+    } else if (this.easelRect && this.nearRect(this.easelRect)) {
+      this.showPrompt(
+        "Пробел / Enter — сыграть в Bulba Colors",
+        this.easelRect.x + this.easelRect.w / 2,
+        this.easelRect.y + this.easelRect.h,
+      );
     } else if (this.nearest) {
       this.showPrompt("Пробел / Enter — поговорить", this.nearest.x, this.nearest.y);
     } else if (this.tv && this.near(this.tv)) {
@@ -956,8 +970,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // Действие по Space/Enter рядом с объектом. Приоритет: предмет в лапах (поставить) →
-  // взять предмет → NPC → телевизор → стена предков → принтер → мониторы → покер →
-  // компьютер → выдача кофе → дверь.
+  // взять предмет → проектор → мольберт → NPC → телевизор → стена предков → принтер →
+  // мониторы → покер → компьютер → выдача кофе → дверь.
   // Взятие идёт раньше стационарных объектов: иначе чашку, стоящую на столе покера, было
   // бы не поднять — тем же пробелом открывался бы покер.
   private tryInteract(): boolean {
@@ -984,6 +998,10 @@ export class WorldScene extends Phaser.Scene {
     if (this.projectorRect && this.nearRect(this.projectorRect)) {
       if (this.projectorOn) this.turnProjectorOff();
       else this.slidePicker.open();
+      return true;
+    }
+    if (this.easelRect && this.nearRect(this.easelRect)) {
+      this.bulbaColors.open();
       return true;
     }
     if (this.nearest) {
