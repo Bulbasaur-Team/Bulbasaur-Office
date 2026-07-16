@@ -11,6 +11,7 @@ const SCREENS: ReadonlyArray<readonly [string, Orient]> = [
   ["bulbajump", "portrait"],
   ["bulbapacker", "portrait"],
   ["bulbaparking", "portrait"],
+  ["bulbatanks", "portrait"],
   ["bulbaguess", "portrait"],
   ["bulbawordle", "portrait"],
   ["bulbacolors", "portrait"],

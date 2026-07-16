@@ -14,6 +14,7 @@ import { GameMenu } from "../ui/GameMenu";
 import { BulbaJump } from "../ui/BulbaJump";
 import { BulbaPacker } from "../ui/BulbaPacker";
 import { BulbaParking } from "../ui/BulbaParking";
+import { BulbaTanks } from "../ui/BulbaTanks";
 import { BulbaGuess } from "../ui/BulbaGuess";
 import { BulbaWordle } from "../ui/BulbaWordle";
 import { BulbaColors } from "../ui/BulbaColors";
@@ -62,6 +63,7 @@ const GAMES: LeaderboardGame[] = [
   { id: "bulbajump", title: "Bulba Jump", format: (v) => String(v) },
   { id: "bulbapacker", title: "Bulba Packer", format: (v) => String(v) },
   { id: "bulbaparking", title: "Bulba Parking", format: (v) => (v / 1000).toFixed(1) + " с" },
+  { id: "bulbatanks", title: "Bulba Tanks", format: (v) => String(v) },
   { id: "bulbacolors", title: "Bulba Colors", format: (v) => String(v) },
   { id: "bulbaguess", title: "Bulba Guess", format: (v) => v + " слов" },
   { id: "bulbawordle", title: "Bulba Wordle", format: (v) => v + " слов" },
@@ -121,6 +123,7 @@ export class WorldScene extends Phaser.Scene {
   private bulbaJump!: BulbaJump;
   private bulbaPacker!: BulbaPacker;
   private bulbaParking!: BulbaParking;
+  private bulbaTanks!: BulbaTanks;
   private bulbaGuess!: BulbaGuess;
   private bulbaWordle!: BulbaWordle;
   private bulbaColors!: BulbaColors;
@@ -241,13 +244,14 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaJump = new BulbaJump();
     this.bulbaPacker = new BulbaPacker();
     this.bulbaParking = new BulbaParking();
+    this.bulbaTanks = new BulbaTanks();
     this.bulbaGuess = new BulbaGuess();
     this.bulbaWordle = new BulbaWordle();
     this.bulbaColors = new BulbaColors();
     this.tvScreen = new TvScreen(this, () => this.expandGame());
     // Свернуть из любой игры -> показать мини-версию на экране TV.
     // Закрытие будит Phaser: update() во сне не крутится и сам сессию не подчистит.
-    for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaGuess, this.bulbaWordle]) {
+    for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaTanks, this.bulbaGuess, this.bulbaWordle]) {
       g.onMinimize = () => this.minimizeGame();
       g.onClose = () => this.onArcadeClosed();
     }
@@ -298,6 +302,7 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaJump.onGameOver = (v) => this.reportScore("bulbajump", v);
     this.bulbaPacker.onGameOver = (v) => this.reportScore("bulbapacker", v);
     this.bulbaParking.onGameOver = (v) => this.reportScore("bulbaparking", v);
+    this.bulbaTanks.onGameOver = (v) => this.reportScore("bulbatanks", v);
     this.bulbaGuess.onGameOver = (v) => this.reportScore("bulbaguess", v);
     this.bulbaWordle.onGameOver = (v) => this.reportScore("bulbawordle", v);
     this.bulbaColors.onGameOver = (v) => this.reportScore("bulbacolors", v);
@@ -736,6 +741,7 @@ export class WorldScene extends Phaser.Scene {
       (this.bulbaJump.isOpen && !this.bulbaJump.minimized) ||
       (this.bulbaPacker.isOpen && !this.bulbaPacker.minimized) ||
       (this.bulbaParking.isOpen && !this.bulbaParking.minimized) ||
+      (this.bulbaTanks.isOpen && !this.bulbaTanks.minimized) ||
       (this.bulbaGuess.isOpen && !this.bulbaGuess.minimized) ||
       (this.bulbaWordle.isOpen && !this.bulbaWordle.minimized) ||
       this.bulbaColors.isOpen ||
@@ -760,6 +766,7 @@ export class WorldScene extends Phaser.Scene {
     if (id === "bulbajump") { this.bulbaJump.open(this.chosen.sprite); this.activeGame = this.bulbaJump; }
     else if (id === "bulbapacker") { this.bulbaPacker.open(); this.activeGame = this.bulbaPacker; }
     else if (id === "bulbaparking") { this.bulbaParking.open(); this.activeGame = this.bulbaParking; }
+    else if (id === "bulbatanks") { this.bulbaTanks.open(); this.activeGame = this.bulbaTanks; }
     else if (id === "bulbaguess") { this.bulbaGuess.open(); this.activeGame = this.bulbaGuess; }
     else if (id === "bulbawordle") { this.bulbaWordle.open(); this.activeGame = this.bulbaWordle; }
     this.setPhaserAsleep(true);

@@ -10,6 +10,7 @@ const GAMES: GameOption[] = [
   { label: "Bulba Jump", id: "bulbajump" },
   { label: "Bulba Packer", id: "bulbapacker" },
   { label: "Bulba Parking", id: "bulbaparking" },
+  { label: "Bulba Tanks", id: "bulbatanks" },
   { label: "Bulba Guess", id: "bulbaguess" },
   { label: "Bulba Wordle", id: "bulbawordle" },
 ];
