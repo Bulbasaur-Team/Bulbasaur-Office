@@ -17,6 +17,7 @@ const GAP_MIN = 70;
 const GAP_MAX = 120;
 const SCROLL_LINE = H * 0.4; // выше этой линии мир едет вниз, а не игрок вверх
 const STEP_MS = 1000 / 90;   // 90 тиков физики/сек — игра идёт в 1.5× быстрее базовых 60; от частоты кадров экрана не зависит
+const RENDER_MS = 1000 / 60; // рисуем не чаще 60 fps — на ProMotion 120 Гц иначе двойная нагрузка с Phaser
 
 type PlatformType = "box" | "belt";
 interface Platform {
@@ -33,6 +34,7 @@ export class BulbaJump {
   isOpen = false;
   minimized = false;
   onMinimize: (() => void) | null = null;
+  onClose: (() => void) | null = null;
   onGameOver: ((value: number) => void) | null = null;
   private reported = false;
 
@@ -48,13 +50,16 @@ export class BulbaJump {
   private vy = 0;
   private faceRight = false;
   private platforms: Platform[] = [];
+  private topY = 0;           // Y самой верхней платформы (без Math.min по массиву каждый тик)
   private score = 0;
+  private shownScore = -1;    // что уже вывели в DOM — не трогаем textContent чаще, чем меняется целые
   private over = false;
   private left = false;
   private right = false;
   private raf = 0;
   private lastT = 0;  // время предыдущего кадра для аккумулятора фиксированного шага
   private acc = 0;    // накопленное время, ещё не отработанное шагами физики
+  private lastRenderT = 0;
 
   constructor() {
     document.getElementById("bjClose")!.onclick = () => this.close();
@@ -139,10 +144,12 @@ export class BulbaJump {
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
     this.root.classList.add("hidden");
+    this.onClose?.();
   }
 
   private reset(): void {
     this.score = 0;
+    this.shownScore = -1;
     this.over = false;
     this.reported = false;
     this.left = this.right = false;
@@ -154,14 +161,15 @@ export class BulbaJump {
 
     // Стартовая платформа точно под игроком + заполняем поле вверх.
     this.platforms = [{ x: W / 2 - PLAT_W / 2, y: H - 50, type: "box", vx: 0, spring: false }];
-    let y = H - 50;
-    while (y > 0) {
-      y -= GAP_MIN + Math.random() * (GAP_MAX - GAP_MIN);
-      this.platforms.push(this.makePlatform(y));
+    this.topY = H - 50;
+    while (this.topY > 0) {
+      this.topY -= GAP_MIN + Math.random() * (GAP_MAX - GAP_MIN);
+      this.platforms.push(this.makePlatform(this.topY));
     }
 
     this.updateStatus();
     this.lastT = performance.now();
+    this.lastRenderT = 0;
     this.acc = 0;
     cancelAnimationFrame(this.raf);
     this.loop();
@@ -190,7 +198,11 @@ export class BulbaJump {
       this.acc -= STEP_MS;
       if (this.over) break;
     }
-    this.render();
+    // Физика 90 Hz, отрисовка ≤60 Hz — меньше работы на 120 Гц дисплеях.
+    if (this.over || now - this.lastRenderT >= RENDER_MS) {
+      this.lastRenderT = now;
+      this.render();
+    }
     if (!this.over) this.raf = requestAnimationFrame(this.loop);
   };
 
@@ -234,12 +246,18 @@ export class BulbaJump {
       this.py = SCROLL_LINE;
       this.score += dy;
       this.updateStatus();
-      for (const p of this.platforms) p.y += dy;
-      this.platforms = this.platforms.filter((p) => p.y < H + PLAT_H);
-      let top = Math.min(...this.platforms.map((p) => p.y));
-      while (top > 0) {
-        top -= GAP_MIN + Math.random() * (GAP_MAX - GAP_MIN);
-        this.platforms.push(this.makePlatform(top));
+      this.topY += dy;
+      // Сдвиг и выкидывание ниже экрана без filter/map (меньше GC на 90 Hz).
+      let write = 0;
+      for (let i = 0; i < this.platforms.length; i++) {
+        const p = this.platforms[i];
+        p.y += dy;
+        if (p.y < H + PLAT_H) this.platforms[write++] = p;
+      }
+      this.platforms.length = write;
+      while (this.topY > 0) {
+        this.topY -= GAP_MIN + Math.random() * (GAP_MAX - GAP_MIN);
+        this.platforms.push(this.makePlatform(this.topY));
       }
     }
 
@@ -278,10 +296,9 @@ export class BulbaJump {
       ctx.fillStyle = "#7ac07a";
       ctx.fillRect(p.x, p.y, PLAT_W, 3); // активная кромка ленты
       ctx.fillStyle = "#565d68";
+      // Ролики ленты — квадраты вместо arc() (дешевле на canvas 2d).
       for (let rx = p.x + 6; rx < p.x + PLAT_W - 2; rx += 14) {
-        ctx.beginPath();
-        ctx.arc(rx, p.y + PLAT_H - 5, 3, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillRect(rx - 2, p.y + PLAT_H - 7, 4, 4);
       }
     } else {
       ctx.fillStyle = "#c8965a";
@@ -339,6 +356,9 @@ export class BulbaJump {
   }
 
   private updateStatus(): void {
-    this.statusEl.textContent = `Результат: ${Math.floor(this.score)}`;
+    const n = Math.floor(this.score);
+    if (n === this.shownScore) return;
+    this.shownScore = n;
+    this.statusEl.textContent = `Результат: ${n}`;
   }
 }

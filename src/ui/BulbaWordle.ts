@@ -64,6 +64,7 @@ export class BulbaWordle {
   isOpen = false;
   minimized = false;
   onMinimize: (() => void) | null = null;
+  onClose: (() => void) | null = null;
   onGameOver: ((value: number) => void) | null = null;
   private reported = false;
 
@@ -182,6 +183,7 @@ export class BulbaWordle {
     window.removeEventListener("keydown", this.onWindowKey, true);
     this.root.classList.add("hidden");
     this.stopConfetti();
+    this.onClose?.();
   }
 
   minimize(): void {

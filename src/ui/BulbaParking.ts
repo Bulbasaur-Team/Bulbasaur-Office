@@ -53,6 +53,7 @@ export class BulbaParking {
   isOpen = false;
   minimized = false;
   onMinimize: (() => void) | null = null;
+  onClose: (() => void) | null = null;
   onGameOver: ((value: number) => void) | null = null;
   private reported = false;
 
@@ -175,6 +176,7 @@ export class BulbaParking {
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
     this.root.classList.add("hidden");
+    this.onClose?.();
   }
 
   private reset(): void {

@@ -23,6 +23,7 @@ import { TvScreen } from "../ui/TvScreen";
 interface ArcadeGame {
   isOpen: boolean;     // сессия существует (полный экран или свёрнута)
   minimized: boolean;  // свёрнута на TV (на паузе, ход не блокирует)
+  onClose: (() => void) | null;
   restore(): void;
   getCanvas(): HTMLCanvasElement;
 }
@@ -138,6 +139,7 @@ export class WorldScene extends Phaser.Scene {
   private laptop!: Laptop;
   private joystick: Joystick | null = null;
   private activeGame: ArcadeGame | null = null;
+  private phaserAsleep = false; // Phaser loop усыплен, пока fullscreen-аркада жрёт свой rAF
   private playerBaseScale = 1; // исходный масштаб игрока (анимация множит на него)
   private walkPhase = 0;       // фаза шага игрока
   private playerLabel!: Phaser.GameObjects.Text; // бейдж с логином над игроком
@@ -244,8 +246,10 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaColors = new BulbaColors();
     this.tvScreen = new TvScreen(this, () => this.expandGame());
     // Свернуть из любой игры -> показать мини-версию на экране TV.
+    // Закрытие будит Phaser: update() во сне не крутится и сам сессию не подчистит.
     for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaGuess, this.bulbaWordle]) {
       g.onMinimize = () => this.minimizeGame();
+      g.onClose = () => this.onArcadeClosed();
     }
 
     // По завершении партии игра отдаёт результат — отправляем его и показываем лидерборд.
@@ -438,6 +442,7 @@ export class WorldScene extends Phaser.Scene {
         await this.bulbaWordle.openDaily(wotd.wordle.today, wotd.wordle.prev, progress);
         this.activeGame = this.bulbaWordle;
       }
+      this.setPhaserAsleep(true);
     } catch (e) {
       console.error("Не удалось открыть слово дня:", e);
     }
@@ -757,11 +762,13 @@ export class WorldScene extends Phaser.Scene {
     else if (id === "bulbaparking") { this.bulbaParking.open(); this.activeGame = this.bulbaParking; }
     else if (id === "bulbaguess") { this.bulbaGuess.open(); this.activeGame = this.bulbaGuess; }
     else if (id === "bulbawordle") { this.bulbaWordle.open(); this.activeGame = this.bulbaWordle; }
+    this.setPhaserAsleep(true);
   }
 
-  // Свернуть текущую игру на экран TV (игра продолжает работать).
+  // Свернуть текущую игру на экран TV (игра на паузе). Phaser снова крутит мир.
   private minimizeGame(): void {
     if (this.activeGame && this.tvRect) this.tvScreen.show(this.tvRect, this.activeGame.getCanvas());
+    this.setPhaserAsleep(false);
   }
 
   // Развернуть свёрнутую игру обратно на весь экран.
@@ -769,6 +776,22 @@ export class WorldScene extends Phaser.Scene {
     if (!this.activeGame) return;
     this.activeGame.restore();
     this.tvScreen.hide();
+    this.setPhaserAsleep(true);
+  }
+
+  private onArcadeClosed(): void {
+    this.activeGame = null;
+    this.tvScreen.hide();
+    this.setPhaserAsleep(false);
+  }
+
+  // Пока fullscreen-аркада рисует свой canvas через rAF, Phaser (WebGL + мир) не
+  // должен крутиться в фоне — на ProMotion это два полноценных цикла на main thread.
+  private setPhaserAsleep(asleep: boolean): void {
+    if (asleep === this.phaserAsleep) return;
+    this.phaserAsleep = asleep;
+    if (asleep) this.game.loop.sleep();
+    else this.game.loop.wake(true);
   }
 
   private goTo(to: number): void {
@@ -824,6 +847,16 @@ export class WorldScene extends Phaser.Scene {
     if (this.activeGame && !this.activeGame.isOpen) {
       this.activeGame = null;
       this.tvScreen.hide();
+      this.setPhaserAsleep(false);
+    }
+
+    // Модалка / парковка: не крутить анимации и физику предметов под оверлеем.
+    if (this.atParking || this.modalOpen()) {
+      this.player.setVelocity(0);
+      this.prompt.setVisible(false);
+      this.showExit(null);
+      this.joystick?.setVisible(false);
+      return;
     }
 
     this.animateCharacters(delta);
@@ -831,23 +864,6 @@ export class WorldScene extends Phaser.Scene {
     this.bubble.update(); // своё чат-облачко едет за игроком (если follow задан)
     for (const rp of this.remotePlayers.values()) rp.update();
     this.updateItems(delta);
-
-    // На парковке управление недоступно — работает только меню.
-    if (this.atParking) {
-      this.player.setVelocity(0);
-      this.prompt.setVisible(false);
-      this.showExit(null);
-      this.joystick?.setVisible(false);
-      return;
-    }
-
-    if (this.modalOpen()) {
-      this.player.setVelocity(0);
-      this.prompt.setVisible(false);
-      this.showExit(null);
-      this.joystick?.setVisible(false);
-      return;
-    }
 
     this.joystick?.setVisible(true);
 

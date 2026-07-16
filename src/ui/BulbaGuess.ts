@@ -62,6 +62,7 @@ export class BulbaGuess {
   isOpen = false;
   minimized = false;
   onMinimize: (() => void) | null = null;
+  onClose: (() => void) | null = null;
   onGameOver: ((value: number) => void) | null = null;
   onDailyOver: ((attempts: number) => void) | null = null;
   onDailyProgress: ((state: DailyProgress) => void | Promise<void>) | null = null;
@@ -184,6 +185,7 @@ export class BulbaGuess {
     window.removeEventListener("keydown", this.onKeyDown);
     this.root.classList.add("hidden");
     this.stopConfetti();
+    this.onClose?.();
   }
 
   minimize(): void {
