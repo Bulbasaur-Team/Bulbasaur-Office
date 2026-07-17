@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { ALL_SPRITES, SPRITE_FILES } from "../entities/sprites";
+import { CLOCK_ASSETS } from "../entities/WallClock";
 import { LOCATIONS } from "../data/locations";
 import { ITEM_TYPES } from "../data/items";
 import { publicPath } from "../publicPath";
@@ -37,6 +38,10 @@ export class BootScene extends Phaser.Scene {
 
     for (const def of Object.values(ITEM_TYPES)) {
       this.load.image(def.texture, publicPath(`assets/items/${def.file}`));
+    }
+
+    for (const { key, file } of CLOCK_ASSETS) {
+      this.load.image(key, publicPath(`assets/${file}`));
     }
   }
 

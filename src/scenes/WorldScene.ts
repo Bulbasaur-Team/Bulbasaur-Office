@@ -30,6 +30,7 @@ import { Realtime, type RemoteState } from "../net/realtime";
 import { PlanningPoker } from "../ui/PlanningPoker";
 import { RemotePlayer } from "../entities/RemotePlayer";
 import { ItemsManager, type ObstacleCircle } from "../entities/ItemsManager";
+import { WallClock } from "../entities/WallClock";
 import { LocationLoader, type Spawn, type Rect, type PlacedNpc } from "./LocationLoader";
 import { AuthGate } from "../ui/AuthGate";
 import { Leaderboard, type LeaderboardGame, boardChangedForYou, rankDeltas } from "../ui/Leaderboard";
@@ -185,6 +186,7 @@ export class WorldScene extends Phaser.Scene {
   private projectorRect: Rect | null = null;     // зона проектора в главном офисе (объект "projector")
   private easelRect: Rect | null = null;         // мольберт Bulba Colors в главном офисе (объект "easel")
   private surkiRect: Rect | null = null;         // автомат Bulba Surki в чилл-зоне (объект "bulbasurki")
+  private wallClock: WallClock | null = null;    // настенные часы (точка "clock" в interactions)
   private menu!: LocationMenu;
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
   private exitLabel = document.getElementById("exitLabel") as HTMLSpanElement;
@@ -729,6 +731,10 @@ export class WorldScene extends Phaser.Scene {
     this.projectorRect = rects.get("projector") ?? null;
     this.easelRect = rects.get("easel") ?? null;
     this.surkiRect = rects.get("bulbasurki") ?? null;
+    this.wallClock?.destroy();
+    this.wallClock = null;
+    const clockAt = interactions.get("clock");
+    if (clockAt) this.wallClock = new WallClock(this, clockAt.x, clockAt.y);
     this.items.load(items, physicsWalls, tableRects, cfg.id);
     // Вне главного офиса общий проектор не рисуем; при возврате стейт придёт по WS
     // (или останется локальным в одиночке, если ещё не выключали).
@@ -849,6 +855,9 @@ export class WorldScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (!this.started) return;
+
+    // Часы живут по клиентскому времени — тикают и под модалкой.
+    this.wallClock?.sync();
 
     // Модалка / парковка: не крутить анимации и физику предметов под оверлеем.
     if (this.atParking || this.modalOpen()) {

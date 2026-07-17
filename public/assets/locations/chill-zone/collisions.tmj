@@ -465,7 +465,7 @@
                 }],
          "opacity":1,
          "type":"objectgroup",
-         "visible":true,
+         "visible":false,
          "x":0,
          "y":0
         }, 
@@ -571,10 +571,23 @@
                  "width":110,
                  "x":530,
                  "y":120
+                }, 
+                {
+                 "height":0,
+                 "id":229,
+                 "name":"clock",
+                 "opacity":1,
+                 "point":true,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":179.735682819383,
+                 "y":72.8340675477239
                 }],
          "opacity":1,
          "type":"objectgroup",
-         "visible":false,
+         "visible":true,
          "x":0,
          "y":0
         }, 
@@ -1007,7 +1020,7 @@
                 }],
          "opacity":1,
          "type":"objectgroup",
-         "visible":true,
+         "visible":false,
          "x":0,
          "y":0
         }, 
@@ -1155,7 +1168,7 @@
          "y":0
         }],
  "nextlayerid":9,
- "nextobjectid":228,
+ "nextobjectid":230,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",
