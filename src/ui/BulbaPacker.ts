@@ -33,10 +33,9 @@ interface FallItem {
 // получаем очки, бомбочки ловить нельзя. Со временем падения ускоряются.
 export class BulbaPacker {
   isOpen = false;
-  minimized = false;
-  onMinimize: (() => void) | null = null;
   onClose: (() => void) | null = null;
   onGameOver: ((value: number) => void) | null = null;
+  onLeaderboard: (() => void) | null = null;
   private reported = false;
 
   private root = document.getElementById("bulbapacker")!;
@@ -58,7 +57,7 @@ export class BulbaPacker {
 
   constructor() {
     document.getElementById("bpClose")!.onclick = () => this.close();
-    document.getElementById("bpMin")!.onclick = () => this.minimize();
+    document.getElementById("bpLb")!.onclick = () => this.onLeaderboard?.();
     document.getElementById("bpRestart")!.onclick = () => this.reset();
     attachArcadePad(this.root.querySelector<HTMLElement>(".arcade-frame")!, (c, d) => this.pressKey(c, d), {
       left: [{ label: "◀", code: "ArrowLeft" }],
@@ -69,32 +68,6 @@ export class BulbaPacker {
       img.src = publicPath(`assets/items/item${i}.png`);
       this.items.push(img);
     }
-  }
-
-  getCanvas(): HTMLCanvasElement {
-    return this.canvas;
-  }
-
-  // Свернуть: ставим игру на паузу, отключаем её управление и прячем окно. На TV
-  // остаётся последний кадр; игра не мешает ходить и ждёт, когда её развернут.
-  minimize(): void {
-    if (!this.isOpen || this.minimized) return;
-    this.minimized = true;
-    cancelAnimationFrame(this.raf);
-    window.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("keyup", this.onKeyUp);
-    this.root.classList.add("hidden");
-    this.onMinimize?.();
-  }
-
-  restore(): void {
-    if (!this.minimized) return;
-    this.minimized = false;
-    this.root.classList.remove("hidden");
-    window.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("keyup", this.onKeyUp);
-    this.lastT = performance.now();
-    this.loop();
   }
 
   // Игре нужно состояние «зажато/отпущено», поэтому свои keydown/keyup живут
@@ -137,7 +110,6 @@ export class BulbaPacker {
   close(): void {
     if (!this.isOpen) return;
     this.isOpen = false;
-    this.minimized = false;
     cancelAnimationFrame(this.raf);
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);

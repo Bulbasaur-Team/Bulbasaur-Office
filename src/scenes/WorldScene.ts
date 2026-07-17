@@ -18,16 +18,7 @@ import { BulbaTanks } from "../ui/BulbaTanks";
 import { BulbaGuess } from "../ui/BulbaGuess";
 import { BulbaWordle } from "../ui/BulbaWordle";
 import { BulbaColors } from "../ui/BulbaColors";
-import { TvScreen } from "../ui/TvScreen";
-
-// Запущенная игра, которую можно свернуть на экран TV и развернуть обратно.
-interface ArcadeGame {
-  isOpen: boolean;     // сессия существует (полный экран или свёрнута)
-  minimized: boolean;  // свёрнута на TV (на паузе, ход не блокирует)
-  onClose: (() => void) | null;
-  restore(): void;
-  getCanvas(): HTMLCanvasElement;
-}
+import { BulbaSurki } from "../ui/BulbaSurki";
 import { KeyboardRouter } from "../ui/KeyboardRouter";
 import { showCharacterSelect } from "../ui/CharacterSelect";
 import { showModeSelect } from "../ui/ModeSelect";
@@ -41,7 +32,7 @@ import { RemotePlayer } from "../entities/RemotePlayer";
 import { ItemsManager, type ObstacleCircle } from "../entities/ItemsManager";
 import { LocationLoader, type Spawn, type Rect, type PlacedNpc } from "./LocationLoader";
 import { AuthGate } from "../ui/AuthGate";
-import { Leaderboard, type LeaderboardGame } from "../ui/Leaderboard";
+import { Leaderboard, type LeaderboardGame, boardChangedForYou, rankDeltas } from "../ui/Leaderboard";
 import { Achievements } from "../ui/Achievements";
 import { AchievementPopup } from "../ui/AchievementPopup";
 import { Community } from "../ui/Community";
@@ -55,18 +46,38 @@ import { computerEnabled, embedded } from "../embed";
 import { Joystick, isTouch } from "../ui/TouchControls";
 import * as api from "../net/api";
 
+// Русское склонение: 1 слово, 2 слова, 5 слов / 1 попытка, 3 попытки, 10 попыток.
+function ruPlural(n: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(Math.round(n));
+  const mod100 = abs % 100;
+  const mod10 = mod100 % 10;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+
+function formatWords(v: number): string {
+  return `${v} ${ruPlural(v, "слово", "слова", "слов")}`;
+}
+
+function formatAttempts(v: number): string {
+  return `${v} ${ruPlural(v, "попытка", "попытки", "попыток")}`;
+}
+
 // Мини-игры для лидерборда: порядок листания, заголовок и формат значения.
 const GAMES: LeaderboardGame[] = [
   // Отдельные лидерборды слова дня (по числу попыток, меньше — лучше).
-  { id: "wotd-bulbaguess", code: "bulbaguess", daily: true, title: "Слово дня: Bulba Guess", format: (v) => v + " поп." },
-  { id: "wotd-bulbawordle", code: "bulbawordle", daily: true, title: "Слово дня: Bulba Wordle", format: (v) => v + " поп." },
+  { id: "wotd-bulbaguess", code: "bulbaguess", daily: true, title: "Слово дня: Bulba Guess", format: formatAttempts },
+  { id: "wotd-bulbawordle", code: "bulbawordle", daily: true, title: "Слово дня: Bulba Wordle", format: formatAttempts },
   { id: "bulbajump", title: "Bulba Jump", format: (v) => String(v) },
   { id: "bulbapacker", title: "Bulba Packer", format: (v) => String(v) },
   { id: "bulbaparking", title: "Bulba Parking", format: (v) => (v / 1000).toFixed(1) + " с" },
   { id: "bulbatanks", title: "Bulba Tanks", format: (v) => String(v) },
   { id: "bulbacolors", title: "Bulba Colors", format: (v) => String(v) },
-  { id: "bulbaguess", title: "Bulba Guess", format: (v) => v + " слов" },
-  { id: "bulbawordle", title: "Bulba Wordle", format: (v) => v + " слов" },
+  { id: "bulbasurki", title: "Bulba Surki", format: (v) => String(v) },
+  { id: "bulbaguess", title: "Bulba Guess", format: formatWords },
+  { id: "bulbawordle", title: "Bulba Wordle", format: formatWords },
 ];
 
 // Соответствие базовой игры её id в списке дневных лидербордов.
@@ -127,7 +138,7 @@ export class WorldScene extends Phaser.Scene {
   private bulbaGuess!: BulbaGuess;
   private bulbaWordle!: BulbaWordle;
   private bulbaColors!: BulbaColors;
-  private tvScreen!: TvScreen;
+  private bulbaSurki!: BulbaSurki;
   private poker!: PlanningPoker;
   private authGate!: AuthGate;
   private leaderboard!: Leaderboard;
@@ -141,7 +152,6 @@ export class WorldScene extends Phaser.Scene {
   private computer!: Computer;
   private laptop!: Laptop;
   private joystick: Joystick | null = null;
-  private activeGame: ArcadeGame | null = null;
   private phaserAsleep = false; // Phaser loop усыплен, пока fullscreen-аркада жрёт свой rAF
   private playerBaseScale = 1; // исходный масштаб игрока (анимация множит на него)
   private walkPhase = 0;       // фаза шага игрока
@@ -165,7 +175,6 @@ export class WorldScene extends Phaser.Scene {
   private atParking = false;
   private doors: Map<string, Spawn> = new Map(); // двери текущей локации (ключ — id соседней локации)
   private tv: Spawn | null = null;               // точка телевизора в текущей локации, если есть
-  private tvRect: Rect | null = null;            // прямоугольник экрана TV из карты (объект "tvScreen")
   private ancestorsRect: Rect | null = null;     // прямоугольник стены с портретами предков (объект "ancestors")
   private printerRect: Rect | null = null;       // прямоугольник принтера с логами в дата-центре (объект "printer")
   private monitorRect: Rect | null = null;       // мониторы с графиками в комнате мониторинга (объект "monitor")
@@ -175,6 +184,7 @@ export class WorldScene extends Phaser.Scene {
   private laptopRects: Rect[] = [];              // ноутбуки в главном офисе (laptop1..laptop4)
   private projectorRect: Rect | null = null;     // зона проектора в главном офисе (объект "projector")
   private easelRect: Rect | null = null;         // мольберт Bulba Colors в главном офисе (объект "easel")
+  private surkiRect: Rect | null = null;         // автомат Bulba Surki в чилл-зоне (объект "bulbasurki")
   private menu!: LocationMenu;
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
   private exitLabel = document.getElementById("exitLabel") as HTMLSpanElement;
@@ -182,6 +192,7 @@ export class WorldScene extends Phaser.Scene {
   private emoteBar = document.getElementById("emoteBar") as HTMLDivElement;
   private emoteBarBuilt = false;
   private currentExit: ExitDef | null = null;
+  private wotdBoardSnap = new Map<string, api.Leaderboard>();
 
   constructor() {
     super("World");
@@ -248,12 +259,10 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaGuess = new BulbaGuess();
     this.bulbaWordle = new BulbaWordle();
     this.bulbaColors = new BulbaColors();
-    this.tvScreen = new TvScreen(this, () => this.expandGame());
-    // Свернуть из любой игры -> показать мини-версию на экране TV.
-    // Закрытие будит Phaser: update() во сне не крутится и сам сессию не подчистит.
-    for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaTanks, this.bulbaGuess, this.bulbaWordle]) {
-      g.onMinimize = () => this.minimizeGame();
-      g.onClose = () => this.onArcadeClosed();
+    this.bulbaSurki = new BulbaSurki();
+    // Закрытие fullscreen-аркады будит Phaser: update() во сне не крутится.
+    for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaTanks, this.bulbaGuess, this.bulbaWordle, this.bulbaSurki]) {
+      g.onClose = () => this.setPhaserAsleep(false);
     }
 
     // По завершении партии игра отдаёт результат — отправляем его и показываем лидерборд.
@@ -306,8 +315,19 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaGuess.onGameOver = (v) => this.reportScore("bulbaguess", v);
     this.bulbaWordle.onGameOver = (v) => this.reportScore("bulbawordle", v);
     this.bulbaColors.onGameOver = (v) => this.reportScore("bulbacolors", v);
-    this.bulbaGuess.onDailyOver = () => void this.showDailyBoard("bulbaguess");
-    this.bulbaWordle.onDailyOver = () => void this.showDailyBoard("bulbawordle");
+    this.bulbaSurki.onGameOver = (v) => this.reportScore("bulbasurki", v);
+    this.bulbaJump.onLeaderboard = () => void this.leaderboard.open("bulbajump");
+    this.bulbaPacker.onLeaderboard = () => void this.leaderboard.open("bulbapacker");
+    this.bulbaParking.onLeaderboard = () => void this.leaderboard.open("bulbaparking");
+    this.bulbaTanks.onLeaderboard = () => void this.leaderboard.open("bulbatanks");
+    this.bulbaColors.onLeaderboard = () => void this.leaderboard.open("bulbacolors");
+    this.bulbaSurki.onLeaderboard = () => void this.leaderboard.open("bulbasurki");
+    this.bulbaGuess.onLeaderboard = () =>
+      void this.leaderboard.open(this.bulbaGuess.isDaily ? "wotd-bulbaguess" : "bulbaguess");
+    this.bulbaWordle.onLeaderboard = () =>
+      void this.leaderboard.open(this.bulbaWordle.isDaily ? "wotd-bulbawordle" : "bulbawordle");
+    this.bulbaGuess.onDailyOver = () => void this.reportDailyBoard("bulbaguess");
+    this.bulbaWordle.onDailyOver = () => void this.reportDailyBoard("bulbawordle");
     // Возвращаем промис (а не void): игра ждёт подтверждения сохранения перед показом
     // лидерборда. При ошибке логируем, но резолвим — чтобы борд всё равно открылся.
     const saveDaily = (gameId: string, s: api.DailyProgress) =>
@@ -414,21 +434,28 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
-  // Отправить результат мини-игры на сервер и показать лидерборд.
+  // Отправить результат: лидерборд показываем только если попытка изменила таблицу,
+  // и тогда — со стрелками изменения ранга.
   private async reportScore(gameId: string, value: number): Promise<void> {
     try {
-      const board = await api.submitScore(gameId, value);
-      this.leaderboard.showBoard(gameId, board);
+      const before = await api.fetchLeaderboard(gameId);
+      const after = await api.submitScore(gameId, value);
+      if (!boardChangedForYou(before, after)) return;
+      this.leaderboard.showBoard(gameId, after, rankDeltas(before, after));
     } catch (e) {
       console.error("Не удалось отправить результат:", e);
     }
   }
 
-  // Показать дневной лидерборд слова дня (прогресс уже сохранён игрой при решении).
-  private async showDailyBoard(gameId: string): Promise<void> {
+  // Слово дня: сравниваем с бордом, снятым при открытии игры.
+  private async reportDailyBoard(gameId: string): Promise<void> {
+    const boardId = WOTD_BOARD_ID[gameId];
     try {
-      const board = await api.fetchDailyLeaderboard(gameId);
-      this.leaderboard.showBoard(WOTD_BOARD_ID[gameId], board);
+      const before = this.wotdBoardSnap.get(gameId) ?? { entries: [], you: null };
+      const after = await api.fetchDailyLeaderboard(gameId);
+      this.wotdBoardSnap.set(gameId, after);
+      if (!boardChangedForYou(before, after)) return;
+      this.leaderboard.showBoard(boardId, after, rankDeltas(before, after));
     } catch (e) {
       console.error("Не удалось показать лидерборд слова дня:", e);
     }
@@ -437,15 +464,17 @@ export class WorldScene extends Phaser.Scene {
   // Открыть игру в режиме слова дня: тянем сиды и сохранённый прогресс, передаём в игру.
   private async openDailyGame(gameId: "bulbaguess" | "bulbawordle"): Promise<void> {
     this.gameMenu.close();
-    this.tvScreen.hide();
     try {
-      const [wotd, progress] = await Promise.all([api.fetchWotd(), api.fetchDailyProgress(gameId)]);
+      const [wotd, progress, boardSnap] = await Promise.all([
+        api.fetchWotd(),
+        api.fetchDailyProgress(gameId),
+        api.fetchDailyLeaderboard(gameId),
+      ]);
+      this.wotdBoardSnap.set(gameId, boardSnap);
       if (gameId === "bulbaguess") {
         await this.bulbaGuess.openDaily(wotd.guess.today, wotd.guess.prev, progress);
-        this.activeGame = this.bulbaGuess;
       } else {
         await this.bulbaWordle.openDaily(wotd.wordle.today, wotd.wordle.prev, progress);
-        this.activeGame = this.bulbaWordle;
       }
       this.setPhaserAsleep(true);
     } catch (e) {
@@ -686,7 +715,6 @@ export class WorldScene extends Phaser.Scene {
     // Внутри компьютера мини-игры, Planning Poker и логи отключены — телевизор, стол
     // покера и принтер остаются частью декорации.
     this.tv = embedded ? null : interactions.get("tv") ?? null;
-    this.tvRect = rects.get("tvScreen") ?? null;
     this.ancestorsRect = rects.get("ancestors") ?? null;
     this.printerRect = embedded ? null : rects.get("printer") ?? null;
     this.monitorRect = embedded ? null : rects.get("monitor") ?? null;
@@ -700,6 +728,7 @@ export class WorldScene extends Phaser.Scene {
       .filter((r): r is Rect => !!r);
     this.projectorRect = rects.get("projector") ?? null;
     this.easelRect = rects.get("easel") ?? null;
+    this.surkiRect = rects.get("bulbasurki") ?? null;
     this.items.load(items, physicsWalls, tableRects, cfg.id);
     // Вне главного офиса общий проектор не рисуем; при возврате стейт придёт по WS
     // (или останется локальным в одиночке, если ещё не выключали).
@@ -708,13 +737,6 @@ export class WorldScene extends Phaser.Scene {
     } else if (this.projectorRect && this.projectorOn && this.projectorOwnerId) {
       const paths = slidePathsByOwnerId(this.projectorOwnerId);
       if (paths) this.projector.showDeck(paths, this.projectorIndex);
-    }
-
-    // Свёрнутая игра видна на экране TV только в чилл-зоне (где задан прямоугольник экрана).
-    if (this.activeGame && this.activeGame.minimized && index === LOC.chillZone && this.tvRect) {
-      this.tvScreen.show(this.tvRect, this.activeGame.getCanvas());
-    } else {
-      this.tvScreen.hide();
     }
 
     this.player.setVisible(!this.atParking);
@@ -737,13 +759,13 @@ export class WorldScene extends Phaser.Scene {
     return (
       this.dialogue.isOpen ||
       this.gameMenu.isOpen ||
-      // Свёрнутая игра (minimized) ход не блокирует — только полноэкранная.
-      (this.bulbaJump.isOpen && !this.bulbaJump.minimized) ||
-      (this.bulbaPacker.isOpen && !this.bulbaPacker.minimized) ||
-      (this.bulbaParking.isOpen && !this.bulbaParking.minimized) ||
-      (this.bulbaTanks.isOpen && !this.bulbaTanks.minimized) ||
-      (this.bulbaGuess.isOpen && !this.bulbaGuess.minimized) ||
-      (this.bulbaWordle.isOpen && !this.bulbaWordle.minimized) ||
+      this.bulbaJump.isOpen ||
+      this.bulbaPacker.isOpen ||
+      this.bulbaParking.isOpen ||
+      this.bulbaTanks.isOpen ||
+      this.bulbaGuess.isOpen ||
+      this.bulbaWordle.isOpen ||
+      this.bulbaSurki.isOpen ||
       this.bulbaColors.isOpen ||
       this.leaderboard.isOpen ||
       this.achievements.isOpen ||
@@ -762,34 +784,13 @@ export class WorldScene extends Phaser.Scene {
 
   private openGame(id: string): void {
     this.gameMenu.close();
-    this.tvScreen.hide();
-    if (id === "bulbajump") { this.bulbaJump.open(this.chosen.sprite); this.activeGame = this.bulbaJump; }
-    else if (id === "bulbapacker") { this.bulbaPacker.open(); this.activeGame = this.bulbaPacker; }
-    else if (id === "bulbaparking") { this.bulbaParking.open(); this.activeGame = this.bulbaParking; }
-    else if (id === "bulbatanks") { this.bulbaTanks.open(); this.activeGame = this.bulbaTanks; }
-    else if (id === "bulbaguess") { this.bulbaGuess.open(); this.activeGame = this.bulbaGuess; }
-    else if (id === "bulbawordle") { this.bulbaWordle.open(); this.activeGame = this.bulbaWordle; }
+    if (id === "bulbajump") this.bulbaJump.open(this.chosen.sprite);
+    else if (id === "bulbapacker") this.bulbaPacker.open();
+    else if (id === "bulbaparking") this.bulbaParking.open();
+    else if (id === "bulbatanks") this.bulbaTanks.open();
+    else if (id === "bulbaguess") void this.bulbaGuess.open();
+    else if (id === "bulbawordle") void this.bulbaWordle.open();
     this.setPhaserAsleep(true);
-  }
-
-  // Свернуть текущую игру на экран TV (игра на паузе). Phaser снова крутит мир.
-  private minimizeGame(): void {
-    if (this.activeGame && this.tvRect) this.tvScreen.show(this.tvRect, this.activeGame.getCanvas());
-    this.setPhaserAsleep(false);
-  }
-
-  // Развернуть свёрнутую игру обратно на весь экран.
-  private expandGame(): void {
-    if (!this.activeGame) return;
-    this.activeGame.restore();
-    this.tvScreen.hide();
-    this.setPhaserAsleep(true);
-  }
-
-  private onArcadeClosed(): void {
-    this.activeGame = null;
-    this.tvScreen.hide();
-    this.setPhaserAsleep(false);
   }
 
   // Пока fullscreen-аркада рисует свой canvas через rAF, Phaser (WebGL + мир) не
@@ -848,14 +849,6 @@ export class WorldScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (!this.started) return;
-
-    // Мини-версия игры на TV: перерисовываем кадр; если игру закрыли — убираем.
-    this.tvScreen.update();
-    if (this.activeGame && !this.activeGame.isOpen) {
-      this.activeGame = null;
-      this.tvScreen.hide();
-      this.setPhaserAsleep(false);
-    }
 
     // Модалка / парковка: не крутить анимации и физику предметов под оверлеем.
     if (this.atParking || this.modalOpen()) {
@@ -932,6 +925,12 @@ export class WorldScene extends Phaser.Scene {
         this.easelRect.x + this.easelRect.w / 2,
         this.easelRect.y + this.easelRect.h,
       );
+    } else if (this.surkiRect && this.nearRect(this.surkiRect)) {
+      this.showPrompt(
+        "Пробел / Enter — сыграть в Bulba Surki",
+        this.surkiRect.x + this.surkiRect.w / 2,
+        this.surkiRect.y + this.surkiRect.h,
+      );
     } else {
       // У столов с ноутбуками зона NPC и ноутбука пересекаются — берём то, что ближе.
       const nearLaptop = this.nearestLaptop();
@@ -948,11 +947,7 @@ export class WorldScene extends Phaser.Scene {
       } else if (this.nearest) {
         this.showPrompt("Пробел / Enter — поговорить", this.nearest.x, this.nearest.y);
       } else if (this.tv && this.near(this.tv)) {
-        const label =
-          this.activeGame && this.activeGame.minimized
-            ? "Пробел / Enter — продолжить игру"
-            : "Пробел / Enter — выбрать игру";
-        this.showPrompt(label, this.tv.x, this.tv.y);
+        this.showPrompt("Пробел / Enter — выбрать игру", this.tv.x, this.tv.y);
       } else if (this.ancestorsRect && this.nearRect(this.ancestorsRect)) {
         this.showPrompt(
           "Пробел / Enter — прочитать",
@@ -1015,7 +1010,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // Действие по Space/Enter рядом с объектом. Приоритет: предмет в лапах (поставить) →
-  // взять предмет → проектор → мольберт → ноутбук/NPC (кто ближе) → телевизор →
+  // взять предмет → проектор → мольберт → автомат Surki → ноутбук/NPC (кто ближе) → телевизор →
   // стена предков → принтер → мониторы → покер → компьютер → выдача кофе → дверь.
   // Взятие идёт раньше стационарных объектов: иначе чашку, стоящую на столе покера, было
   // бы не поднять — тем же пробелом открывался бы покер.
@@ -1049,6 +1044,11 @@ export class WorldScene extends Phaser.Scene {
       this.bulbaColors.open();
       return true;
     }
+    if (this.surkiRect && this.nearRect(this.surkiRect)) {
+      this.bulbaSurki.open();
+      this.setPhaserAsleep(true);
+      return true;
+    }
     {
       const nearLaptop = this.nearestLaptop();
       const laptopDist = nearLaptop ? this.distToRect(nearLaptop) : Infinity;
@@ -1067,8 +1067,7 @@ export class WorldScene extends Phaser.Scene {
       }
     }
     if (this.tv && this.near(this.tv)) {
-      if (this.activeGame && this.activeGame.minimized) this.expandGame();
-      else this.gameMenu.open();
+      this.gameMenu.open();
       return true;
     }
     if (this.ancestorsRect && this.nearRect(this.ancestorsRect)) {

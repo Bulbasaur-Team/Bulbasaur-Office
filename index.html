@@ -128,23 +128,24 @@
     /* Полноэкранное окно игры */
     /* safe center — второй строкой: если окно игры выше экрана, верх не уезжает
        за край (иначе flex-центрирование делает его недоступным для скролла). */
-    #bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; align-items: safe center; justify-content: center; padding: 24px; overflow: auto; }
+    #bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; align-items: safe center; justify-content: center; padding: 24px; overflow: auto; }
     #bjCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 420 / 640; }
     #bpCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(600px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 600; }
     #bpkCanvas { background: #26303a; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 640; }
     #btCanvas { background: #101418; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 456 / 504; }
+    #bsCanvas { background: #1a2430; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(560px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 560; cursor: none; }
     .arcade-frame { position: relative; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 24px 30px; display: flex; flex-direction: column; align-items: center; gap: 14px; box-shadow: 0 12px 44px rgba(0,0,0,.55); }
     .arcade-title { margin: 0; font-size: 22px; }
     .arcade-close { position: absolute; top: -16px; right: -16px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
     .arcade-close:hover { background: var(--accent); color: #14210f; }
     .arcade-close svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-    .arcade-min { position: absolute; top: -16px; left: -16px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
-    .arcade-min:hover { background: var(--accent); color: #14210f; }
-    .arcade-min svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+    .arcade-lb { width: 40px; height: 40px; border-radius: 12px; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; }
+    .arcade-lb:hover { background: var(--accent); color: #14210f; }
+    .arcade-lb svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .ttt-status { font-size: 16px; opacity: .85; min-height: 20px; }
     .ttt-restart { background: var(--panel); border: 2px solid var(--accent); border-radius: 12px; padding: 8px 22px; color: var(--text); font-family: inherit; font-size: 15px; font-weight: bold; cursor: pointer; }
     .ttt-restart:hover { background: var(--accent); color: #14210f; }
-    .bg-actions { display: flex; gap: 10px; }
+    .bg-actions, .arcade-actions { display: flex; gap: 10px; align-items: center; justify-content: center; }
 
     /* Bulba Colors */
     .bc-hud { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; width: min(360px, calc(var(--sw) * .8)); }
@@ -341,11 +342,16 @@
 
     /* Лидерборд */
     #leaderboard { position: fixed; inset: 0; z-index: 70; background: rgba(8,10,14,.85); display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .lb-box { position: relative; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 22px 26px; width: min(420px, calc(var(--sw) * .92)); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
+    #lbConfetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+    .lb-box { position: relative; z-index: 2; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 22px 26px; width: min(420px, calc(var(--sw) * .92)); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
     .lb-title { margin: 0 0 4px; text-align: center; }
     .lb-status { text-align: center; opacity: .8; font-size: 14px; min-height: 18px; margin-bottom: 10px; }
     .lb-list { display: flex; flex-direction: column; gap: 4px; max-height: calc(var(--sh) * .56); overflow-y: auto; }
     .lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid #353c46; border-radius: 8px; }
+    .lb-row .lb-delta { width: 16px; flex-shrink: 0; text-align: center; font-size: 12px; font-weight: bold; line-height: 1; }
+    .lb-row .lb-delta.lb-up { color: #7ac07a; }
+    .lb-row .lb-delta.lb-down { color: #e85d5d; }
+    .lb-row .lb-delta.lb-delta-empty { visibility: hidden; }
     .lb-row .lb-rank { width: 28px; opacity: .7; font-weight: bold; }
     .lb-row .lb-rank.lb-medal { opacity: 1; font-size: 18px; text-align: center; }
     .lb-row .lb-login { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -727,20 +733,19 @@
     /* --- Мобильный адаптив --- */
     /* У canvas аркад размер задан по высоте сцены + aspect-ratio; на узком портрете
        ширина от высоты может вылезать за экран — ограничиваем по ширине (высота подстроится). */
-    #bjCanvas, #bpCanvas, #bpkCanvas, #btCanvas { max-width: 100%; }
+    #bjCanvas, #bpCanvas, #bpkCanvas, #btCanvas, #bsCanvas { max-width: 100%; }
     /* На телефоне режем поля модалок и рамок, чтобы игровое поле влезало.
        Брейкпоинты — классы bp-* от ширины сцены (media-запрос мерил бы окно,
        а сцена может быть повёрнута на 90°). Классы ставит orientation.ts. */
     html.bp-640 h1 { font-size: 16px; margin: 6px 0 2px; }
     html.bp-640 #game canvas { border-width: 2px; }
-    html.bp-640 :is(#bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #slides) { padding: 10px; }
+    html.bp-640 :is(#bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki, #slides) { padding: 10px; }
     html.bp-640 #bcRef { width: 96px; height: 96px; }
     html.bp-640 .bc-options { gap: 10px; width: min(240px, calc(var(--sw) * .78)); }
     html.bp-640 .arcade-frame { padding: 16px 14px; gap: 10px; }
     html.bp-640 .arcade-title { font-size: 18px; }
     /* Кнопки окна вынесены за рамку на -16px — на узком экране убираем их внутрь. */
     html.bp-640 .arcade-close { top: 6px; right: 6px; width: 34px; height: 34px; }
-    html.bp-640 .arcade-min { top: 6px; left: 6px; width: 34px; height: 34px; }
     /* Доска Wordle задана в фиксированных px — ужимаем под узкий экран. */
     html.bp-400 .bw-grid { grid-template-columns: repeat(5, 44px); grid-template-rows: repeat(6, 44px); gap: 5px; }
     html.bp-400 .bw-cell { font-size: 24px; }
@@ -837,13 +842,15 @@
         <button class="arcade-close" id="bjClose" aria-label="закрыть">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
-        <button class="arcade-min" id="bjMin" aria-label="свернуть">
-          <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
-        </button>
         <h2 class="arcade-title">Bulba Jump</h2>
         <div class="ttt-status" id="bjStatus">Доставлено: 0</div>
         <canvas id="bjCanvas" width="420" height="640"></canvas>
-        <button class="ttt-restart" id="bjRestart">Заново</button>
+        <div class="arcade-actions">
+          <button class="ttt-restart" id="bjRestart">Заново</button>
+          <button class="arcade-lb" id="bjLb" aria-label="лидерборд" title="Лидерборд">
+            <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -852,13 +859,15 @@
         <button class="arcade-close" id="bpClose" aria-label="закрыть">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
-        <button class="arcade-min" id="bpMin" aria-label="свернуть">
-          <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
-        </button>
         <h2 class="arcade-title">Bulba Packer</h2>
         <div class="ttt-status" id="bpStatus">Очки: 0</div>
         <canvas id="bpCanvas" width="480" height="600"></canvas>
-        <button class="ttt-restart" id="bpRestart">Заново</button>
+        <div class="arcade-actions">
+          <button class="ttt-restart" id="bpRestart">Заново</button>
+          <button class="arcade-lb" id="bpLb" aria-label="лидерборд" title="Лидерборд">
+            <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -867,13 +876,15 @@
         <button class="arcade-close" id="bpkClose" aria-label="закрыть">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
-        <button class="arcade-min" id="bpkMin" aria-label="свернуть">
-          <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
-        </button>
         <h2 class="arcade-title">Bulba Parking</h2>
         <div class="ttt-status" id="bpkStatus">Стрелки: газ, задний ход и руль</div>
         <canvas id="bpkCanvas" width="480" height="640"></canvas>
-        <button class="ttt-restart" id="bpkRestart">Заново</button>
+        <div class="arcade-actions">
+          <button class="ttt-restart" id="bpkRestart">Заново</button>
+          <button class="arcade-lb" id="bpkLb" aria-label="лидерборд" title="Лидерборд">
+            <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -882,13 +893,15 @@
         <button class="arcade-close" id="btClose" aria-label="закрыть">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
-        <button class="arcade-min" id="btMin" aria-label="свернуть">
-          <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
-        </button>
         <h2 class="arcade-title">Bulba Tanks</h2>
         <div class="ttt-status" id="btStatus">Защити базу</div>
         <canvas id="btCanvas" width="456" height="504"></canvas>
-        <button class="ttt-restart" id="btRestart">Заново</button>
+        <div class="arcade-actions">
+          <button class="ttt-restart" id="btRestart">Заново</button>
+          <button class="arcade-lb" id="btLb" aria-label="лидерборд" title="Лидерборд">
+            <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -896,9 +909,6 @@
       <div class="arcade-frame">
         <button class="arcade-close" id="bgClose" aria-label="закрыть">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
-        <button class="arcade-min" id="bgMin" aria-label="свернуть">
-          <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
         </button>
         <h2 class="arcade-title">Bulba Guess<span class="bg-help">
           <button class="bg-help-btn" id="bgHelp" type="button" aria-label="правила">i</button>
@@ -914,6 +924,9 @@
         <div class="bg-actions">
           <button class="ttt-restart" id="bgGiveUp">Сдаться</button>
           <button class="ttt-restart" id="bgRestart">Новое слово</button>
+          <button class="arcade-lb" id="bgLb" aria-label="лидерборд" title="Лидерборд">
+            <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
+          </button>
         </div>
         <canvas id="bgCanvas" width="300" height="380"></canvas>
       </div>
@@ -925,16 +938,18 @@
         <button class="arcade-close" id="bwClose" aria-label="закрыть">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
-        <button class="arcade-min" id="bwMin" aria-label="свернуть">
-          <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
-        </button>
         <h2 class="arcade-title">Bulba Wordle</h2>
         <div class="ttt-status" id="bwStatus">Угадай слово из пяти букв</div>
         <div class="wotd-yesterday hidden" id="bwYesterday"></div>
         <input id="bwInput" class="bw-input" type="text" autocomplete="off" autocapitalize="off" />
         <div class="bw-grid" id="bwGrid"></div>
         <div class="bw-keyboard" id="bwKeyboard"></div>
-        <button class="ttt-restart" id="bwRestart">Новое слово</button>
+        <div class="arcade-actions">
+          <button class="ttt-restart" id="bwRestart">Новое слово</button>
+          <button class="arcade-lb" id="bwLb" aria-label="лидерборд" title="Лидерборд">
+            <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
+          </button>
+        </div>
         <canvas id="bwCanvas" width="320" height="420"></canvas>
       </div>
       <canvas id="bwConfetti"></canvas>
@@ -961,7 +976,29 @@
           <button type="button" class="bc-opt" aria-label="вариант 3"></button>
           <button type="button" class="bc-opt" aria-label="вариант 4"></button>
         </div>
-        <button class="ttt-restart hidden" id="bcRestart">Заново</button>
+        <div class="arcade-actions">
+          <button class="ttt-restart hidden" id="bcRestart">Заново</button>
+          <button class="arcade-lb" id="bcLb" aria-label="лидерборд" title="Лидерборд">
+            <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="bulbasurki" class="hidden">
+      <div class="arcade-frame">
+        <button class="arcade-close" id="bsClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <h2 class="arcade-title">Bulba Surki</h2>
+        <div class="ttt-status" id="bsStatus">Очки: 0 · 30.0 с</div>
+        <canvas id="bsCanvas" width="480" height="560"></canvas>
+        <div class="arcade-actions">
+          <button class="ttt-restart" id="bsRestart">Заново</button>
+          <button class="arcade-lb" id="bsLb" aria-label="лидерборд" title="Лидерборд">
+            <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1084,6 +1121,7 @@
     </div>
 
     <div id="leaderboard" class="hidden">
+      <canvas id="lbConfetti"></canvas>
       <div class="lb-box">
         <button class="lb-close" id="lbClose" aria-label="закрыть">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>

@@ -90,6 +90,7 @@ function makeRound(): { target: Rgb; options: Rgb[] } {
 export class BulbaColors {
   isOpen = false;
   onGameOver: ((value: number) => void) | null = null;
+  onLeaderboard: (() => void) | null = null;
 
   private root = document.getElementById("bulbacolors")!;
   private statusEl = document.getElementById("bcStatus")!;
@@ -108,6 +109,7 @@ export class BulbaColors {
 
   constructor() {
     document.getElementById("bcClose")!.onclick = () => this.close();
+    document.getElementById("bcLb")!.onclick = () => this.onLeaderboard?.();
     this.restartBtn.onclick = () => this.reset();
     this.optionButtons = Array.from(this.optionsEl.querySelectorAll<HTMLButtonElement>(".bc-opt"));
     this.optionButtons.forEach((btn, i) => {

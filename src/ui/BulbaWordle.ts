@@ -62,10 +62,9 @@ function evaluate(guess: string, target: string): Mark[] {
 // Словарь (он же список загадываемых слов) грузится один раз при первом открытии.
 export class BulbaWordle {
   isOpen = false;
-  minimized = false;
-  onMinimize: (() => void) | null = null;
   onClose: (() => void) | null = null;
   onGameOver: ((value: number) => void) | null = null;
+  onLeaderboard: (() => void) | null = null;
   private reported = false;
 
   private root = document.getElementById("bulbawordle")!;
@@ -109,7 +108,7 @@ export class BulbaWordle {
 
   constructor() {
     document.getElementById("bwClose")!.onclick = () => this.close();
-    document.getElementById("bwMin")!.onclick = () => this.minimize();
+    document.getElementById("bwLb")!.onclick = () => this.onLeaderboard?.();
     document.getElementById("bwRestart")!.onclick = () => this.newGame();
     this.buildGrid();
     this.buildKeyboard();
@@ -119,10 +118,6 @@ export class BulbaWordle {
     this.input.addEventListener("keydown", (e) => this.handleInput(e));
     // Клик по окну игры возвращает фокус в поле.
     this.root.addEventListener("pointerdown", () => this.focusInput());
-  }
-
-  getCanvas(): HTMLCanvasElement {
-    return this.canvas;
   }
 
   async open(): Promise<void> {
@@ -135,6 +130,10 @@ export class BulbaWordle {
     requestAnimationFrame(() => this.focusInput());
     await this.ensureData();
     this.newGame();
+  }
+
+  get isDaily(): boolean {
+    return this.daily;
   }
 
   // Режим слова дня: слово выводится из сида, «Новое слово» скрыто, показано вчерашнее слово.
@@ -179,28 +178,10 @@ export class BulbaWordle {
   close(): void {
     if (!this.isOpen) return;
     this.isOpen = false;
-    this.minimized = false;
     window.removeEventListener("keydown", this.onWindowKey, true);
     this.root.classList.add("hidden");
     this.stopConfetti();
     this.onClose?.();
-  }
-
-  minimize(): void {
-    if (!this.isOpen || this.minimized) return;
-    this.minimized = true;
-    window.removeEventListener("keydown", this.onWindowKey, true);
-    this.root.classList.add("hidden");
-    this.stopConfetti();
-    this.onMinimize?.();
-  }
-
-  restore(): void {
-    if (!this.minimized) return;
-    this.minimized = false;
-    this.root.classList.remove("hidden");
-    window.addEventListener("keydown", this.onWindowKey, true);
-    this.focusInput();
   }
 
   private focusInput(): void {
@@ -229,7 +210,7 @@ export class BulbaWordle {
   // же физический ввод работает без клика по экранной клавиатуре. Если поле уже в
   // фокусе, уступаем событие его собственному обработчику (иначе двойная обработка).
   private onWindowKey = (e: KeyboardEvent): void => {
-    if (!this.isOpen || this.minimized) return;
+    if (!this.isOpen) return;
     if (document.activeElement === this.input) return;
     this.focusInput();
     this.handleInput(e);

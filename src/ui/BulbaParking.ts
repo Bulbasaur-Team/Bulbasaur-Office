@@ -51,10 +51,9 @@ const ALIGN_TOL = 0.35; // допустимое отклонение курса 
 // нажатия любой стрелки.
 export class BulbaParking {
   isOpen = false;
-  minimized = false;
-  onMinimize: (() => void) | null = null;
   onClose: (() => void) | null = null;
   onGameOver: ((value: number) => void) | null = null;
+  onLeaderboard: (() => void) | null = null;
   private reported = false;
 
   private root = document.getElementById("bulbaparking")!;
@@ -87,7 +86,7 @@ export class BulbaParking {
 
   constructor() {
     document.getElementById("bpkClose")!.onclick = () => this.close();
-    document.getElementById("bpkMin")!.onclick = () => this.minimize();
+    document.getElementById("bpkLb")!.onclick = () => this.onLeaderboard?.();
     document.getElementById("bpkRestart")!.onclick = () => this.reset();
     attachArcadePad(this.root.querySelector<HTMLElement>(".arcade-frame")!, (c, d) => this.pressKey(c, d), {
       left: [{ label: "◀", code: "ArrowLeft" }, { label: "▶", code: "ArrowRight" }],
@@ -100,33 +99,6 @@ export class BulbaParking {
     const e = { code, preventDefault() {} } as unknown as KeyboardEvent;
     if (down) this.onKeyDown(e);
     else this.onKeyUp(e);
-  }
-
-  getCanvas(): HTMLCanvasElement {
-    return this.canvas;
-  }
-
-  // Свернуть: ставим игру на паузу, отключаем её управление и прячем окно. На TV
-  // остаётся последний кадр; игра не мешает ходить и ждёт, когда её развернут.
-  minimize(): void {
-    if (!this.isOpen || this.minimized) return;
-    this.minimized = true;
-    cancelAnimationFrame(this.raf);
-    window.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("keyup", this.onKeyUp);
-    this.root.classList.add("hidden");
-    this.onMinimize?.();
-  }
-
-  restore(): void {
-    if (!this.minimized) return;
-    this.minimized = false;
-    this.root.classList.remove("hidden");
-    window.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("keyup", this.onKeyUp);
-    this.lastT = performance.now();
-    this.startT = performance.now() - this.elapsedMs; // не засчитываем время на паузе
-    this.loop();
   }
 
   // Игре нужно состояние «зажато/отпущено», поэтому свои keydown/keyup живут
@@ -171,7 +143,6 @@ export class BulbaParking {
   close(): void {
     if (!this.isOpen) return;
     this.isOpen = false;
-    this.minimized = false;
     cancelAnimationFrame(this.raf);
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);

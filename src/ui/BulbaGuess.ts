@@ -60,12 +60,11 @@ function normalize(w: string): string {
 // первом открытии.
 export class BulbaGuess {
   isOpen = false;
-  minimized = false;
-  onMinimize: (() => void) | null = null;
   onClose: (() => void) | null = null;
   onGameOver: ((value: number) => void) | null = null;
   onDailyOver: ((attempts: number) => void) | null = null;
   onDailyProgress: ((state: DailyProgress) => void | Promise<void>) | null = null;
+  onLeaderboard: (() => void) | null = null;
   private reported = false;
 
   private daily = false;                  // режим слова дня: без «Сдаться»/«Новое слово», со вчерашним словом
@@ -102,7 +101,7 @@ export class BulbaGuess {
 
   constructor() {
     document.getElementById("bgClose")!.onclick = () => this.close();
-    document.getElementById("bgMin")!.onclick = () => this.minimize();
+    document.getElementById("bgLb")!.onclick = () => this.onLeaderboard?.();
     document.getElementById("bgRestart")!.onclick = () => this.newRound();
     document.getElementById("bgGiveUp")!.onclick = () => this.giveUp();
     const help = document.getElementById("bgHelp")!;
@@ -120,10 +119,6 @@ export class BulbaGuess {
     });
   }
 
-  getCanvas(): HTMLCanvasElement {
-    return this.canvas;
-  }
-
   async open(): Promise<void> {
     this.isOpen = true;
     this.daily = false;
@@ -134,6 +129,10 @@ export class BulbaGuess {
     window.addEventListener("keydown", this.onKeyDown);
     await this.ensureData();
     this.newRound();
+  }
+
+  get isDaily(): boolean {
+    return this.daily;
   }
 
   // Режим слова дня: раунд выводится из сида, «Сдаться»/«Новое слово» скрыты, показано вчерашнее слово.
@@ -181,28 +180,10 @@ export class BulbaGuess {
   close(): void {
     if (!this.isOpen) return;
     this.isOpen = false;
-    this.minimized = false;
     window.removeEventListener("keydown", this.onKeyDown);
     this.root.classList.add("hidden");
     this.stopConfetti();
     this.onClose?.();
-  }
-
-  minimize(): void {
-    if (!this.isOpen || this.minimized) return;
-    this.minimized = true;
-    window.removeEventListener("keydown", this.onKeyDown);
-    this.root.classList.add("hidden");
-    this.stopConfetti();
-    this.onMinimize?.();
-  }
-
-  restore(): void {
-    if (!this.minimized) return;
-    this.minimized = false;
-    this.root.classList.remove("hidden");
-    window.addEventListener("keydown", this.onKeyDown);
-    this.input.focus();
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {

@@ -67,10 +67,9 @@ const MAP_THEMES: MapTheme[] = ["lanes", "fortress", "islands", "marsh", "canals
 // на каждом уровне выезжает 20 противников, кирпич можно пробивать снарядами.
 export class BulbaTanks {
   isOpen = false;
-  minimized = false;
-  onMinimize: (() => void) | null = null;
   onClose: (() => void) | null = null;
   onGameOver: ((value: number) => void) | null = null;
+  onLeaderboard: (() => void) | null = null;
 
   private root = document.getElementById("bulbatanks")!;
   private canvas = document.getElementById("btCanvas") as HTMLCanvasElement;
@@ -110,7 +109,7 @@ export class BulbaTanks {
 
   constructor() {
     document.getElementById("btClose")!.onclick = () => this.close();
-    document.getElementById("btMin")!.onclick = () => this.minimize();
+    document.getElementById("btLb")!.onclick = () => this.onLeaderboard?.();
     document.getElementById("btRestart")!.onclick = () => this.resetCampaign();
     attachArcadePad(this.root.querySelector<HTMLElement>(".arcade-frame")!, (c, d) => this.pressKey(c, d), {
       left: [
@@ -131,10 +130,6 @@ export class BulbaTanks {
     else this.onKeyUp(e);
   }
 
-  getCanvas(): HTMLCanvasElement {
-    return this.canvas;
-  }
-
   open(): void {
     this.isOpen = true;
     this.root.classList.remove("hidden");
@@ -148,7 +143,6 @@ export class BulbaTanks {
   close(): void {
     if (!this.isOpen) return;
     this.isOpen = false;
-    this.minimized = false;
     cancelAnimationFrame(this.raf);
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
@@ -156,31 +150,6 @@ export class BulbaTanks {
     this.keys.clear();
     this.stopMusic();
     this.onClose?.();
-  }
-
-  minimize(): void {
-    if (!this.isOpen || this.minimized) return;
-    this.minimized = true;
-    cancelAnimationFrame(this.raf);
-    window.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("keyup", this.onKeyUp);
-    this.root.classList.add("hidden");
-    this.keys.clear();
-    this.stopMusic();
-    this.onMinimize?.();
-  }
-
-  restore(): void {
-    if (!this.minimized) return;
-    this.minimized = false;
-    this.root.classList.remove("hidden");
-    window.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("keyup", this.onKeyUp);
-    this.lastT = performance.now();
-    this.acc = 0;
-    this.startAudio();
-    this.startMusic();
-    this.loop();
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {
@@ -1083,7 +1052,7 @@ export class BulbaTanks {
   }
 
   private playMusicTick(): void {
-    if (!this.audio || !this.master || this.over || this.won || this.minimized || this.audio.state !== "running") return;
+    if (!this.audio || !this.master || this.over || this.won || this.audio.state !== "running") return;
     const bass = [55, 55, 82, 55, 73, 55, 98, 55];
     const lead = [220, 0, 247, 0, 196, 0, 165, 0, 147, 0, 165, 0, 196, 0, 247, 0];
     const step = this.musicStep++;

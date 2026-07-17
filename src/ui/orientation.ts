@@ -15,6 +15,7 @@ const SCREENS: ReadonlyArray<readonly [string, Orient]> = [
   ["bulbaguess", "portrait"],
   ["bulbawordle", "portrait"],
   ["bulbacolors", "portrait"],
+  ["bulbasurki", "portrait"],
   ["auth", "portrait"],
 ];
 
@@ -83,7 +84,7 @@ export function initOrientation(): void {
   window.visualViewport?.addEventListener("resize", apply);
 
   // Экраны показываются/прячутся через класс hidden — следим за ним, чтобы не
-  // дёргать ориентацию вручную из каждого open()/close()/minimize().
+  // дёргать ориентацию вручную из каждого open()/close().
   const observer = new MutationObserver(apply);
   for (const [id] of SCREENS) {
     const el = document.getElementById(id);

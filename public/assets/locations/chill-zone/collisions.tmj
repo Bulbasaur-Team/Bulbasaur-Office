@@ -559,6 +559,18 @@
                  "width":110,
                  "x":30,
                  "y":497
+                }, 
+                {
+                 "height":120,
+                 "id":227,
+                 "name":"bulbasurki",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":110,
+                 "x":530,
+                 "y":120
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -1143,7 +1155,7 @@
          "y":0
         }],
  "nextlayerid":9,
- "nextobjectid":227,
+ "nextobjectid":228,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",
