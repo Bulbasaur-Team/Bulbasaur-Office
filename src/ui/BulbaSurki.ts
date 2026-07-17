@@ -1,5 +1,4 @@
 import { publicPath } from "../publicPath";
-import { attachArcadePad } from "./TouchControls";
 import { screenToStage, stage } from "./orientation";
 
 // Логическое поле (px). Канвас масштабируется через CSS.
@@ -96,15 +95,6 @@ export class BulbaSurki {
     document.getElementById("bsClose")!.onclick = () => this.close();
     document.getElementById("bsLb")!.onclick = () => this.onLeaderboard?.();
     document.getElementById("bsRestart")!.onclick = () => this.reset();
-    attachArcadePad(this.root.querySelector<HTMLElement>(".arcade-frame")!, (c, d) => this.pressKey(c, d), {
-      left: [
-        { label: "▲", code: "ArrowUp" },
-        { label: "◀", code: "ArrowLeft" },
-        { label: "▼", code: "ArrowDown" },
-        { label: "▶", code: "ArrowRight" },
-      ],
-      right: [{ label: "⚒", code: "Space" }],
-    });
 
     this.moleImg.src = publicPath("assets/bulbasurki/mole.png");
     this.hammerImg.src = publicPath("assets/bulbasurki/hammer.png");
@@ -161,11 +151,6 @@ export class BulbaSurki {
       }
     }
   };
-
-  pressKey(code: string, down: boolean): void {
-    if (!down) return;
-    this.onKeyDown({ code, preventDefault() {} } as KeyboardEvent);
-  }
 
   open(): void {
     this.isOpen = true;
