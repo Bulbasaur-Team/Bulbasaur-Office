@@ -6,8 +6,10 @@ import type { KeyConsumer } from "./KeyboardRouter";
 export const AH_W = 420;
 export const AH_H = 700;
 
-const PADDLE_R = 28;
-const PUCK_R = 18.2; // 14 × 1.3 — как на сервере
+const PADDLE_R = 29.75; // 35 × 0.85
+const PUCK_R = 22.75; // 18.2 × 1.25 — как на сервере
+/** Как на сервере: хитбокс чуть меньше из‑за прозрачных краёв спрайтов. */
+const CONTACT_SCALE = 0.9;
 const PADDLE_DRAW = PADDLE_R * 2;
 const PUCK_DRAW = PUCK_R * 2;
 const SCORE_TO_WIN = 10;
@@ -36,6 +38,8 @@ export interface AirHockeyStateView {
   winnerSide: AirHockeySide | null;
   winnerLogin: string | null;
   rematchBy: AirHockeySide | null;
+  goalFreezeMs: number;
+  goalScorerLogin: string | null;
 }
 
 interface Particle {
@@ -77,6 +81,8 @@ export class AirHockey implements KeyConsumer {
   private rematchRoot = document.getElementById("ahRematch")!;
   private rematchText = document.getElementById("ahRematchText")!;
   private rematchActions = document.getElementById("ahRematchActions")!;
+  private goalRoot = document.getElementById("ahGoal")!;
+  private goalText = document.getElementById("ahGoalText")!;
 
   private fieldImg = loadImg("assets/airhockey/field.png");
   private paddleRedImg = loadImg("assets/airhockey/paddle-red.png");
@@ -140,6 +146,7 @@ export class AirHockey implements KeyConsumer {
     this.renderOppY = AH_H * 0.22;
     this.stopConfetti();
     this.hideRematch();
+    this.hideGoal();
     this.root.classList.remove("hidden");
     this.statusEl.textContent = `Счёт 0 : 0 · 3:00 · до ${SCORE_TO_WIN}`;
     cancelAnimationFrame(this.raf);
@@ -154,6 +161,7 @@ export class AirHockey implements KeyConsumer {
     cancelAnimationFrame(this.raf);
     this.stopConfetti();
     this.hideRematch();
+    this.hideGoal();
     this.pointerId = null;
     this.pointerActive = false;
     this.root.classList.add("hidden");
@@ -180,6 +188,7 @@ export class AirHockey implements KeyConsumer {
     }
 
     if (state.phase === "ended") {
+      this.hideGoal();
       if (!this.over) {
         this.over = true;
         this.showFinale(state, true);
@@ -192,14 +201,20 @@ export class AirHockey implements KeyConsumer {
       this.finaleShown = false;
       this.hideRematch();
       this.stopConfetti();
+      this.updateGoalUi(state);
       const oppGone =
         (this.mySide === "red" && !state.blueConnected) ||
         (this.mySide === "blue" && !state.redConnected);
       const mine = this.mySide === "red" ? state.redScore : state.blueScore;
       const opp = this.mySide === "red" ? state.blueScore : state.redScore;
-      this.statusEl.textContent =
-        `Счёт ${mine} : ${opp} · ${formatMs(state.remainingMs)} · до ${SCORE_TO_WIN}` +
-        (oppGone ? " · соперник вышел" : "");
+      if (state.goalFreezeMs > 0 && state.goalScorerLogin) {
+        this.statusEl.textContent =
+          `Гол! · ${formatMs(state.remainingMs)} · до ${SCORE_TO_WIN}`;
+      } else {
+        this.statusEl.textContent =
+          `Счёт ${mine} : ${opp} · ${formatMs(state.remainingMs)} · до ${SCORE_TO_WIN}` +
+          (oppGone ? " · соперник вышел" : "");
+      }
     }
   }
 
@@ -280,6 +295,23 @@ export class AirHockey implements KeyConsumer {
     this.rematchText.textContent = "";
   }
 
+  private updateGoalUi(state: AirHockeyStateView): void {
+    if (state.goalFreezeMs <= 0 || !state.goalScorerLogin) {
+      this.hideGoal();
+      return;
+    }
+    const mine = this.mySide === "red" ? state.redScore : state.blueScore;
+    const opp = this.mySide === "red" ? state.blueScore : state.redScore;
+    this.goalText.textContent =
+      `Гол! Игрок ${state.goalScorerLogin}. Счёт ${mine} : ${opp}`;
+    this.goalRoot.classList.remove("hidden");
+  }
+
+  private hideGoal(): void {
+    this.goalRoot.classList.add("hidden");
+    this.goalText.textContent = "";
+  }
+
   private loop = (): void => {
     if (!this.isOpen) return;
     if (this.pointerActive && !this.over) {
@@ -310,10 +342,13 @@ export class AirHockey implements KeyConsumer {
     const st = this.state;
     if (st) {
       if (Number.isFinite(st.puckX) && Number.isFinite(st.puckY)) {
-        // Пока ведём биту — не тянем шайбу обратно в биту серверным lerp.
-        if (!this.pointerActive) {
-          this.renderPuckX += (st.puckX - this.renderPuckX) * 0.55;
-          this.renderPuckY += (st.puckY - this.renderPuckY) * 0.55;
+        if (st.goalFreezeMs > 0) {
+          // После гола шайба мягко едет в центр, без телепорта.
+          this.renderPuckX += (AH_W * 0.5 - this.renderPuckX) * 0.18;
+          this.renderPuckY += (AH_H * 0.5 - this.renderPuckY) * 0.18;
+        } else if (!this.pointerActive) {
+          this.renderPuckX += (st.puckX - this.renderPuckX) * 0.45;
+          this.renderPuckY += (st.puckY - this.renderPuckY) * 0.45;
         } else {
           this.renderPuckX += (st.puckX - this.renderPuckX) * 0.2;
           this.renderPuckY += (st.puckY - this.renderPuckY) * 0.2;
@@ -324,8 +359,8 @@ export class AirHockey implements KeyConsumer {
         this.renderOppY += (st.oppY - this.renderOppY) * 0.55;
       }
     }
-    // Каждый кадр: шайба не должна рисоваться внутри своей биты.
-    if (!this.over) {
+    // После гола / реванша шайба не должна рисоваться внутри биты только при движении.
+    if (!this.over && !(st && st.goalFreezeMs > 0) && this.pointerActive) {
       this.pushPuckOut(this.localX, this.localY, 0, -1);
     }
 
@@ -443,11 +478,11 @@ export class AirHockey implements KeyConsumer {
     }
   }
 
-  private pushPuckOut(px: number, py: number, moveX: number, moveY: number): void {
-    const minDist = PADDLE_R + PUCK_R;
-    let dx = this.renderPuckX - px;
-    let dy = this.renderPuckY - py;
-    let dist = Math.hypot(dx, dy);
+  private pushPuckOut(px: number, py: number, _moveX: number, _moveY: number): void {
+    const minDist = (PADDLE_R + PUCK_R) * CONTACT_SCALE;
+    const dx = this.renderPuckX - px;
+    const dy = this.renderPuckY - py;
+    const dist = Math.hypot(dx, dy);
     if (dist >= minDist) return;
 
     let nx: number;
@@ -458,20 +493,6 @@ export class AirHockey implements KeyConsumer {
     } else {
       nx = dx / dist;
       ny = dy / dist;
-    }
-    const moveLen = Math.hypot(moveX, moveY);
-    if (moveLen > 1e-6) {
-      const mx = moveX / moveLen;
-      const my = moveY / moveLen;
-      if (nx * mx + ny * my < 0.35) {
-        nx += mx * 1.25;
-        ny += my * 1.25;
-        const nl = Math.hypot(nx, ny);
-        if (nl > 1e-6) {
-          nx /= nl;
-          ny /= nl;
-        }
-      }
     }
     this.renderPuckX = clamp(px + nx * minDist, PUCK_R, AH_W - PUCK_R);
     this.renderPuckY = clamp(py + ny * minDist, PUCK_R, AH_H - PUCK_R);

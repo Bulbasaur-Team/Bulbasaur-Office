@@ -121,6 +121,8 @@ export interface AirHockeyStateView {
   winnerSide: AirHockeySide | null;
   winnerLogin: string | null;
   rematchBy: AirHockeySide | null;
+  goalFreezeMs: number;
+  goalScorerLogin: string | null;
 }
 
 export interface RealtimeHandlers {
@@ -375,6 +377,8 @@ function parseAirHockeyState(msg: any): AirHockeyStateView {
     winnerSide: msg.winnerSide ?? null,
     winnerLogin: msg.winnerLogin ?? null,
     rematchBy: msg.rematchBy === "red" || msg.rematchBy === "blue" ? msg.rematchBy : null,
+    goalFreezeMs: Number(msg.goalFreezeMs ?? 0),
+    goalScorerLogin: msg.goalScorerLogin ?? null,
   };
 
   // Новый протокол: уже вид получателя.
