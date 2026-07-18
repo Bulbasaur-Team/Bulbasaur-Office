@@ -120,6 +120,7 @@ export interface AirHockeyStateView {
   blueConnected: boolean;
   winnerSide: AirHockeySide | null;
   winnerLogin: string | null;
+  rematchBy: AirHockeySide | null;
 }
 
 export interface RealtimeHandlers {
@@ -276,6 +277,18 @@ export class Realtime {
     this.send({ type: "airhockeyPaddle", x, y });
   }
 
+  airhockeyRematchRequest(): void {
+    this.send({ type: "airhockeyRematchRequest" });
+  }
+
+  airhockeyRematchCancel(): void {
+    this.send({ type: "airhockeyRematchCancel" });
+  }
+
+  airhockeyRematchRespond(accept: boolean): void {
+    this.send({ type: "airhockeyRematchRespond", accept });
+  }
+
   private open(): void {
     const token = getToken() ?? "";
     const ws = new WebSocket(`${WS_BASE}?token=${encodeURIComponent(token)}`);
@@ -361,6 +374,7 @@ function parseAirHockeyState(msg: any): AirHockeyStateView {
     blueConnected: msg.blueConnected !== false,
     winnerSide: msg.winnerSide ?? null,
     winnerLogin: msg.winnerLogin ?? null,
+    rematchBy: msg.rematchBy === "red" || msg.rematchBy === "blue" ? msg.rematchBy : null,
   };
 
   // Новый протокол: уже вид получателя.

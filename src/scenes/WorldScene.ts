@@ -106,7 +106,8 @@ const THOUGHT_INTERVAL_JITTER_MS = 5000; // случайная добавка к
 const THOUGHT_PROBABILITY = 0.1;         // вероятность появления мысли при очередной проверке
 
 const DEPTH = {
-  prompt: 1_000_000,
+  // Подсказки «Пробел / Enter» — поверх всего мира (фон, персонажи, overlay, облачка).
+  prompt: 10_000_000,
   player: 1_000_001,
   doorOverlay: 2_000_000,
   bubble: 3_000_000,
@@ -275,6 +276,9 @@ export class WorldScene extends Phaser.Scene {
     }
     this.airHockey.onLeave = () => this.realtime.airhockeyLeave();
     this.airHockey.onPaddle = (x, y) => this.realtime.airhockeyPaddle(x, y);
+    this.airHockey.onRematchRequest = () => this.realtime.airhockeyRematchRequest();
+    this.airHockey.onRematchCancel = () => this.realtime.airhockeyRematchCancel();
+    this.airHockey.onRematchRespond = (accept) => this.realtime.airhockeyRematchRespond(accept);
 
     // По завершении партии игра отдаёт результат — отправляем его и показываем лидерборд.
     this.leaderboard = new Leaderboard(GAMES);
@@ -1276,15 +1280,17 @@ export class WorldScene extends Phaser.Scene {
     blueLogin: string | null;
     phase: string;
   }): void {
-    const invite = AirHockey.inviteText();
     const next = new Set<string>();
     if (lobby.redSessionId) next.add(lobby.redSessionId);
     if (lobby.blueSessionId) next.add(lobby.blueSessionId);
     for (const id of this.airHockeyInviteIds) {
       if (!next.has(id)) this.remotePlayers.get(id)?.hideBubble();
     }
-    for (const id of next) {
-      this.remotePlayers.get(id)?.showInvite(invite);
+    if (lobby.redSessionId) {
+      this.remotePlayers.get(lobby.redSessionId)?.showInvite(AirHockey.inviteText("red"));
+    }
+    if (lobby.blueSessionId) {
+      this.remotePlayers.get(lobby.blueSessionId)?.showInvite(AirHockey.inviteText("blue"));
     }
     this.airHockeyInviteIds = next;
 
@@ -1295,7 +1301,7 @@ export class WorldScene extends Phaser.Scene {
           : null;
     if (mySide) {
       this.airHockeyWaiting = mySide;
-      this.bubble.show(invite, this.player.x, this.player.y - TARGET_H * 0.95, undefined, () => ({
+      this.bubble.show(AirHockey.inviteText(mySide), this.player.x, this.player.y - TARGET_H * 0.95, undefined, () => ({
         x: this.player.x,
         y: this.player.y - TARGET_H * 0.95,
       }));

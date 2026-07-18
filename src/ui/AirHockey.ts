@@ -1,4 +1,5 @@
 import { screenToStage, stage } from "./orientation";
+import { publicPath } from "../publicPath";
 import type { KeyConsumer } from "./KeyboardRouter";
 
 // Логическое поле — как на сервере. Координаты ВИДА: своя бита всегда внизу.
@@ -6,11 +7,13 @@ export const AH_W = 420;
 export const AH_H = 700;
 
 const PADDLE_R = 28;
-const PUCK_R = 14;
-const GOAL_HALF = 55;
+const PUCK_R = 18.2; // 14 × 1.3 — как на сервере
+const PADDLE_DRAW = PADDLE_R * 2;
+const PUCK_DRAW = PUCK_R * 2;
 const SCORE_TO_WIN = 10;
 
-const INVITE = "Сыграем в аэрохоккей?";
+const INVITE_RED = "Сыграем в аэрохоккей? Я за красную сторону!";
+const INVITE_BLUE = "Сыграем в аэрохоккей? Я за синюю сторону!";
 
 export type AirHockeySide = "red" | "blue";
 
@@ -32,6 +35,7 @@ export interface AirHockeyStateView {
   blueConnected: boolean;
   winnerSide: AirHockeySide | null;
   winnerLogin: string | null;
+  rematchBy: AirHockeySide | null;
 }
 
 interface Particle {
@@ -45,6 +49,12 @@ interface Particle {
   color: string;
 }
 
+function loadImg(src: string): HTMLImageElement {
+  const img = new Image();
+  img.src = publicPath(src);
+  return img;
+}
+
 /**
  * Аэрохоккей. Сервер отдаёт уже «вид» игрока (я внизу, соперник сверху).
  * Клиент только рисует и шлёт координаты своей половины без переворотов.
@@ -54,6 +64,9 @@ export class AirHockey implements KeyConsumer {
   onClose: (() => void) | null = null;
   onLeave: (() => void) | null = null;
   onPaddle: ((x: number, y: number) => void) | null = null;
+  onRematchRequest: (() => void) | null = null;
+  onRematchCancel: (() => void) | null = null;
+  onRematchRespond: ((accept: boolean) => void) | null = null;
 
   private root = document.getElementById("airhockey")!;
   private canvas = document.getElementById("ahCanvas") as HTMLCanvasElement;
@@ -61,12 +74,21 @@ export class AirHockey implements KeyConsumer {
   private statusEl = document.getElementById("ahStatus")!;
   private confetti = document.getElementById("ahConfetti") as HTMLCanvasElement;
   private confettiCtx = this.confetti.getContext("2d")!;
+  private rematchRoot = document.getElementById("ahRematch")!;
+  private rematchText = document.getElementById("ahRematchText")!;
+  private rematchActions = document.getElementById("ahRematchActions")!;
+
+  private fieldImg = loadImg("assets/airhockey/field.png");
+  private paddleRedImg = loadImg("assets/airhockey/paddle-red.png");
+  private paddleBlueImg = loadImg("assets/airhockey/paddle-blue.png");
+  private puckImg = loadImg("assets/airhockey/puck.png");
 
   private mySide: AirHockeySide = "red";
   private state: AirHockeyStateView | null = null;
   private localX = AH_W * 0.5;
   private localY = AH_H * 0.78;
   private over = false;
+  private finaleShown = false;
   private raf = 0;
   private lastSend = 0;
   private pointerId: number | null = null;
@@ -106,6 +128,7 @@ export class AirHockey implements KeyConsumer {
     this.mySide = side;
     this.isOpen = true;
     this.over = false;
+    this.finaleShown = false;
     this.state = null;
     this.canvas.width = AH_W;
     this.canvas.height = AH_H;
@@ -116,8 +139,9 @@ export class AirHockey implements KeyConsumer {
     this.renderOppX = AH_W * 0.5;
     this.renderOppY = AH_H * 0.22;
     this.stopConfetti();
+    this.hideRematch();
     this.root.classList.remove("hidden");
-    this.statusEl.textContent = `Счёт 0 : 0 · до ${SCORE_TO_WIN}`;
+    this.statusEl.textContent = `Счёт 0 : 0 · 3:00 · до ${SCORE_TO_WIN}`;
     cancelAnimationFrame(this.raf);
     this.loop();
   }
@@ -126,8 +150,10 @@ export class AirHockey implements KeyConsumer {
     if (!this.isOpen) return;
     this.isOpen = false;
     this.over = false;
+    this.finaleShown = false;
     cancelAnimationFrame(this.raf);
     this.stopConfetti();
+    this.hideRematch();
     this.pointerId = null;
     this.pointerActive = false;
     this.root.classList.add("hidden");
@@ -142,7 +168,6 @@ export class AirHockey implements KeyConsumer {
     this.state = state;
     if (state.mySide) this.mySide = state.mySide;
 
-    // Первый стейт — сразу ставим шайбу/соперника, без долгого lerp из нулей.
     if (first) {
       if (Number.isFinite(state.puckX) && Number.isFinite(state.puckY)) {
         this.renderPuckX = state.puckX;
@@ -154,27 +179,43 @@ export class AirHockey implements KeyConsumer {
       }
     }
 
-    if (state.phase === "ended" && !this.over) {
-      this.over = true;
-      this.showFinale(state);
+    if (state.phase === "ended") {
+      if (!this.over) {
+        this.over = true;
+        this.showFinale(state, true);
+      } else {
+        this.showFinale(state, false);
+      }
+      this.updateRematchUi(state);
     } else if (state.phase === "playing") {
       this.over = false;
+      this.finaleShown = false;
+      this.hideRematch();
+      this.stopConfetti();
       const oppGone =
         (this.mySide === "red" && !state.blueConnected) ||
         (this.mySide === "blue" && !state.redConnected);
       const mine = this.mySide === "red" ? state.redScore : state.blueScore;
       const opp = this.mySide === "red" ? state.blueScore : state.redScore;
       this.statusEl.textContent =
-        `Счёт ${mine} : ${opp} · до ${SCORE_TO_WIN}` +
+        `Счёт ${mine} : ${opp} · ${formatMs(state.remainingMs)} · до ${SCORE_TO_WIN}` +
         (oppGone ? " · соперник вышел" : "");
     }
   }
 
-  static inviteText(): string {
-    return INVITE;
+  static inviteText(side: AirHockeySide): string {
+    return side === "red" ? INVITE_RED : INVITE_BLUE;
   }
 
-  private showFinale(state: AirHockeyStateView): void {
+  private oppLogin(state: AirHockeyStateView): string {
+    return (this.mySide === "red" ? state.blueLogin : state.redLogin) ?? "соперник";
+  }
+
+  private oppConnected(state: AirHockeyStateView): boolean {
+    return this.mySide === "red" ? state.blueConnected : state.redConnected;
+  }
+
+  private showFinale(state: AirHockeyStateView, first: boolean): void {
     const mine = this.mySide === "red" ? state.redScore : state.blueScore;
     const opp = this.mySide === "red" ? state.blueScore : state.redScore;
     const score = `${mine} : ${opp}`;
@@ -182,14 +223,61 @@ export class AirHockey implements KeyConsumer {
       (this.mySide === "red" && state.winnerSide === "red") ||
       (this.mySide === "blue" && state.winnerSide === "blue");
     if (!state.winnerSide) {
-      this.statusEl.textContent = `Ничья ${score}`;
+      this.statusEl.textContent = `Ничья ${score} · время вышло`;
     } else if (iWon) {
       this.statusEl.textContent = `Победа! ${score}`;
-      this.launchConfetti();
+      if (first && !this.finaleShown) {
+        this.finaleShown = true;
+        this.launchConfetti();
+      }
     } else {
       const name = state.winnerLogin ?? "соперник";
       this.statusEl.textContent = `Победил ${name}. ${score}`;
     }
+  }
+
+  private updateRematchUi(state: AirHockeyStateView): void {
+    if (!this.oppConnected(state)) {
+      this.hideRematch();
+      return;
+    }
+    const opp = this.oppLogin(state);
+    const by = state.rematchBy;
+    this.rematchActions.replaceChildren();
+    this.rematchRoot.classList.remove("hidden");
+
+    if (!by) {
+      this.rematchText.textContent = "";
+      this.rematchActions.append(
+        this.btn(`Предложить ${opp} сыграть ещё раз`, () => this.onRematchRequest?.()),
+      );
+      return;
+    }
+    if (by === this.mySide) {
+      this.rematchText.textContent = `Ожидание ответа от ${opp}`;
+      this.rematchActions.append(this.btn("Отмена", () => this.onRematchCancel?.()));
+      return;
+    }
+    this.rematchText.textContent = `Игрок ${opp} предлагает сыграть ещё раз`;
+    this.rematchActions.append(
+      this.btn("Да", () => this.onRematchRespond?.(true)),
+      this.btn("Нет", () => this.onRematchRespond?.(false)),
+    );
+  }
+
+  private btn(label: string, onClick: () => void): HTMLButtonElement {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "ttt-restart";
+    b.textContent = label;
+    b.onclick = onClick;
+    return b;
+  }
+
+  private hideRematch(): void {
+    this.rematchRoot.classList.add("hidden");
+    this.rematchActions.replaceChildren();
+    this.rematchText.textContent = "";
   }
 
   private loop = (): void => {
@@ -212,65 +300,42 @@ export class AirHockey implements KeyConsumer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    ctx.fillStyle = "#2a3038";
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = "#d8dde4";
-    roundRect(ctx, 8, 8, w - 16, h - 16, 18);
-    ctx.fill();
-
-    ctx.strokeStyle = "#e05555";
-    ctx.lineWidth = 3;
-    ctx.setLineDash([10, 8]);
-    ctx.beginPath();
-    ctx.moveTo(16, h / 2);
-    ctx.lineTo(w - 16, h / 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.strokeStyle = "#4a7fd4";
-    ctx.beginPath();
-    ctx.arc(w / 2, h / 2, 48, 0, Math.PI * 2);
-    ctx.stroke();
+    this.drawField(ctx, w, h);
 
     const myColor = this.mySide === "red" ? "#c94f4f" : "#4a7fd4";
     const oppColor = this.mySide === "red" ? "#4a7fd4" : "#c94f4f";
-    ctx.fillStyle = oppColor;
-    ctx.fillRect(w / 2 - GOAL_HALF, 0, GOAL_HALF * 2, 10);
-    ctx.fillStyle = myColor;
-    ctx.fillRect(w / 2 - GOAL_HALF, h - 10, GOAL_HALF * 2, 10);
+    const myPaddle = this.mySide === "red" ? this.paddleRedImg : this.paddleBlueImg;
+    const oppPaddle = this.mySide === "red" ? this.paddleBlueImg : this.paddleRedImg;
 
     const st = this.state;
     if (st) {
       if (Number.isFinite(st.puckX) && Number.isFinite(st.puckY)) {
-        this.renderPuckX += (st.puckX - this.renderPuckX) * 0.55;
-        this.renderPuckY += (st.puckY - this.renderPuckY) * 0.55;
+        // Пока ведём биту — не тянем шайбу обратно в биту серверным lerp.
+        if (!this.pointerActive) {
+          this.renderPuckX += (st.puckX - this.renderPuckX) * 0.55;
+          this.renderPuckY += (st.puckY - this.renderPuckY) * 0.55;
+        } else {
+          this.renderPuckX += (st.puckX - this.renderPuckX) * 0.2;
+          this.renderPuckY += (st.puckY - this.renderPuckY) * 0.2;
+        }
       }
       if (Number.isFinite(st.oppX) && Number.isFinite(st.oppY)) {
         this.renderOppX += (st.oppX - this.renderOppX) * 0.55;
         this.renderOppY += (st.oppY - this.renderOppY) * 0.55;
       }
     }
+    // Каждый кадр: шайба не должна рисоваться внутри своей биты.
+    if (!this.over) {
+      this.pushPuckOut(this.localX, this.localY, 0, -1);
+    }
 
     const oppConnected =
       this.mySide === "red" ? st?.blueConnected !== false : st?.redConnected !== false;
     if (oppConnected) {
-      drawPaddle(ctx, this.renderOppX, this.renderOppY, oppColor);
+      this.drawSprite(ctx, oppPaddle, this.renderOppX, this.renderOppY, PADDLE_DRAW, PADDLE_DRAW);
     }
-    drawPaddle(ctx, this.localX, this.localY, myColor);
-
-    // Шайба — крупный контрастный диск по центру, если стейта ещё нет.
-    ctx.fillStyle = "#1b1f24";
-    ctx.beginPath();
-    ctx.arc(this.renderPuckX, this.renderPuckY, PUCK_R, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#f4f1e8";
-    ctx.beginPath();
-    ctx.arc(this.renderPuckX, this.renderPuckY, PUCK_R * 0.4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#c94f4f";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(this.renderPuckX, this.renderPuckY, PUCK_R, 0, Math.PI * 2);
-    ctx.stroke();
+    this.drawSprite(ctx, myPaddle, this.localX, this.localY, PADDLE_DRAW, PADDLE_DRAW);
+    this.drawSprite(ctx, this.puckImg, this.renderPuckX, this.renderPuckY, PUCK_DRAW, PUCK_DRAW);
 
     const rs = st?.redScore ?? 0;
     const bs = st?.blueScore ?? 0;
@@ -285,6 +350,46 @@ export class AirHockey implements KeyConsumer {
     ctx.fillStyle = myColor;
     ctx.fillText(String(botScore), w / 2, h - 48);
     ctx.globalAlpha = 1;
+  }
+
+  /** Поле: для синего вида ассет с абсолютной разметкой крутим на 180°. */
+  private drawField(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    const img = this.fieldImg;
+    if (img.complete && img.naturalWidth > 0) {
+      if (this.mySide === "blue") {
+        ctx.save();
+        ctx.translate(w, h);
+        ctx.rotate(Math.PI);
+        ctx.drawImage(img, 0, 0, w, h);
+        ctx.restore();
+      } else {
+        ctx.drawImage(img, 0, 0, w, h);
+      }
+      return;
+    }
+    // Fallback, пока картинка грузится.
+    ctx.fillStyle = "#2a3038";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "#d8dde4";
+    ctx.fillRect(8, 8, w - 16, h - 16);
+  }
+
+  private drawSprite(
+    ctx: CanvasRenderingContext2D,
+    img: HTMLImageElement,
+    x: number,
+    y: number,
+    dw: number,
+    dh: number,
+  ): void {
+    if (img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, x - dw / 2, y - dh / 2, dw, dh);
+      return;
+    }
+    ctx.fillStyle = "#1b1f24";
+    ctx.beginPath();
+    ctx.arc(x, y, Math.min(dw, dh) / 2, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private onPointerDown = (e: PointerEvent): void => {
@@ -313,16 +418,68 @@ export class AirHockey implements KeyConsumer {
 
   private moveToPointer(e: PointerEvent): void {
     const p = this.canvasPos(e);
-    this.localX = clamp(p.x, PADDLE_R + 4, AH_W - PADDLE_R - 4);
-    this.localY = clamp(p.y, AH_H * 0.5 + PADDLE_R + 2, AH_H - PADDLE_R - 4);
+    const tx = clamp(p.x, PADDLE_R + 4, AH_W - PADDLE_R - 4);
+    const ty = clamp(p.y, AH_H * 0.5 + PADDLE_R + 2, AH_H - PADDLE_R - 4);
+    // Локально выталкиваем шайбу по пути биты — иначе курсор рисует биту
+    // поверх серверной шайбы и кажется, что бита проходит насквозь.
+    if (!this.over) {
+      this.sweepLocalPuck(this.localX, this.localY, tx, ty);
+    }
+    this.localX = tx;
+    this.localY = ty;
     this.onPaddle?.(this.localX, this.localY);
     this.lastSend = performance.now();
+  }
+
+  /** Проход биты от (ox,oy) к (nx,ny) с выталкиванием отрисованной шайбы. */
+  private sweepLocalPuck(ox: number, oy: number, nx: number, ny: number): void {
+    const dx = nx - ox;
+    const dy = ny - oy;
+    const travel = Math.hypot(dx, dy);
+    const steps = Math.max(1, Math.ceil(travel / 4));
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      this.pushPuckOut(ox + dx * t, oy + dy * t, dx, dy);
+    }
+  }
+
+  private pushPuckOut(px: number, py: number, moveX: number, moveY: number): void {
+    const minDist = PADDLE_R + PUCK_R;
+    let dx = this.renderPuckX - px;
+    let dy = this.renderPuckY - py;
+    let dist = Math.hypot(dx, dy);
+    if (dist >= minDist) return;
+
+    let nx: number;
+    let ny: number;
+    if (dist < 1e-6) {
+      nx = 0;
+      ny = -1;
+    } else {
+      nx = dx / dist;
+      ny = dy / dist;
+    }
+    const moveLen = Math.hypot(moveX, moveY);
+    if (moveLen > 1e-6) {
+      const mx = moveX / moveLen;
+      const my = moveY / moveLen;
+      if (nx * mx + ny * my < 0.35) {
+        nx += mx * 1.25;
+        ny += my * 1.25;
+        const nl = Math.hypot(nx, ny);
+        if (nl > 1e-6) {
+          nx /= nl;
+          ny /= nl;
+        }
+      }
+    }
+    this.renderPuckX = clamp(px + nx * minDist, PUCK_R, AH_W - PUCK_R);
+    this.renderPuckY = clamp(py + ny * minDist, PUCK_R, AH_H - PUCK_R);
   }
 
   private canvasPos(e: PointerEvent): { x: number; y: number } {
     const canvas = this.canvas;
     const rect = canvas.getBoundingClientRect();
-    // Без поворота сцены — прямое отображение в битмап (надёжнее для десктопа).
     if (!stage.rotated) {
       if (rect.width < 1 || rect.height < 1) return { x: AH_W / 2, y: AH_H * 0.78 };
       return {
@@ -330,7 +487,6 @@ export class AirHockey implements KeyConsumer {
         y: ((e.clientY - rect.top) / rect.height) * AH_H,
       };
     }
-    // Сцена повёрнута на 90°: AABB канваса осецентричен, смещение — через screenToStage.
     const local = screenToStage(
       e.clientX - (rect.left + rect.width / 2),
       e.clientY - (rect.top + rect.height / 2),
@@ -409,31 +565,9 @@ function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
 
-function roundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number, r: number,
-): void {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-}
-
-function drawPaddle(ctx: CanvasRenderingContext2D, x: number, y: number, color: string): void {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(x, y, PADDLE_R, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#f4f1e8";
-  ctx.beginPath();
-  ctx.arc(x, y, PADDLE_R * 0.35, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#1b1f24";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(x, y, PADDLE_R, 0, Math.PI * 2);
-  ctx.stroke();
+function formatMs(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
