@@ -162,8 +162,9 @@
       box-shadow: 0 10px 28px rgba(0,0,0,.45);
       font-size: 16px; line-height: 1.4; font-weight: bold;
     }
+    /* Плашка пинга — в углу модалки (arcade-frame), не на поле. */
     .ah-ping {
-      position: absolute; top: 10px; left: 12px; z-index: 6; pointer-events: none;
+      position: absolute; top: 12px; left: 14px; z-index: 6; pointer-events: none;
       display: flex; align-items: center; gap: 7px;
       background: rgba(38, 43, 51, .88); border: 2px solid #3a414c; border-radius: 8px;
       padding: 4px 9px; font-size: 12px;
@@ -180,6 +181,12 @@
     .ah-ping.good #ahPingText { color: #7ac07a; }
     .ah-ping.mid #ahPingText { color: #f9c74f; }
     .ah-ping.bad #ahPingText { color: #e05555; }
+    .ah-timer {
+      font-size: 30px; font-weight: bold; letter-spacing: 2px; line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .ah-timer.danger { color: #e05555; animation: ahTimerBlink 1s steps(2, start) infinite; }
+    @keyframes ahTimerBlink { 50% { opacity: .2; } }
     .arcade-frame { position: relative; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 24px 30px; display: flex; flex-direction: column; align-items: center; gap: 14px; box-shadow: 0 12px 44px rgba(0,0,0,.55); }
     .arcade-title { margin: 0; font-size: 22px; }
     .arcade-close { position: absolute; top: -16px; right: -16px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -1054,14 +1061,15 @@
         <button class="arcade-close" id="ahClose" aria-label="закрыть">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
-        <h2 class="arcade-title">Аэрохоккей</h2>
+        <h2 class="arcade-title">Bulba Hockey</h2>
+        <div id="ahPing" class="ah-ping hidden">
+          <span class="ah-ping-bars"><i></i><i></i><i></i></span>
+          <span id="ahPingText"></span>
+        </div>
+        <div class="ah-timer" id="ahTimer">3:00</div>
         <div class="ttt-status" id="ahStatus">Счёт 0 : 0</div>
         <div class="ah-board-wrap">
           <canvas id="ahCanvas" width="420" height="700"></canvas>
-          <div id="ahPing" class="ah-ping hidden">
-            <span class="ah-ping-bars"><i></i><i></i><i></i></span>
-            <span id="ahPingText"></span>
-          </div>
           <div id="ahGoal" class="ah-goal hidden">
             <div class="ah-goal-card" id="ahGoalText"></div>
           </div>

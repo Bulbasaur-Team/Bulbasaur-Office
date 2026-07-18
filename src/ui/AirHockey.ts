@@ -6,8 +6,8 @@ import type { KeyConsumer } from "./KeyboardRouter";
 export const AH_W = 420;
 export const AH_H = 700;
 
-const PADDLE_R = 34.2; // 29.75 × 1.15 — как на сервере
-const PUCK_R = 22.75; // 18.2 × 1.25 — как на сервере
+const PADDLE_R = 37.6; // 34.2 × 1.1 — как на сервере
+const PUCK_R = 25; // 22.75 × 1.1 — как на сервере
 /** Как на сервере: хитбокс чуть меньше из‑за прозрачных краёв спрайтов. */
 const CONTACT_SCALE = 0.9;
 const PADDLE_DRAW = PADDLE_R * 2;
@@ -85,6 +85,7 @@ export class AirHockey implements KeyConsumer {
   private goalText = document.getElementById("ahGoalText")!;
   private pingRoot = document.getElementById("ahPing")!;
   private pingText = document.getElementById("ahPingText")!;
+  private timerEl = document.getElementById("ahTimer")!;
 
   private fieldImg = loadImg("assets/airhockey/field.png");
   private paddleRedImg = loadImg("assets/airhockey/paddle-red.png");
@@ -150,8 +151,9 @@ export class AirHockey implements KeyConsumer {
     this.hideRematch();
     this.hideGoal();
     this.pingRoot.classList.add("hidden"); // покажем после первого замера
+    this.setTimer(3 * 60 * 1000, false);
     this.root.classList.remove("hidden");
-    this.statusEl.textContent = `Счёт 0 : 0 · 3:00 · до ${SCORE_TO_WIN}`;
+    this.statusEl.textContent = `Счёт 0 : 0 · до ${SCORE_TO_WIN}`;
     cancelAnimationFrame(this.raf);
     this.loop();
   }
@@ -202,6 +204,7 @@ export class AirHockey implements KeyConsumer {
 
     if (state.phase === "ended") {
       this.hideGoal();
+      this.setTimer(state.remainingMs, false);
       if (!this.over) {
         this.over = true;
         this.showFinale(state, true);
@@ -220,15 +223,21 @@ export class AirHockey implements KeyConsumer {
         (this.mySide === "blue" && !state.redConnected);
       const mine = this.mySide === "red" ? state.redScore : state.blueScore;
       const opp = this.mySide === "red" ? state.blueScore : state.redScore;
+      this.setTimer(state.remainingMs, true);
       if (state.goalFreezeMs > 0 && state.goalScorerLogin) {
-        this.statusEl.textContent =
-          `Гол! · ${formatMs(state.remainingMs)} · до ${SCORE_TO_WIN}`;
+        this.statusEl.textContent = `Гол! · до ${SCORE_TO_WIN}`;
       } else {
         this.statusEl.textContent =
-          `Счёт ${mine} : ${opp} · ${formatMs(state.remainingMs)} · до ${SCORE_TO_WIN}` +
+          `Счёт ${mine} : ${opp} · до ${SCORE_TO_WIN}` +
           (oppGone ? " · соперник вышел" : "");
       }
     }
+  }
+
+  /** Крупный таймер над полем; в последние 20 секунд матча мигает красным. */
+  private setTimer(remainingMs: number, playing: boolean): void {
+    this.timerEl.textContent = formatMs(remainingMs);
+    this.timerEl.classList.toggle("danger", playing && remainingMs <= 20_000);
   }
 
   static inviteText(side: AirHockeySide): string {
