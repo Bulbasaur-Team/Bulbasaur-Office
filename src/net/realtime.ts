@@ -151,6 +151,7 @@ export interface RealtimeHandlers {
   onAirHockeyLobby?: (lobby: AirHockeyLobbyView) => void;
   onAirHockeyState?: (state: AirHockeyStateView) => void;
   onAirHockeyError?: (message: string) => void;
+  onPing?: (rttMs: number) => void; // замер RTT до сервера
 }
 
 // Клиент реалтайма мультиплеера. Токен передаётся в query (браузерный WebSocket не
@@ -160,6 +161,7 @@ export class Realtime {
   private ws: WebSocket | null = null;
   private handlers: RealtimeHandlers = {};
   private closedByUs = false;
+  private pingTimer: ReturnType<typeof setInterval> | null = null;
 
   connect(handlers: RealtimeHandlers): void {
     this.handlers = handlers;
@@ -169,6 +171,7 @@ export class Realtime {
 
   disconnect(): void {
     this.closedByUs = true;
+    this.stopPing();
     this.ws?.close();
     this.ws = null;
   }
@@ -295,11 +298,29 @@ export class Realtime {
     const token = getToken() ?? "";
     const ws = new WebSocket(`${WS_BASE}?token=${encodeURIComponent(token)}`);
     this.ws = ws;
-    ws.addEventListener("open", () => this.handlers.onOpen?.());
+    ws.addEventListener("open", () => {
+      this.handlers.onOpen?.();
+      this.startPing();
+    });
     ws.addEventListener("message", (e) => this.dispatch(JSON.parse(e.data)));
     ws.addEventListener("close", () => {
+      this.stopPing();
       if (!this.closedByUs) setTimeout(() => this.open(), RECONNECT_DELAY);
     });
+  }
+
+  private startPing(): void {
+    this.stopPing();
+    const sendPing = () => this.send({ type: "ping", t: Date.now() });
+    sendPing();
+    this.pingTimer = setInterval(sendPing, 2000);
+  }
+
+  private stopPing(): void {
+    if (this.pingTimer != null) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = null;
+    }
   }
 
   private dispatch(msg: any): void {
@@ -344,6 +365,7 @@ export class Realtime {
         this.handlers.onAirHockeyState?.(parseAirHockeyState(msg));
         break;
       case "airhockeyError": this.handlers.onAirHockeyError?.(msg.message); break;
+      case "pong": this.handlers.onPing?.(Math.max(0, Date.now() - Number(msg.t ?? 0))); break;
     }
   }
 

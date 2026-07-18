@@ -6,7 +6,7 @@ import type { KeyConsumer } from "./KeyboardRouter";
 export const AH_W = 420;
 export const AH_H = 700;
 
-const PADDLE_R = 29.75; // 35 × 0.85
+const PADDLE_R = 34.2; // 29.75 × 1.15 — как на сервере
 const PUCK_R = 22.75; // 18.2 × 1.25 — как на сервере
 /** Как на сервере: хитбокс чуть меньше из‑за прозрачных краёв спрайтов. */
 const CONTACT_SCALE = 0.9;
@@ -83,6 +83,8 @@ export class AirHockey implements KeyConsumer {
   private rematchActions = document.getElementById("ahRematchActions")!;
   private goalRoot = document.getElementById("ahGoal")!;
   private goalText = document.getElementById("ahGoalText")!;
+  private pingRoot = document.getElementById("ahPing")!;
+  private pingText = document.getElementById("ahPingText")!;
 
   private fieldImg = loadImg("assets/airhockey/field.png");
   private paddleRedImg = loadImg("assets/airhockey/paddle-red.png");
@@ -147,6 +149,7 @@ export class AirHockey implements KeyConsumer {
     this.stopConfetti();
     this.hideRematch();
     this.hideGoal();
+    this.pingRoot.classList.add("hidden"); // покажем после первого замера
     this.root.classList.remove("hidden");
     this.statusEl.textContent = `Счёт 0 : 0 · 3:00 · до ${SCORE_TO_WIN}`;
     cancelAnimationFrame(this.raf);
@@ -164,9 +167,19 @@ export class AirHockey implements KeyConsumer {
     this.hideGoal();
     this.pointerId = null;
     this.pointerActive = false;
+    this.pingRoot.classList.add("hidden");
     this.root.classList.add("hidden");
     this.onLeave?.();
     this.onClose?.();
+  }
+
+  /** Обновляет плашку пинга: зелёный ≤80 мс, жёлтый ≤180 мс, дальше красный. */
+  setPing(rttMs: number): void {
+    if (!this.isOpen) return;
+    const cls = rttMs <= 80 ? "good" : rttMs <= 180 ? "mid" : "bad";
+    this.pingRoot.classList.remove("hidden", "good", "mid", "bad");
+    this.pingRoot.classList.add(cls);
+    this.pingText.textContent = `${Math.round(rttMs)} мс`;
   }
 
   onState(state: AirHockeyStateView): void {
@@ -346,12 +359,11 @@ export class AirHockey implements KeyConsumer {
           // После гола шайба мягко едет в центр, без телепорта.
           this.renderPuckX += (AH_W * 0.5 - this.renderPuckX) * 0.18;
           this.renderPuckY += (AH_H * 0.5 - this.renderPuckY) * 0.18;
-        } else if (!this.pointerActive) {
-          this.renderPuckX += (st.puckX - this.renderPuckX) * 0.45;
-          this.renderPuckY += (st.puckY - this.renderPuckY) * 0.45;
         } else {
-          this.renderPuckX += (st.puckX - this.renderPuckX) * 0.2;
-          this.renderPuckY += (st.puckY - this.renderPuckY) * 0.2;
+          // Быстрая сходимость к серверу: после удара шайба сразу «отлетает»,
+          // медленный лерп визуально выглядел как прилипание к бите.
+          this.renderPuckX += (st.puckX - this.renderPuckX) * 0.5;
+          this.renderPuckY += (st.puckY - this.renderPuckY) * 0.5;
         }
       }
       if (Number.isFinite(st.oppX) && Number.isFinite(st.oppY)) {

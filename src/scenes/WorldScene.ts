@@ -611,6 +611,7 @@ export class WorldScene extends Phaser.Scene {
         }
       },
       onAirHockeyError: (message) => console.warn("Аэрохоккей:", message),
+      onPing: (rttMs) => this.airHockey.setPing(rttMs),
     });
   }
 
