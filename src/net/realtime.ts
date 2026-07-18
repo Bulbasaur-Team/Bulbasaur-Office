@@ -92,6 +92,36 @@ export interface ProjectorStateView {
   index: number;
 }
 
+export type AirHockeySide = "red" | "blue";
+
+export interface AirHockeyLobbyView {
+  redSessionId: string | null;
+  redLogin: string | null;
+  blueSessionId: string | null;
+  blueLogin: string | null;
+  phase: string;
+}
+
+export interface AirHockeyStateView {
+  phase: string;
+  mySide: AirHockeySide | null;
+  redScore: number;
+  blueScore: number;
+  remainingMs: number;
+  puckX: number;
+  puckY: number;
+  myX: number;
+  myY: number;
+  oppX: number;
+  oppY: number;
+  redLogin: string | null;
+  blueLogin: string | null;
+  redConnected: boolean;
+  blueConnected: boolean;
+  winnerSide: AirHockeySide | null;
+  winnerLogin: string | null;
+}
+
 export interface RealtimeHandlers {
   onOpen?: () => void; // соединение открыто (в т.ч. после реконнекта) — здесь шлём join
   onSnapshot?: (players: RemoteState[]) => void;
@@ -115,6 +145,9 @@ export interface RealtimeHandlers {
   onPokerError?: (message: string) => void;
   onProjectorState?: (state: ProjectorStateView) => void;
   onAchievement?: (code: string, title: string, description: string, image: string) => void; // выдана ачивка
+  onAirHockeyLobby?: (lobby: AirHockeyLobbyView) => void;
+  onAirHockeyState?: (state: AirHockeyStateView) => void;
+  onAirHockeyError?: (message: string) => void;
 }
 
 // Клиент реалтайма мультиплеера. Токен передаётся в query (браузерный WebSocket не
@@ -231,6 +264,18 @@ export class Realtime {
     this.send({ type: "projectorIndex", index });
   }
 
+  airhockeyJoin(side: AirHockeySide): void {
+    this.send({ type: "airhockeyJoin", side });
+  }
+
+  airhockeyLeave(): void {
+    this.send({ type: "airhockeyLeave" });
+  }
+
+  airhockeyPaddle(x: number, y: number): void {
+    this.send({ type: "airhockeyPaddle", x, y });
+  }
+
   private open(): void {
     const token = getToken() ?? "";
     const ws = new WebSocket(`${WS_BASE}?token=${encodeURIComponent(token)}`);
@@ -271,6 +316,19 @@ export class Realtime {
         });
         break;
       case "achievement": this.handlers.onAchievement?.(msg.code, msg.title, msg.description, msg.image); break;
+      case "airhockeyLobby":
+        this.handlers.onAirHockeyLobby?.({
+          redSessionId: msg.redSessionId ?? null,
+          redLogin: msg.redLogin ?? null,
+          blueSessionId: msg.blueSessionId ?? null,
+          blueLogin: msg.blueLogin ?? null,
+          phase: msg.phase ?? "idle",
+        });
+        break;
+      case "airhockeyState":
+        this.handlers.onAirHockeyState?.(parseAirHockeyState(msg));
+        break;
+      case "airhockeyError": this.handlers.onAirHockeyError?.(msg.message); break;
     }
   }
 
@@ -279,4 +337,74 @@ export class Realtime {
       this.ws.send(JSON.stringify(payload));
     }
   }
+}
+
+/** Поле аэрохоккея (как на сервере). Нужно только для legacy-стейта. */
+const AH_W = 420;
+const AH_H = 700;
+
+/**
+ * Сервер шлёт плоские координаты ВИДА (my/opp/puck).
+ * Старый формат с redPaddle/bluePaddle/puck в абсолюте — конвертим на клиенте.
+ */
+function parseAirHockeyState(msg: any): AirHockeyStateView {
+  const mySide: AirHockeySide | null = msg.mySide ?? null;
+  const base = {
+    phase: msg.phase ?? "idle",
+    mySide,
+    redScore: msg.redScore ?? 0,
+    blueScore: msg.blueScore ?? 0,
+    remainingMs: msg.remainingMs ?? 0,
+    redLogin: msg.redLogin ?? null,
+    blueLogin: msg.blueLogin ?? null,
+    redConnected: msg.redConnected !== false,
+    blueConnected: msg.blueConnected !== false,
+    winnerSide: msg.winnerSide ?? null,
+    winnerLogin: msg.winnerLogin ?? null,
+  };
+
+  // Новый протокол: уже вид получателя.
+  if (msg.puckX != null || msg.oppX != null || msg.myX != null) {
+    return {
+      ...base,
+      puckX: num(msg.puckX, AH_W * 0.5),
+      puckY: num(msg.puckY, AH_H * 0.5),
+      myX: num(msg.myX, AH_W * 0.5),
+      myY: num(msg.myY, AH_H * 0.78),
+      oppX: num(msg.oppX, AH_W * 0.5),
+      oppY: num(msg.oppY, AH_H * 0.22),
+    };
+  }
+
+  // Legacy: абсолютные nested-координаты → вид.
+  const flip = mySide === "blue";
+  const toView = (x: number, y: number) =>
+    flip ? { x: AH_W - x, y: AH_H - y } : { x, y };
+  const puck = toView(num(msg.puck?.x, AH_W * 0.5), num(msg.puck?.y, AH_H * 0.5));
+  const red = {
+    x: num(msg.redPaddle?.x, AH_W * 0.5),
+    y: num(msg.redPaddle?.y, AH_H * 0.78),
+  };
+  const blue = {
+    x: num(msg.bluePaddle?.x, AH_W * 0.5),
+    y: num(msg.bluePaddle?.y, AH_H * 0.22),
+  };
+  const me = mySide === "blue" ? blue : red;
+  const opp = mySide === "blue" ? red : blue;
+  const meV = toView(me.x, me.y);
+  const oppV = toView(opp.x, opp.y);
+  return {
+    ...base,
+    puckX: puck.x,
+    puckY: puck.y,
+    myX: meV.x,
+    myY: meV.y,
+    oppX: oppV.x,
+    oppY: oppV.y,
+  };
+}
+
+function num(v: unknown, fallback: number): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
 }

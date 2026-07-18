@@ -19,6 +19,7 @@ import { BulbaGuess } from "../ui/BulbaGuess";
 import { BulbaWordle } from "../ui/BulbaWordle";
 import { BulbaColors } from "../ui/BulbaColors";
 import { BulbaSurki } from "../ui/BulbaSurki";
+import { AirHockey, type AirHockeySide } from "../ui/AirHockey";
 import { KeyboardRouter } from "../ui/KeyboardRouter";
 import { showCharacterSelect } from "../ui/CharacterSelect";
 import { showModeSelect } from "../ui/ModeSelect";
@@ -140,6 +141,7 @@ export class WorldScene extends Phaser.Scene {
   private bulbaWordle!: BulbaWordle;
   private bulbaColors!: BulbaColors;
   private bulbaSurki!: BulbaSurki;
+  private airHockey!: AirHockey;
   private poker!: PlanningPoker;
   private authGate!: AuthGate;
   private leaderboard!: Leaderboard;
@@ -186,6 +188,10 @@ export class WorldScene extends Phaser.Scene {
   private projectorRect: Rect | null = null;     // зона проектора в главном офисе (объект "projector")
   private easelRect: Rect | null = null;         // мольберт Bulba Colors в главном офисе (объект "easel")
   private surkiRect: Rect | null = null;         // автомат Bulba Surki в чилл-зоне (объект "bulbasurki")
+  private airhockeyRedRect: Rect | null = null;  // красная сторона аэрохоккея (объект "airhockey-red")
+  private airhockeyBlueRect: Rect | null = null; // синяя сторона аэрохоккея (объект "airhockey-blue")
+  private airHockeyWaiting: AirHockeySide | null = null; // ждём соперника у стола
+  private airHockeyInviteIds = new Set<string>(); // sessionId с облачком приглашения
   private wallClock: WallClock | null = null;    // настенные часы (точка "clock" в interactions)
   private menu!: LocationMenu;
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
@@ -262,10 +268,13 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaWordle = new BulbaWordle();
     this.bulbaColors = new BulbaColors();
     this.bulbaSurki = new BulbaSurki();
+    this.airHockey = new AirHockey();
     // Закрытие fullscreen-аркады будит Phaser: update() во сне не крутится.
-    for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaTanks, this.bulbaGuess, this.bulbaWordle, this.bulbaSurki]) {
+    for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaTanks, this.bulbaGuess, this.bulbaWordle, this.bulbaSurki, this.airHockey]) {
       g.onClose = () => this.setPhaserAsleep(false);
     }
+    this.airHockey.onLeave = () => this.realtime.airhockeyLeave();
+    this.airHockey.onPaddle = (x, y) => this.realtime.airhockeyPaddle(x, y);
 
     // По завершении партии игра отдаёт результат — отправляем его и показываем лидерборд.
     this.leaderboard = new Leaderboard(GAMES);
@@ -375,6 +384,7 @@ export class WorldScene extends Phaser.Scene {
     // разбираются в update() — там Space и Enter равноценны.
     this.router.register(this.slides);
     this.router.register(this.poker);
+    this.router.register(this.airHockey);
     this.router.register(this.slidePicker);
     this.router.register(this.dialogue);
     this.router.register(this.gameMenu);
@@ -585,6 +595,18 @@ export class WorldScene extends Phaser.Scene {
       onPokerError: (message) => this.poker.onError(message),
       onProjectorState: (state) => this.applyProjectorState(state.on, state.ownerId, state.index),
       onAchievement: (_code, title, description, image) => this.achievementPopup.show(title, description, image),
+      onAirHockeyLobby: (lobby) => this.applyAirHockeyLobby(lobby),
+      onAirHockeyState: (state) => {
+        if (state.phase === "playing" || state.phase === "ended") {
+          this.airHockeyWaiting = null;
+          if (!this.airHockey.isOpen && state.mySide) {
+            this.airHockey.open(state.mySide);
+            this.setPhaserAsleep(true);
+          }
+          this.airHockey.onState(state);
+        }
+      },
+      onAirHockeyError: (message) => console.warn("Аэрохоккей:", message),
     });
   }
 
@@ -731,6 +753,8 @@ export class WorldScene extends Phaser.Scene {
     this.projectorRect = rects.get("projector") ?? null;
     this.easelRect = rects.get("easel") ?? null;
     this.surkiRect = rects.get("bulbasurki") ?? null;
+    this.airhockeyRedRect = this.multiplayer ? rects.get("airhockey-red") ?? null : null;
+    this.airhockeyBlueRect = this.multiplayer ? rects.get("airhockey-blue") ?? null : null;
     this.wallClock?.destroy();
     this.wallClock = null;
     const clockAt = interactions.get("clock");
@@ -783,6 +807,7 @@ export class WorldScene extends Phaser.Scene {
       this.computer.isOpen ||
       this.laptop.isOpen ||
       this.poker.isOpen ||
+      this.airHockey.isOpen ||
       this.slidePicker.isOpen ||
       this.slides.isOpen
     );
@@ -809,6 +834,12 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private goTo(to: number): void {
+    if (this.airHockey.isOpen) this.airHockey.close();
+    else if (this.airHockeyWaiting) {
+      this.realtime.airhockeyLeave();
+      this.airHockeyWaiting = null;
+      this.bubble.hide();
+    }
     this.showExit(null);
     this.loadLocation(to, LOCATIONS[this.locIndex].id);
     if (this.multiplayer) {
@@ -940,6 +971,18 @@ export class WorldScene extends Phaser.Scene {
         this.surkiRect.x + this.surkiRect.w / 2,
         this.surkiRect.y + this.surkiRect.h,
       );
+    } else if (this.airhockeyRedRect && this.nearRect(this.airhockeyRedRect)) {
+      this.showPrompt(
+        "Пробел / Enter — аэрохоккей (красная сторона)",
+        this.airhockeyRedRect.x + this.airhockeyRedRect.w / 2,
+        this.airhockeyRedRect.y + this.airhockeyRedRect.h,
+      );
+    } else if (this.airhockeyBlueRect && this.nearRect(this.airhockeyBlueRect)) {
+      this.showPrompt(
+        "Пробел / Enter — аэрохоккей (синяя сторона)",
+        this.airhockeyBlueRect.x + this.airhockeyBlueRect.w / 2,
+        this.airhockeyBlueRect.y + this.airhockeyBlueRect.h,
+      );
     } else {
       // У столов с ноутбуками зона NPC и ноутбука пересекаются — берём то, что ближе.
       const nearLaptop = this.nearestLaptop();
@@ -1056,6 +1099,14 @@ export class WorldScene extends Phaser.Scene {
     if (this.surkiRect && this.nearRect(this.surkiRect)) {
       this.bulbaSurki.open();
       this.setPhaserAsleep(true);
+      return true;
+    }
+    if (this.airhockeyRedRect && this.nearRect(this.airhockeyRedRect)) {
+      this.joinAirHockey("red");
+      return true;
+    }
+    if (this.airhockeyBlueRect && this.nearRect(this.airhockeyBlueRect)) {
+      this.joinAirHockey("blue");
       return true;
     }
     {
@@ -1205,6 +1256,52 @@ export class WorldScene extends Phaser.Scene {
     if (this.slides.isOpen) {
       if (sameDeck) this.slides.syncIndex(index);
       else this.slides.syncDeck(paths, index);
+    }
+  }
+
+  private joinAirHockey(side: AirHockeySide): void {
+    if (!this.multiplayer) return;
+    // Повторный пробел на той же стороне — отмена ожидания.
+    if (this.airHockeyWaiting === side) {
+      this.realtime.airhockeyLeave();
+      return;
+    }
+    this.realtime.airhockeyJoin(side);
+  }
+
+  private applyAirHockeyLobby(lobby: {
+    redSessionId: string | null;
+    redLogin: string | null;
+    blueSessionId: string | null;
+    blueLogin: string | null;
+    phase: string;
+  }): void {
+    const invite = AirHockey.inviteText();
+    const next = new Set<string>();
+    if (lobby.redSessionId) next.add(lobby.redSessionId);
+    if (lobby.blueSessionId) next.add(lobby.blueSessionId);
+    for (const id of this.airHockeyInviteIds) {
+      if (!next.has(id)) this.remotePlayers.get(id)?.hideBubble();
+    }
+    for (const id of next) {
+      this.remotePlayers.get(id)?.showInvite(invite);
+    }
+    this.airHockeyInviteIds = next;
+
+    const me = api.getLogin();
+    const mySide: AirHockeySide | null =
+      lobby.phase === "waiting" && lobby.redLogin === me ? "red"
+        : lobby.phase === "waiting" && lobby.blueLogin === me ? "blue"
+          : null;
+    if (mySide) {
+      this.airHockeyWaiting = mySide;
+      this.bubble.show(invite, this.player.x, this.player.y - TARGET_H * 0.95, undefined, () => ({
+        x: this.player.x,
+        y: this.player.y - TARGET_H * 0.95,
+      }));
+    } else if (this.airHockeyWaiting) {
+      this.airHockeyWaiting = null;
+      if (!this.airHockey.isOpen) this.bubble.hide();
     }
   }
 

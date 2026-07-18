@@ -80,6 +80,18 @@ export class RemotePlayer {
     }), EMOTE_FONT);
   }
 
+  /** Облачко приглашения в аэрохоккей — висит, пока не спрячем. */
+  showInvite(text: string): void {
+    this.bubble.show(text, this.sprite.x, this.sprite.y - this.targetH * 0.95, undefined, () => ({
+      x: this.sprite.x,
+      y: this.sprite.y - this.targetH * 0.95,
+    }));
+  }
+
+  hideBubble(): void {
+    this.bubble.hide();
+  }
+
   // Предмет в лапах: type — ключ ITEM_TYPES, null — руки пусты.
   setHeldItem(type: string | null): void {
     this.held?.destroy();

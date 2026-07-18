@@ -128,12 +128,14 @@
     /* Полноэкранное окно игры */
     /* safe center — второй строкой: если окно игры выше экрана, верх не уезжает
        за край (иначе flex-центрирование делает его недоступным для скролла). */
-    #bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; align-items: safe center; justify-content: center; padding: 24px; overflow: auto; }
+    #bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki, #airhockey { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; align-items: safe center; justify-content: center; padding: 24px; overflow: auto; }
     #bjCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 420 / 640; }
     #bpCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(600px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 600; }
     #bpkCanvas { background: #26303a; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 640; }
     #btCanvas { background: #101418; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 456 / 504; }
     #bsCanvas { background: #1a2430; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(560px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 560; cursor: none; }
+    #ahCanvas { background: #2a3038; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(700px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 420 / 700; touch-action: none; cursor: none; }
+    #ahConfetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
     .arcade-frame { position: relative; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 24px 30px; display: flex; flex-direction: column; align-items: center; gap: 14px; box-shadow: 0 12px 44px rgba(0,0,0,.55); }
     .arcade-title { margin: 0; font-size: 22px; }
     .arcade-close { position: absolute; top: -16px; right: -16px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -739,7 +741,7 @@
        а сцена может быть повёрнута на 90°). Классы ставит orientation.ts. */
     html.bp-640 h1 { font-size: 16px; margin: 6px 0 2px; }
     html.bp-640 #game canvas { border-width: 2px; }
-    html.bp-640 :is(#bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki, #slides) { padding: 10px; }
+    html.bp-640 :is(#bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki, #airhockey, #slides) { padding: 10px; }
     html.bp-640 #bcRef { width: 96px; height: 96px; }
     html.bp-640 .bc-options { gap: 10px; width: min(240px, calc(var(--sw) * .78)); }
     html.bp-640 .arcade-frame { padding: 16px 14px; gap: 10px; }
@@ -999,6 +1001,18 @@
             <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
           </button>
         </div>
+      </div>
+    </div>
+
+    <div id="airhockey" class="hidden">
+      <canvas id="ahConfetti"></canvas>
+      <div class="arcade-frame">
+        <button class="arcade-close" id="ahClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <h2 class="arcade-title">Аэрохоккей</h2>
+        <div class="ttt-status" id="ahStatus">Счёт 0 : 0</div>
+        <canvas id="ahCanvas" width="420" height="700"></canvas>
       </div>
     </div>
 

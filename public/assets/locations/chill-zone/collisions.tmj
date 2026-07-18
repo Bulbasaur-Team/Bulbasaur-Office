@@ -440,18 +440,6 @@
                  "y":22.852245947297
                 }, 
                 {
-                 "height":75.4716981132075,
-                 "id":223,
-                 "name":"",
-                 "opacity":1,
-                 "rotation":0,
-                 "type":"",
-                 "visible":true,
-                 "width":173.241852487135,
-                 "x":99.9142367066896,
-                 "y":203.68782161235
-                }, 
-                {
                  "height":32.7487396044297,
                  "id":225,
                  "name":"",
@@ -462,10 +450,22 @@
                  "width":34.472357478347,
                  "x":33.6105485413884,
                  "y":156.849226526479
+                }, 
+                {
+                 "height":71.071953010279,
+                 "id":239,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":162.701908957416,
+                 "x":99.8531571218796,
+                 "y":203.230543318649
                 }],
          "opacity":1,
          "type":"objectgroup",
-         "visible":false,
+         "visible":true,
          "x":0,
          "y":0
         }, 
@@ -584,10 +584,34 @@
                  "width":0,
                  "x":179.735682819383,
                  "y":72.8340675477239
+                }, 
+                {
+                 "height":98.6784140969163,
+                 "id":236,
+                 "name":"airhockey-blue",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":45.8149779735683,
+                 "x":214.977973568282,
+                 "y":186.196769456681
+                }, 
+                {
+                 "height":99.2657856093979,
+                 "id":238,
+                 "name":"airhockey-red",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":51.6886930983847,
+                 "x":93.3920704845815,
+                 "y":186.784140969163
                 }],
          "opacity":1,
          "type":"objectgroup",
-         "visible":true,
+         "visible":false,
          "x":0,
          "y":0
         }, 
@@ -983,16 +1007,16 @@
                  "y":320.080862533693
                 }, 
                 {
-                 "height":119.988075719183,
+                 "height":110,
                  "id":207,
                  "name":"",
                  "opacity":1,
                  "rotation":0,
                  "type":"",
                  "visible":true,
-                 "width":180.3547473543,
-                 "x":88.6868385750484,
-                 "y":184.826352660605
+                 "width":320,
+                 "x":100,
+                 "y":160
                 }, 
                 {
                  "height":122.223878372336,
@@ -1168,7 +1192,7 @@
          "y":0
         }],
  "nextlayerid":9,
- "nextobjectid":230,
+ "nextobjectid":240,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",
