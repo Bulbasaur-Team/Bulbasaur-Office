@@ -1,12 +1,10 @@
 import Phaser from "phaser";
 import type { Character } from "../data/characters";
-import { pixelate } from "../entities/sprites";
 import { SAMPLE_SLIDES, slidePaths } from "./slides";
 
 // Прямоугольник экрана проектора в переговорке (мировые px фона).
 const SCREEN = { x: 166, y: 431, w: 170, h: 82 };
 const TEX_KEY = "projectorSlide";
-const BLOCK = 5; // размер «пикселя» слайда на экране, мировых px
 
 export class Projector {
   private image: Phaser.GameObjects.Image;
@@ -79,17 +77,23 @@ export class Projector {
     this.load();
   }
 
-  // Вписываем слайд в экран и пикселизуем (уменьшаем и растягиваем без сглаживания).
+  // Вписываем оригинал в экран со сглаживанием (pixelArt в Phaser иначе сделал бы nearest-neighbor).
   private draw(img: HTMLImageElement): void {
     const { naturalWidth: w, naturalHeight: h } = img;
     const fit = Math.min(SCREEN.w / w, SCREEN.h / h);
     const outW = Math.max(1, Math.round(w * fit));
     const outH = Math.max(1, Math.round(h * fit));
-    const lowW = Math.max(1, Math.round(outW / BLOCK));
-    const lowH = Math.max(1, Math.round(outH / BLOCK));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = outW;
+    canvas.height = outH;
+    const ctx = canvas.getContext("2d")!;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, outW, outH);
 
     if (this.scene.textures.exists(TEX_KEY)) this.scene.textures.remove(TEX_KEY);
-    this.scene.textures.addCanvas(TEX_KEY, pixelate(img, outW, outH, lowW, lowH));
+    this.scene.textures.addCanvas(TEX_KEY, canvas);
     this.image.setTexture(TEX_KEY);
   }
 
