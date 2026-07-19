@@ -7,7 +7,7 @@ alwaysApply: false
 # Контент и карты
 
 - Карты: `public/assets/locations/<id>/` — `background.png`, `overlay.png`, `collisions.tmj`
-- Interaction-типы из Tiled (`tv`, `printer`, `poker`, `coffee`, `computer`, `projector`, `easel`, `bulbasurki`, `clock`, `airhockey-red`, `airhockey-blue`, …) уже вяжутся в `WorldScene` — новые типы нужно явно подключить
+- Interaction-типы из Tiled (`tv`, `printer`, `poker`, `coffee`, `computer`, `projector`, `easel`, `bulbapacker`, `bulbasurki`, `clock`, `airhockey-red`, `airhockey-blue`, …) уже вяжутся в `WorldScene` — новые типы нужно явно подключить
 - Точка `clock` — декоративные настенные часы (клиентское время браузера); ассеты в `public/assets/clock/`
 - ID локаций: kebab-case (`main-office`, `chill-zone`)
 - Роли/эмоты: коды как на бэке (`DEV`, `DEV_FE`, `WAVE`, …)

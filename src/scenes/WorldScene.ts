@@ -188,6 +188,7 @@ export class WorldScene extends Phaser.Scene {
   private laptopRects: Rect[] = [];              // ноутбуки в главном офисе (laptop1..laptop4)
   private projectorRect: Rect | null = null;     // зона проектора в главном офисе (объект "projector")
   private easelRect: Rect | null = null;         // мольберт Bulba Colors в главном офисе (объект "easel")
+  private packerRect: Rect | null = null;        // склад Bulba Packer в кладовой главного офиса (объект "bulbapacker")
   private surkiRect: Rect | null = null;         // автомат Bulba Surki в чилл-зоне (объект "bulbasurki")
   private airhockeyRedRect: Rect | null = null;  // красная сторона аэрохоккея (объект "airhockey-red")
   private airhockeyBlueRect: Rect | null = null; // синяя сторона аэрохоккея (объект "airhockey-blue")
@@ -757,6 +758,7 @@ export class WorldScene extends Phaser.Scene {
       .filter((r): r is Rect => !!r);
     this.projectorRect = rects.get("projector") ?? null;
     this.easelRect = rects.get("easel") ?? null;
+    this.packerRect = rects.get("bulbapacker") ?? null;
     this.surkiRect = rects.get("bulbasurki") ?? null;
     this.airhockeyRedRect = this.multiplayer ? rects.get("airhockey-red") ?? null : null;
     this.airhockeyBlueRect = this.multiplayer ? rects.get("airhockey-blue") ?? null : null;
@@ -821,7 +823,6 @@ export class WorldScene extends Phaser.Scene {
   private openGame(id: string): void {
     this.gameMenu.close();
     if (id === "bulbajump") this.bulbaJump.open(this.chosen.sprite);
-    else if (id === "bulbapacker") this.bulbaPacker.open();
     else if (id === "bulbaparking") this.bulbaParking.open();
     else if (id === "bulbatanks") this.bulbaTanks.open();
     else if (id === "bulbaguess") void this.bulbaGuess.open();
@@ -970,6 +971,12 @@ export class WorldScene extends Phaser.Scene {
         this.easelRect.x + this.easelRect.w / 2,
         this.easelRect.y + this.easelRect.h,
       );
+    } else if (this.packerRect && this.nearRect(this.packerRect)) {
+      this.showPrompt(
+        "Пробел / Enter — сыграть в Bulba Packer",
+        this.packerRect.x + this.packerRect.w / 2,
+        this.packerRect.y + this.packerRect.h,
+      );
     } else if (this.surkiRect && this.nearRect(this.surkiRect)) {
       this.showPrompt(
         "Пробел / Enter — сыграть в Bulba Surki",
@@ -1067,8 +1074,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // Действие по Space/Enter рядом с объектом. Приоритет: предмет в лапах (поставить) →
-  // взять предмет → проектор → мольберт → автомат Surki → ноутбук/NPC (кто ближе) → телевизор →
-  // стена предков → принтер → мониторы → покер → компьютер → выдача кофе → дверь.
+  // взять предмет → проектор → мольберт → склад Packer → автомат Surki → ноутбук/NPC (кто ближе) →
+  // телевизор → стена предков → принтер → мониторы → покер → компьютер → выдача кофе → дверь.
   // Взятие идёт раньше стационарных объектов: иначе чашку, стоящую на столе покера, было
   // бы не поднять — тем же пробелом открывался бы покер.
   private tryInteract(): boolean {
@@ -1099,6 +1106,11 @@ export class WorldScene extends Phaser.Scene {
     }
     if (this.easelRect && this.nearRect(this.easelRect)) {
       this.bulbaColors.open();
+      return true;
+    }
+    if (this.packerRect && this.nearRect(this.packerRect)) {
+      this.bulbaPacker.open();
+      this.setPhaserAsleep(true);
       return true;
     }
     if (this.surkiRect && this.nearRect(this.surkiRect)) {

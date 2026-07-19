@@ -1666,7 +1666,7 @@
                 }],
          "opacity":1,
          "type":"objectgroup",
-         "visible":true,
+         "visible":false,
          "x":0,
          "y":0
         }, 
@@ -1746,7 +1746,21 @@
                  "width":59.4811523577469,
                  "x":207.825713057188,
                  "y":255.840619177297
+                }, 
+                {
+                 "height":20.1987557566454,
+                 "id":667,
+                 "name":"bulbapacker",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":562.333360265008,
+                 "x":778.120755371309,
+                 "y":183.168825863944
                 }],
+         "offsetx":-30.7667923754295,
+         "offsety":34.1697860775603,
          "opacity":1,
          "type":"objectgroup",
          "visible":true,
@@ -1754,7 +1768,7 @@
          "y":0
         }],
  "nextlayerid":10,
- "nextobjectid":666,
+ "nextobjectid":668,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",
