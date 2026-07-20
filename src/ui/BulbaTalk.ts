@@ -1,6 +1,7 @@
 import { publicPath } from "../publicPath";
 
 const CHAR_DELAY = 25;
+const BOSS_CHAR_DELAY = 50;
 const LINE_HOLD_MS = 900;
 const AFTER_PLAYER_MS = 500;
 
@@ -108,7 +109,7 @@ const CALLS: CallDef[] = [
   },
 ];
 
-function typeText(el: HTMLElement, text: string, onDone: () => void): () => void {
+function typeText(el: HTMLElement, text: string, onDone: () => void, delay = CHAR_DELAY): () => void {
   let shown = 0;
   el.textContent = "";
   const timer = window.setInterval(() => {
@@ -118,7 +119,7 @@ function typeText(el: HTMLElement, text: string, onDone: () => void): () => void
       window.clearInterval(timer);
       onDone();
     }
-  }, CHAR_DELAY);
+  }, delay);
   return () => window.clearInterval(timer);
 }
 
@@ -403,7 +404,7 @@ export class BulbaTalk {
         continue;
       }
       bubble.classList.remove("hidden");
-      cancels.push(typeText(textEl, line.text, onAllTyped));
+      cancels.push(typeText(textEl, line.text, onAllTyped, BOSS_CHAR_DELAY));
     }
 
     this.cancelTyping = () => {
