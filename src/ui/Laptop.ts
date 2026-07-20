@@ -1,4 +1,7 @@
-type AppId = "claude" | "cursor";
+import { BulbaTalk } from "./BulbaTalk";
+
+type ChatAppId = "claude" | "cursor";
+type AppId = ChatAppId | "bulbatalk";
 
 interface RefusalPool {
   full: readonly string[];
@@ -137,7 +140,7 @@ const CURSOR_POOL: RefusalPool = {
   ],
 };
 
-const REFUSAL_POOLS: Record<AppId, RefusalPool> = {
+const REFUSAL_POOLS: Record<ChatAppId, RefusalPool> = {
   claude: CLAUDE_POOL,
   cursor: CURSOR_POOL,
 };
@@ -146,8 +149,12 @@ function pick<T>(items: readonly T[]): T {
   return items[Math.floor(Math.random() * items.length)]!;
 }
 
+function isChatApp(app: AppId): app is ChatAppId {
+  return app === "claude" || app === "cursor";
+}
+
 // Случайный отказ для конкретного приложения: готовая фраза или сборка из кусков.
-function inventRefusal(app: AppId): string {
+function inventRefusal(app: ChatAppId): string {
   const pool = REFUSAL_POOLS[app];
   const roll = Math.random();
   if (roll < 0.22) return pick(pool.full);
@@ -157,7 +164,7 @@ function inventRefusal(app: AppId): string {
   return `${pick(pool.hooks)} ${pick(pool.reasons)} ${pick(pool.closers)} ${pick(pool.closers)}`;
 }
 
-const APP_META: Record<AppId, { title: string; placeholder: string; hello: string }> = {
+const APP_META: Record<ChatAppId, { title: string; placeholder: string; hello: string }> = {
   claude: {
     title: "Claude",
     placeholder: "Спроси Клода о чём угодно…",
@@ -182,7 +189,7 @@ function blankSession(): AppSession {
 }
 
 // Ноутбуки в главном офисе: корпус в духе MacBook, рабочий стол macOS,
-// ярлыки Claude / Cursor открывают фейковый чат LLM (без бэкенда).
+// ярлыки Claude / Cursor / BulbaTalk (без бэкенда).
 export class Laptop {
   isOpen = false;
 
@@ -198,23 +205,27 @@ export class Laptop {
   private sendBtn = document.getElementById("macChatSend") as HTMLButtonElement;
   private dockClaude = document.getElementById("macDockClaude")!;
   private dockCursor = document.getElementById("macDockCursor")!;
+  private dockBulbaTalk = document.getElementById("macDockBulbaTalk")!;
   private clockTimer = 0;
   private replyTimer = 0;
   /** Какое окно сейчас на переднем плане (даже если свёрнуто в Dock). */
   private foreground: AppId | null = null;
-  private sessions: Record<AppId, AppSession> = {
+  private sessions: Record<ChatAppId, AppSession> = {
     claude: blankSession(),
     cursor: blankSession(),
   };
   private busy = false;
+  private bulbaTalk = new BulbaTalk(() => this.closeForegroundApp());
 
   constructor() {
     const openShortcut = (app: AppId) => () => this.openApp(app);
 
     document.getElementById("macShortcutClaude")!.onclick = openShortcut("claude");
     document.getElementById("macShortcutCursor")!.onclick = openShortcut("cursor");
+    document.getElementById("macShortcutBulbaTalk")!.onclick = openShortcut("bulbatalk");
     this.dockClaude.onclick = openShortcut("claude");
     this.dockCursor.onclick = openShortcut("cursor");
+    this.dockBulbaTalk.onclick = openShortcut("bulbatalk");
     document.getElementById("macChatClose")!.onclick = () => this.closeForegroundApp();
     document.getElementById("macChatMin")!.onclick = () => this.minimizeWindow();
     document.getElementById("macChatMax")!.onclick = () => this.toggleMaximize();
@@ -280,6 +291,14 @@ export class Laptop {
     // Другое приложение открыто — сохранить его (в т.ч. точку в Dock) и переключиться.
     this.stashForeground();
 
+    if (app === "bulbatalk") {
+      const fresh = !this.bulbaTalk.running;
+      this.foreground = "bulbatalk";
+      this.bulbaTalk.open(fresh);
+      this.syncDockRunning();
+      return;
+    }
+
     if (this.sessions[app].running) {
       this.showSession(app, false);
       return;
@@ -294,6 +313,13 @@ export class Laptop {
   // Сохранить состояние текущего окна, оставить приложение «запущенным» в Dock.
   private stashForeground(): void {
     if (!this.foreground) return;
+
+    if (this.foreground === "bulbatalk") {
+      this.bulbaTalk.stash();
+      this.foreground = null;
+      return;
+    }
+
     window.clearTimeout(this.replyTimer);
     this.busy = false;
     this.sendBtn.disabled = false;
@@ -307,10 +333,11 @@ export class Laptop {
     session.maximized = this.windowEl.classList.contains("is-maximized");
     session.messagesHtml = this.messagesEl.innerHTML;
     session.draft = this.input.value;
+    this.windowEl.classList.add("hidden");
     this.foreground = null;
   }
 
-  private showSession(app: AppId, fresh: boolean): void {
+  private showSession(app: ChatAppId, fresh: boolean): void {
     const session = this.sessions[app];
     const meta = APP_META[app];
     this.foreground = app;
@@ -337,6 +364,14 @@ export class Laptop {
   // Красная кнопка: закрыть только текущее приложение, второе остаётся в Dock.
   private closeForegroundApp(): void {
     if (!this.foreground) return;
+
+    if (this.foreground === "bulbatalk") {
+      this.bulbaTalk.close();
+      this.foreground = null;
+      this.syncDockRunning();
+      return;
+    }
+
     window.clearTimeout(this.replyTimer);
     this.busy = false;
     this.sendBtn.disabled = false;
@@ -355,6 +390,7 @@ export class Laptop {
     this.sendBtn.disabled = false;
     this.sessions.claude = blankSession();
     this.sessions.cursor = blankSession();
+    this.bulbaTalk.close();
     this.foreground = null;
     this.windowEl.classList.add("hidden");
     this.windowEl.classList.remove("is-minimized", "is-maximized");
@@ -364,7 +400,13 @@ export class Laptop {
   }
 
   private minimizeWindow(): void {
-    if (!this.foreground || this.windowEl.classList.contains("hidden")) return;
+    if (!this.foreground) return;
+    if (this.foreground === "bulbatalk") {
+      this.bulbaTalk.minimize();
+      this.syncDockRunning();
+      return;
+    }
+    if (this.windowEl.classList.contains("hidden")) return;
     this.sessions[this.foreground].maximized = false;
     this.windowEl.classList.add("is-minimized");
     this.windowEl.classList.remove("is-maximized");
@@ -372,7 +414,12 @@ export class Laptop {
   }
 
   private toggleMaximize(): void {
-    if (!this.foreground || this.windowEl.classList.contains("hidden")) return;
+    if (!this.foreground) return;
+    if (this.foreground === "bulbatalk") {
+      this.bulbaTalk.toggleMaximize();
+      return;
+    }
+    if (this.windowEl.classList.contains("hidden")) return;
     if (this.windowEl.classList.contains("is-minimized")) {
       this.restoreWindow();
       this.windowEl.classList.add("is-maximized");
@@ -385,6 +432,11 @@ export class Laptop {
 
   private restoreWindow(): void {
     if (!this.foreground) return;
+    if (this.foreground === "bulbatalk") {
+      this.bulbaTalk.restore();
+      this.syncDockRunning();
+      return;
+    }
     this.windowEl.classList.remove("hidden", "is-minimized");
     this.windowEl.classList.toggle("is-maximized", this.sessions[this.foreground].maximized);
     this.syncDockRunning();
@@ -394,10 +446,11 @@ export class Laptop {
   private syncDockRunning(): void {
     this.dockClaude.classList.toggle("is-running", this.sessions.claude.running);
     this.dockCursor.classList.toggle("is-running", this.sessions.cursor.running);
+    this.dockBulbaTalk.classList.toggle("is-running", this.bulbaTalk.running);
   }
 
   private sendPrompt(): void {
-    if (!this.foreground || this.busy) return;
+    if (!this.foreground || !isChatApp(this.foreground) || this.busy) return;
     const app = this.foreground;
     const text = this.input.value.trim();
     if (!text) return;
@@ -436,7 +489,7 @@ export class Laptop {
     row.appendChild(bubble);
     this.messagesEl.appendChild(row);
     this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
-    if (this.foreground && !typing) {
+    if (this.foreground && isChatApp(this.foreground) && !typing) {
       this.sessions[this.foreground].messagesHtml = this.messagesEl.innerHTML;
     }
     return row;
@@ -455,11 +508,17 @@ export class Laptop {
       e.preventDefault();
       e.stopPropagation();
       if (!this.appleMenu.classList.contains("hidden")) this.hideAppleMenu();
-      else if (this.windowEl.classList.contains("is-maximized")) {
+      else if (this.foreground === "bulbatalk" && this.bulbaTalk.isVisible()) {
+        if (this.bulbaTalk.isMaximized()) this.bulbaTalk.unmaximize();
+        else if (this.bulbaTalk.handleEscape() === "close-app") this.closeForegroundApp();
+      } else if (this.windowEl.classList.contains("is-maximized")) {
         this.windowEl.classList.remove("is-maximized");
-        if (this.foreground) this.sessions[this.foreground].maximized = false;
+        if (this.foreground && isChatApp(this.foreground)) {
+          this.sessions[this.foreground].maximized = false;
+        }
       } else if (
         this.foreground
+        && isChatApp(this.foreground)
         && !this.windowEl.classList.contains("hidden")
         && !this.windowEl.classList.contains("is-minimized")
       ) {

@@ -583,6 +583,10 @@
       background: linear-gradient(160deg, #2a2a2a, #111);
       color: #fff; font-size: 20px; font-weight: 700;
     }
+    .mac-shortcut-icon-bulbatalk {
+      background: linear-gradient(160deg, #3d8bfd, #1a5fd0);
+      color: #fff; font-size: 20px; font-weight: 700;
+    }
     .mac-shortcut-label {
       font-size: 11px; text-align: center;
       text-shadow: 0 1px 3px rgba(0,0,0,.75);
@@ -604,6 +608,7 @@
     }
     .mac-dock-item-claude { background: linear-gradient(160deg, #d4a27f, #c47a4a); color: #5a2e14; }
     .mac-dock-item-cursor { background: linear-gradient(160deg, #2a2a2a, #111); color: #fff; }
+    .mac-dock-item-bulbatalk { background: linear-gradient(160deg, #3d8bfd, #1a5fd0); color: #fff; }
     .mac-dock-item.is-running::after {
       content: ""; position: absolute; left: 50%; bottom: -5px; transform: translateX(-50%);
       width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,.85);
@@ -684,6 +689,144 @@
     }
     .mac-chat-send:hover { filter: brightness(1.06); }
     .mac-chat-send:disabled { opacity: .55; cursor: default; }
+
+    /* BulbaTalk — фейковый KTalk */
+    .mac-bt-window {
+      position: absolute; inset: 40px 48px 70px 48px;
+      display: flex; flex-direction: column;
+      background: #1c1f26; border-radius: 12px; overflow: hidden;
+      box-shadow: 0 18px 48px rgba(0,0,0,.45);
+      border: 1px solid rgba(255,255,255,.08);
+      transition: inset .22s ease, border-radius .22s ease, opacity .2s ease, transform .28s ease;
+      transform-origin: bottom center;
+      color: #e8ecf2;
+    }
+    .mac-bt-window.is-maximized { inset: 28px 8px 58px 8px; border-radius: 8px; }
+    .mac-bt-window.is-minimized {
+      opacity: 0; pointer-events: none;
+      transform: translateY(40%) scale(.18);
+    }
+    .mac-bt-window .mac-chat-titlebar {
+      background: linear-gradient(180deg, #2a303a, #222830);
+      border-bottom: 1px solid #151820;
+    }
+    .mac-bt-window .mac-chat-title { color: #e8ecf2; }
+    .mac-bt-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .mac-bt-list {
+      flex: 1; overflow-y: auto; padding: 16px 18px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .mac-bt-call-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 14px 16px; border-radius: 12px;
+      background: #262b35; border: 1px solid #343b48;
+    }
+    .mac-bt-call-info { min-width: 0; }
+    .mac-bt-call-title { font-size: 15px; font-weight: 650; color: #f2f5fa; }
+    .mac-bt-call-status {
+      margin-top: 4px; font-size: 12px; color: #7ddea0;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .mac-bt-live-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: #3dd68c;
+      box-shadow: 0 0 0 3px rgba(61,214,140,.18);
+      animation: mac-bt-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes mac-bt-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .45; }
+    }
+    .mac-bt-join {
+      flex-shrink: 0; border: 0; border-radius: 999px;
+      padding: 8px 14px; background: #3d8bfd; color: #fff;
+      font-family: inherit; font-size: 13px; font-weight: 650; cursor: pointer;
+    }
+    .mac-bt-join:hover { filter: brightness(1.08); }
+    .mac-bt-call {
+      flex: 1; min-height: 0; display: flex; flex-direction: column;
+      background: #12151b;
+    }
+    .mac-bt-call-heading {
+      padding: 8px 14px 0; font-size: 12px; font-weight: 600;
+      color: #aeb6c4; text-align: center;
+    }
+    .mac-bt-grid {
+      flex: 1; min-height: 0; display: grid;
+      grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+      gap: 6px; padding: 8px 10px;
+    }
+    .mac-bt-participant {
+      position: relative; overflow: hidden; border-radius: 10px;
+      background: #1e2430; border: 1px solid #2c3340;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .mac-bt-avatar {
+      width: 100%; height: 100%; object-fit: contain;
+      image-rendering: auto; background: #1e2430;
+    }
+    .mac-bt-participant-name {
+      position: absolute; left: 6px; bottom: 5px;
+      padding: 2px 7px; border-radius: 6px;
+      background: rgba(0,0,0,.55); color: #f2f5fa;
+      font-size: 10px; font-weight: 600;
+    }
+    .mac-bt-bubble {
+      position: absolute; left: 6px; right: 6px; top: 6px; z-index: 2;
+      padding: 7px 9px; border-radius: 10px;
+      background: #f4f1e8; border: 1.5px solid #7ac07a;
+      box-shadow: 0 4px 12px rgba(0,0,0,.25);
+      max-height: 68%; overflow: hidden;
+    }
+    .mac-bt-bubble-text {
+      color: #1b1f24; font-size: 14px; line-height: 1.35;
+      font-family: "Trebuchet MS", sans-serif;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .mac-bt-controls {
+      position: relative; display: flex; align-items: center; justify-content: center;
+      gap: 18px; padding: 10px 12px 12px;
+      background: linear-gradient(180deg, transparent, rgba(0,0,0,.35));
+    }
+    .mac-bt-mic-wrap { position: relative; display: flex; flex-direction: column; align-items: center; }
+    .mac-bt-player-bubble {
+      position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+      min-width: 120px; max-width: 220px; padding: 7px 10px; border-radius: 12px;
+      background: #f4f1e8; border: 1.5px solid #7ac07a;
+      box-shadow: 0 6px 16px rgba(0,0,0,.3); z-index: 3;
+    }
+    .mac-bt-player-bubble::after {
+      content: ""; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%);
+      border: 6px solid transparent; border-top-color: #7ac07a;
+    }
+    .mac-bt-player-bubble-text {
+      color: #1b1f24; font-size: 12px; line-height: 1.35;
+      font-family: "Trebuchet MS", sans-serif;
+      text-align: center; white-space: pre-wrap; word-break: break-word;
+    }
+    .mac-bt-replies {
+      position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; gap: 6px; min-width: 220px; z-index: 4;
+    }
+    .mac-bt-reply {
+      border: 1px solid #3a4456; border-radius: 10px;
+      padding: 8px 12px; background: rgba(38,43,53,.96); color: #eef2f8;
+      font-family: inherit; font-size: 12px; font-weight: 600;
+      text-align: left; cursor: pointer; white-space: nowrap;
+      box-shadow: 0 6px 18px rgba(0,0,0,.35);
+    }
+    .mac-bt-reply:hover { background: #3d8bfd; border-color: #3d8bfd; }
+    .mac-bt-ctrl {
+      width: 44px; height: 44px; border-radius: 50%; border: 0;
+      display: grid; place-items: center; cursor: pointer;
+      box-shadow: 0 4px 14px rgba(0,0,0,.35);
+    }
+    .mac-bt-mic {
+      background: #3a414c; color: #f2f5fa; font-size: 18px;
+    }
+    .mac-bt-mic.is-unmuted { background: #2f9e57; }
+    .mac-bt-hangup { background: #e5484d; color: #fff; font-size: 18px; }
+    .mac-bt-hangup:hover { filter: brightness(1.08); }
+    .mac-bt-hangup-icon { display: block; transform: rotate(135deg); }
 
     /* Смена пароля */
     #passChange { position: fixed; inset: 0; z-index: 70; background: rgba(8,10,14,.85); display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -1368,6 +1511,10 @@
                   <span class="mac-shortcut-icon mac-shortcut-icon-cursor" aria-hidden="true">▸</span>
                   <span class="mac-shortcut-label">Cursor</span>
                 </button>
+                <button class="mac-shortcut" id="macShortcutBulbaTalk">
+                  <span class="mac-shortcut-icon mac-shortcut-icon-bulbatalk" aria-hidden="true">☎</span>
+                  <span class="mac-shortcut-label">BulbaTalk</span>
+                </button>
               </div>
 
               <div class="mac-chat-window hidden" id="macChatWindow">
@@ -1387,9 +1534,38 @@
                 </form>
               </div>
 
+              <div class="mac-bt-window hidden" id="macBulbaTalkWindow">
+                <div class="mac-chat-titlebar">
+                  <div class="mac-traffic">
+                    <span class="mac-dot-close" id="macBtClose" role="button" tabindex="0" aria-label="закрыть"></span>
+                    <span class="mac-dot-min" id="macBtMin" role="button" tabindex="0" aria-label="свернуть"></span>
+                    <span class="mac-dot-max" id="macBtMax" role="button" tabindex="0" aria-label="развернуть"></span>
+                  </div>
+                  <div class="mac-chat-title">BulbaTalk</div>
+                </div>
+                <div class="mac-bt-body">
+                  <div class="mac-bt-list" id="macBtList"></div>
+                  <div class="mac-bt-call hidden" id="macBtCall">
+                    <div class="mac-bt-call-heading" id="macBtCallTitle">Стратегия развития</div>
+                    <div class="mac-bt-grid" id="macBtGrid"></div>
+                    <div class="mac-bt-controls">
+                      <div class="mac-bt-mic-wrap">
+                        <div class="mac-bt-player-bubble hidden" id="macBtPlayerBubble">
+                          <div class="mac-bt-player-bubble-text" id="macBtPlayerBubbleText"></div>
+                        </div>
+                        <div class="mac-bt-replies hidden" id="macBtReplies"></div>
+                        <button class="mac-bt-ctrl mac-bt-mic" id="macBtMic" type="button" aria-label="включить микрофон" title="Микрофон выключен">🔇</button>
+                      </div>
+                      <button class="mac-bt-ctrl mac-bt-hangup" id="macBtHangup" type="button" aria-label="завершить звонок" title="Завершить звонок"><span class="mac-bt-hangup-icon" aria-hidden="true">📞</span></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div class="mac-dock">
                 <button class="mac-dock-item mac-dock-item-claude" id="macDockClaude" type="button" aria-label="Claude">✶</button>
                 <button class="mac-dock-item mac-dock-item-cursor" id="macDockCursor" type="button" aria-label="Cursor">▸</button>
+                <button class="mac-dock-item mac-dock-item-bulbatalk" id="macDockBulbaTalk" type="button" aria-label="BulbaTalk">☎</button>
               </div>
             </div>
           </div>
