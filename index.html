@@ -267,6 +267,16 @@
     }
     .bw-key:hover { filter: brightness(1.12); }
     .bw-key-wide { flex: 1.9 1 0; font-size: clamp(9px, calc(var(--sw) * .026), 13px); }
+    /* Enter того же размера, что и ⌫, но зелёный — акцент на отправку. */
+    .bw-key-enter { background: #5aa05a; }
+    /* «Новое слово» — эмодзи того же размера, что и кнопка лидерборда. */
+    .bw-restart {
+      width: 40px; height: 40px; border-radius: 12px; border: 2px solid var(--accent);
+      background: var(--panel); color: var(--text); cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 20px; line-height: 1; padding: 0; flex-shrink: 0;
+    }
+    .bw-restart:hover { background: var(--accent); color: #14210f; }
     .bw-key.bw-correct { background: #5aa05a; }
     .bw-key.bw-present { background: #c9b458; color: #1b1f24; }
     .bw-key.bw-absent { background: #2a2f37; color: #7a828c; }
@@ -1184,7 +1194,7 @@
         <div class="bw-grid" id="bwGrid"></div>
         <div class="bw-keyboard" id="bwKeyboard"></div>
         <div class="arcade-actions">
-          <button class="ttt-restart" id="bwRestart">Новое слово</button>
+          <button class="bw-restart" id="bwRestart" aria-label="новое слово" title="Новое слово">🎲</button>
           <button class="arcade-lb" id="bwLb" aria-label="лидерборд" title="Лидерборд">
             <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
           </button>

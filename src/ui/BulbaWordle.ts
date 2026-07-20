@@ -264,7 +264,7 @@ export class BulbaWordle {
       rowEl.className = "bw-krow";
       for (const key of row) {
         const btn = document.createElement("button");
-        btn.className = "bw-key" + (key === "enter" || key === "back" ? " bw-key-wide" : "");
+        btn.className = "bw-key" + (key === "enter" || key === "back" ? " bw-key-wide" : "") + (key === "enter" ? " bw-key-enter" : "");
         btn.textContent = key === "enter" ? "ВВОД" : key === "back" ? "⌫" : key;
         // pointerdown, а не click: не уводим фокус со скрытого поля ввода.
         btn.addEventListener("pointerdown", (e) => {
