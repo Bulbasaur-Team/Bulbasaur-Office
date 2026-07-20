@@ -94,12 +94,14 @@ export interface ProjectorStateView {
 
 export type AirHockeySide = "red" | "blue";
 
+export interface AirHockeyLobbyWaiter {
+  side: AirHockeySide;
+  sessionId: string;
+  login: string;
+}
+
 export interface AirHockeyLobbyView {
-  redSessionId: string | null;
-  redLogin: string | null;
-  blueSessionId: string | null;
-  blueLogin: string | null;
-  phase: string;
+  waiting: AirHockeyLobbyWaiter[];
 }
 
 export interface AirHockeyStateView {
@@ -353,13 +355,7 @@ export class Realtime {
         break;
       case "achievement": this.handlers.onAchievement?.(msg.code, msg.title, msg.description, msg.image); break;
       case "airhockeyLobby":
-        this.handlers.onAirHockeyLobby?.({
-          redSessionId: msg.redSessionId ?? null,
-          redLogin: msg.redLogin ?? null,
-          blueSessionId: msg.blueSessionId ?? null,
-          blueLogin: msg.blueLogin ?? null,
-          phase: msg.phase ?? "idle",
-        });
+        this.handlers.onAirHockeyLobby?.(parseAirHockeyLobby(msg));
         break;
       case "airhockeyState":
         this.handlers.onAirHockeyState?.(parseAirHockeyState(msg));
@@ -379,6 +375,29 @@ export class Realtime {
 /** Поле аэрохоккея (как на сервере). Нужно только для legacy-стейта. */
 const AH_W = 420;
 const AH_H = 700;
+
+function parseAirHockeyLobby(msg: any): AirHockeyLobbyView {
+  const raw = Array.isArray(msg.waiting) ? msg.waiting : [];
+  const waiting: AirHockeyLobbyWaiter[] = [];
+  for (const w of raw) {
+    const side = w?.side === "red" || w?.side === "blue" ? w.side : null;
+    const sessionId = typeof w?.sessionId === "string" ? w.sessionId : null;
+    const login = typeof w?.login === "string" ? w.login : null;
+    if (side && sessionId && login) {
+      waiting.push({ side, sessionId, login });
+    }
+  }
+  // Старый формат (одна пара полей) — на случай смешанных версий.
+  if (waiting.length === 0) {
+    if (msg.redSessionId && msg.redLogin) {
+      waiting.push({ side: "red", sessionId: msg.redSessionId, login: msg.redLogin });
+    }
+    if (msg.blueSessionId && msg.blueLogin) {
+      waiting.push({ side: "blue", sessionId: msg.blueSessionId, login: msg.blueLogin });
+    }
+  }
+  return { waiting };
+}
 
 /**
  * Сервер шлёт плоские координаты ВИДА (my/opp/puck).

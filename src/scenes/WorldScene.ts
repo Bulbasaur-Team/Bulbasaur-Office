@@ -1286,35 +1286,22 @@ export class WorldScene extends Phaser.Scene {
     this.realtime.airhockeyJoin(side);
   }
 
-  private applyAirHockeyLobby(lobby: {
-    redSessionId: string | null;
-    redLogin: string | null;
-    blueSessionId: string | null;
-    blueLogin: string | null;
-    phase: string;
-  }): void {
+  private applyAirHockeyLobby(lobby: { waiting: { side: AirHockeySide; sessionId: string; login: string }[] }): void {
     const next = new Set<string>();
-    if (lobby.redSessionId) next.add(lobby.redSessionId);
-    if (lobby.blueSessionId) next.add(lobby.blueSessionId);
+    for (const w of lobby.waiting) next.add(w.sessionId);
     for (const id of this.airHockeyInviteIds) {
       if (!next.has(id)) this.remotePlayers.get(id)?.hideBubble();
     }
-    if (lobby.redSessionId) {
-      this.remotePlayers.get(lobby.redSessionId)?.showInvite(AirHockey.inviteText("red"));
-    }
-    if (lobby.blueSessionId) {
-      this.remotePlayers.get(lobby.blueSessionId)?.showInvite(AirHockey.inviteText("blue"));
+    for (const w of lobby.waiting) {
+      this.remotePlayers.get(w.sessionId)?.showInvite(AirHockey.inviteText(w.side));
     }
     this.airHockeyInviteIds = next;
 
     const me = api.getLogin();
-    const mySide: AirHockeySide | null =
-      lobby.phase === "waiting" && lobby.redLogin === me ? "red"
-        : lobby.phase === "waiting" && lobby.blueLogin === me ? "blue"
-          : null;
-    if (mySide) {
-      this.airHockeyWaiting = mySide;
-      this.bubble.show(AirHockey.inviteText(mySide), this.player.x, this.player.y - TARGET_H * 0.95, undefined, () => ({
+    const mine = lobby.waiting.find((w) => w.login === me);
+    if (mine) {
+      this.airHockeyWaiting = mine.side;
+      this.bubble.show(AirHockey.inviteText(mine.side), this.player.x, this.player.y - TARGET_H * 0.95, undefined, () => ({
         x: this.player.x,
         y: this.player.y - TARGET_H * 0.95,
       }));
