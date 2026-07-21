@@ -91,7 +91,6 @@ export class BulbaJump {
     this.jetImg.src = publicPath("assets/bulbajump/jetpack.png");
     document.getElementById("bjClose")!.onclick = () => this.close();
     document.getElementById("bjLb")!.onclick = () => this.onLeaderboard?.();
-    document.getElementById("bjRestart")!.onclick = () => this.reset();
     this.root.addEventListener("pointerdown", this.onPointerDown);
     this.root.addEventListener("pointermove", this.onPointerMove);
     this.root.addEventListener("pointerup", this.onPointerUp);
@@ -576,7 +575,7 @@ export class BulbaJump {
     ctx.fillText(`Результат: ${Math.floor(this.score)}`, W / 2, H / 2 + 16);
     ctx.fillStyle = "#7ac07a";
     ctx.font = "15px 'Trebuchet MS', sans-serif";
-    ctx.fillText("«Заново» — сыграть ещё раз", W / 2, H / 2 + 48);
+    ctx.fillText("Enter — сыграть ещё раз", W / 2, H / 2 + 48);
   }
 
   private finish(value: number): void {
