@@ -34,6 +34,7 @@ import { ItemsManager, type ObstacleCircle } from "../entities/ItemsManager";
 import { WallClock } from "../entities/WallClock";
 import { LocationLoader, type Spawn, type Rect, type PlacedNpc } from "./LocationLoader";
 import { AuthGate } from "../ui/AuthGate";
+import { hideBootLoader } from "../ui/BootLoader";
 import { Leaderboard, type LeaderboardGame, boardChangedForYou, rankDeltas } from "../ui/Leaderboard";
 import { Achievements } from "../ui/Achievements";
 import { AchievementPopup } from "../ui/AchievementPopup";
@@ -427,6 +428,7 @@ export class WorldScene extends Phaser.Scene {
         void this.startMultiplayer();
       }
     };
+    hideBootLoader();
     if (api.isAuthenticated()) start();
     else void this.authGate.open().then(start);
   }

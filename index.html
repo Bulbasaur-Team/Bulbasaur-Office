@@ -386,6 +386,33 @@
     html.bp-640 .poker-card { width: 60px; height: 84px; }
     html.bp-640 .poker-hand-card { width: 44px; height: 62px; font-size: 17px; }
 
+    /* Стартовый лоадер (до появления экрана входа) */
+    #bootLoader {
+      position: fixed; inset: 0; z-index: 55;
+      background: rgba(15,18,23,.97);
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .boot-loader-box {
+      display: flex; flex-direction: column; align-items: center; gap: 18px;
+      width: min(280px, calc(var(--sw) * .8));
+    }
+    .boot-loader-title { margin: 0; font-size: 22px; letter-spacing: .02em; }
+    .boot-loader-spin {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 3px solid #3a414c; border-top-color: var(--accent);
+      animation: boot-spin .7s linear infinite;
+    }
+    @keyframes boot-spin { to { transform: rotate(360deg); } }
+    .boot-loader-bar {
+      width: 100%; height: 10px; border-radius: 999px;
+      background: #1b1f24; border: 2px solid #3a414c; overflow: hidden;
+    }
+    .boot-loader-fill {
+      height: 100%; width: 0%; background: var(--accent);
+      transition: width .12s ease-out;
+    }
+    .boot-loader-label { margin: 0; font-size: 14px; opacity: .85; }
+
     /* Авторизация */
     #auth { position: fixed; inset: 0; z-index: 60; background: rgba(15,18,23,.97); display: flex; align-items: center; justify-content: center; padding: 20px; }
     .auth-box { background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 26px 30px; width: min(360px, calc(var(--sw) * .9)); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
@@ -1297,6 +1324,17 @@
         <canvas id="slidesCanvas" class="slides-media"></canvas>
         <button class="slides-nav next" id="slidesNext">›</button>
         <div class="slides-count" id="slidesCount"></div>
+      </div>
+    </div>
+
+    <div id="bootLoader">
+      <div class="boot-loader-box">
+        <h2 class="boot-loader-title">🌱 Bulba Office</h2>
+        <div class="boot-loader-spin" aria-hidden="true"></div>
+        <div class="boot-loader-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+          <div id="bootLoaderFill" class="boot-loader-fill"></div>
+        </div>
+        <p id="bootLoaderLabel" class="boot-loader-label">Загрузка…</p>
       </div>
     </div>
 

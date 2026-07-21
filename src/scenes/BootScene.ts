@@ -4,6 +4,7 @@ import { CLOCK_ASSETS } from "../entities/WallClock";
 import { LOCATIONS } from "../data/locations";
 import { ITEM_TYPES } from "../data/items";
 import { publicPath } from "../publicPath";
+import { setBootProgress } from "../ui/BootLoader";
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -13,6 +14,7 @@ export class BootScene extends Phaser.Scene {
   preload(): void {
     // overlay и коллизии могут появиться позже — их отсутствие не фатально.
     this.load.on("loaderror", () => {});
+    this.load.on("progress", (value: number) => setBootProgress(value));
 
     for (const loc of LOCATIONS) {
       // Парковка — не локация, а способ перемещения: её фон лежит в корне assets.
