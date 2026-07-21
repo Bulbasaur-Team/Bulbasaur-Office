@@ -32,12 +32,14 @@ const JET_VY = -10.5;
 const POWER_SIZE = 28;   // размер спрайта бонуса на платформе
 const FRAGILE_SPAWN = 0.05; // хрупкая платформа: ломается после двух прыжков
 const FRAGILE_HITS = 2;     // сколько приземлений выдерживает до исчезновения
+const SAFETY_GAP = 28;      // отступ страховочной платформы под ногами после бонуса
 
-type PlatformType = "box" | "belt" | "fragile";
+type PlatformType = "box" | "belt" | "fragile" | "safety";
 type PowerUpKind = "heli" | "jet";
 interface Platform {
   x: number;
   y: number;
+  w: number;        // ширина (у safety — на весь экран)
   type: PlatformType;
   vx: number;       // скорость для конвейера
   spring: boolean;  // батут (усиленный отскок)
@@ -203,7 +205,7 @@ export class BulbaJump {
 
     // Стартовая платформа точно под игроком + заполняем поле вверх.
     this.platforms = [{
-      x: W / 2 - PLAT_W / 2, y: H - 50, type: "box", vx: 0,
+      x: W / 2 - PLAT_W / 2, y: H - 50, w: PLAT_W, type: "box", vx: 0,
       spring: false, powerUp: null, hits: 0, falling: false, fallVy: 0,
     }];
     this.topY = H - 50;
@@ -235,6 +237,7 @@ export class BulbaJump {
     return {
       x: Math.random() * (W - PLAT_W),
       y,
+      w: PLAT_W,
       type: belt ? "belt" : fragile ? "fragile" : "box",
       vx: belt ? (Math.random() < 0.5 ? -1.5 : 1.5) : 0,
       spring,
@@ -243,6 +246,22 @@ export class BulbaJump {
       falling: false,
       fallVy: 0,
     };
+  }
+
+  // После шапочки/ранца — широкая платформа прямо под ногами, чтобы не упасть в пустоту.
+  private spawnSafetyPlatform(): void {
+    this.platforms.push({
+      x: 0,
+      y: this.py + PLAYER_H / 2 + SAFETY_GAP,
+      w: W,
+      type: "safety",
+      vx: 0,
+      spring: false,
+      powerUp: null,
+      hits: 0,
+      falling: false,
+      fallVy: 0,
+    });
   }
 
   private loop = (): void => {
@@ -278,7 +297,7 @@ export class BulbaJump {
     for (const p of this.platforms) {
       if (p.type === "belt" && !p.falling) {
         p.x += p.vx;
-        if (p.x < 0 || p.x > W - PLAT_W) p.vx *= -1;
+        if (p.x < 0 || p.x > W - p.w) p.vx *= -1;
       }
       if (p.falling) {
         p.fallVy += GRAVITY;
@@ -308,6 +327,7 @@ export class BulbaJump {
       if (this.score - this.boost.startScore >= need) {
         this.boost = null;
         this.vy = JUMP_V * 0.35; // мягкий выход из полёта
+        this.spawnSafetyPlatform();
       } else {
         this.vy = this.boost.kind === "heli" ? HELI_VY : JET_VY;
       }
@@ -326,7 +346,7 @@ export class BulbaJump {
         if (p.falling) continue;
         const overX =
           this.px + HALF_W + LAND_PAD_X > p.x &&
-          this.px - HALF_W - LAND_PAD_X < p.x + PLAT_W;
+          this.px - HALF_W - LAND_PAD_X < p.x + p.w;
         if (overX && prevFeet <= p.y + LAND_SLACK && feet >= p.y) {
           this.py = p.y - PLAYER_H / 2;
           this.vy = JUMP_V * (p.spring ? SPRING_MULT : 1);
@@ -395,14 +415,15 @@ export class BulbaJump {
 
   private drawPlatform(p: Platform): void {
     const ctx = this.ctx;
+    const pw = p.w;
     if (p.type === "belt") {
       ctx.fillStyle = "#2f343c";
-      ctx.fillRect(p.x, p.y, PLAT_W, PLAT_H);
+      ctx.fillRect(p.x, p.y, pw, PLAT_H);
       ctx.fillStyle = "#7ac07a";
-      ctx.fillRect(p.x, p.y, PLAT_W, 3); // активная кромка ленты
+      ctx.fillRect(p.x, p.y, pw, 3); // активная кромка ленты
       ctx.fillStyle = "#565d68";
       // Ролики ленты — квадраты вместо arc() (дешевле на canvas 2d).
-      for (let rx = p.x + 6; rx < p.x + PLAT_W - 2; rx += 14) {
+      for (let rx = p.x + 6; rx < p.x + pw - 2; rx += 14) {
         ctx.fillRect(rx - 2, p.y + PLAT_H - 7, 4, 4);
       }
     } else if (p.type === "fragile") {
@@ -412,12 +433,12 @@ export class BulbaJump {
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.fillStyle = cracked ? "#cbb896" : "#d8c9a6";
-      ctx.fillRect(p.x, p.y, PLAT_W, PLAT_H);
+      ctx.fillRect(p.x, p.y, pw, PLAT_H);
       ctx.strokeStyle = "#a89068";
       ctx.lineWidth = 2;
-      ctx.strokeRect(p.x + 1, p.y + 1, PLAT_W - 2, PLAT_H - 2);
+      ctx.strokeRect(p.x + 1, p.y + 1, pw - 2, PLAT_H - 2);
       ctx.fillStyle = "#c4a45a"; // предупреждающая полоска «хрупкое»
-      ctx.fillRect(p.x + 4, p.y + 5, PLAT_W - 8, 3);
+      ctx.fillRect(p.x + 4, p.y + 5, pw - 8, 3);
       ctx.strokeStyle = cracked ? "#5c4a38" : "#7a6550";
       ctx.lineWidth = cracked ? 2 : 1.2;
       ctx.beginPath();
@@ -442,22 +463,41 @@ export class BulbaJump {
       }
       ctx.stroke();
       ctx.restore();
+    } else if (p.type === "safety") {
+      // Страховочная сетка на всю ширину — после шапочки/ранца.
+      ctx.fillStyle = "#2a3d34";
+      ctx.fillRect(p.x, p.y, pw, PLAT_H);
+      ctx.fillStyle = "#7ac07a";
+      ctx.fillRect(p.x, p.y, pw, 3);
+      ctx.strokeStyle = "#5a8a6a";
+      ctx.lineWidth = 1.2;
+      for (let rx = p.x + 10; rx < p.x + pw; rx += 18) {
+        ctx.beginPath();
+        ctx.moveTo(rx, p.y + 3);
+        ctx.lineTo(rx - 8, p.y + PLAT_H - 1);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = "#4a7058";
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y + PLAT_H / 2);
+      ctx.lineTo(p.x + pw, p.y + PLAT_H / 2);
+      ctx.stroke();
     } else {
       ctx.fillStyle = "#c8965a";
-      ctx.fillRect(p.x, p.y, PLAT_W, PLAT_H);
+      ctx.fillRect(p.x, p.y, pw, PLAT_H);
       ctx.strokeStyle = "#8a6332";
       ctx.lineWidth = 2;
-      ctx.strokeRect(p.x + 1, p.y + 1, PLAT_W - 2, PLAT_H - 2);
+      ctx.strokeRect(p.x + 1, p.y + 1, pw - 2, PLAT_H - 2);
       ctx.fillStyle = "#efe2c0"; // скотч крест-накрест
-      ctx.fillRect(p.x + PLAT_W / 2 - 5, p.y, 10, PLAT_H);
+      ctx.fillRect(p.x + pw / 2 - 5, p.y, 10, PLAT_H);
     }
     if (p.spring) {
       ctx.fillStyle = "#7ac07a";
-      ctx.fillRect(p.x + PLAT_W / 2 - 8, p.y - 7, 16, 7);
+      ctx.fillRect(p.x + pw / 2 - 8, p.y - 7, 16, 7);
       ctx.fillStyle = "#5aa05a";
-      ctx.fillRect(p.x + PLAT_W / 2 - 8, p.y - 3, 16, 3);
+      ctx.fillRect(p.x + pw / 2 - 8, p.y - 3, 16, 3);
     }
-    if (p.powerUp && !p.falling) this.drawPowerUp(p.x + PLAT_W / 2, p.y - 2, p.powerUp, POWER_SIZE);
+    if (p.powerUp && !p.falling) this.drawPowerUp(p.x + pw / 2, p.y - 2, p.powerUp, POWER_SIZE);
   }
 
   private powerImg(kind: PowerUpKind): HTMLImageElement {
