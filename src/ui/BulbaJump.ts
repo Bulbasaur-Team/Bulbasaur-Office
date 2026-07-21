@@ -30,7 +30,8 @@ const JET_SPAWN = 0.005;  // вероятность ранца (взаимоис
 const HELI_VY = -7.5;    // постоянная скорость подъёма в полёте
 const JET_VY = -10.5;
 const POWER_SIZE = 28;   // размер спрайта бонуса на платформе
-const FRAGILE_SPAWN = 0.05; // хрупкая платформа: ломается после первого прыжка
+const FRAGILE_SPAWN = 0.05; // хрупкая платформа: ломается после двух прыжков
+const FRAGILE_HITS = 2;     // сколько приземлений выдерживает до исчезновения
 
 type PlatformType = "box" | "belt" | "fragile";
 type PowerUpKind = "heli" | "jet";
@@ -41,6 +42,7 @@ interface Platform {
   vx: number;       // скорость для конвейера
   spring: boolean;  // батут (усиленный отскок)
   powerUp: PowerUpKind | null;
+  hits: number;     // сколько раз уже приземлялись (для fragile: 0 — малая трещина, 1 — большая)
   falling: boolean; // хрупкая уже сломалась и падает
   fallVy: number;
 }
@@ -203,7 +205,7 @@ export class BulbaJump {
     // Стартовая платформа точно под игроком + заполняем поле вверх.
     this.platforms = [{
       x: W / 2 - PLAT_W / 2, y: H - 50, type: "box", vx: 0,
-      spring: false, powerUp: null, falling: false, fallVy: 0,
+      spring: false, powerUp: null, hits: 0, falling: false, fallVy: 0,
     }];
     this.topY = H - 50;
     while (this.topY > 0) {
@@ -238,6 +240,7 @@ export class BulbaJump {
       vx: belt ? (Math.random() < 0.5 ? -1.5 : 1.5) : 0,
       spring,
       powerUp,
+      hits: 0,
       falling: false,
       fallVy: 0,
     };
@@ -329,9 +332,12 @@ export class BulbaJump {
           this.py = p.y - PLAYER_H / 2;
           this.vy = JUMP_V * (p.spring ? SPRING_MULT : 1);
           if (p.type === "fragile") {
-            p.falling = true;
-            p.fallVy = 1.2;
-            p.powerUp = null;
+            p.hits += 1;
+            if (p.hits >= FRAGILE_HITS) {
+              p.falling = true;
+              p.fallVy = 1.2;
+              p.powerUp = null;
+            }
           }
           break;
         }
@@ -401,24 +407,40 @@ export class BulbaJump {
         ctx.fillRect(rx - 2, p.y + PLAT_H - 7, 4, 4);
       }
     } else if (p.type === "fragile") {
-      // Хрупкая посылка: бледнее обычной, с трещинами — ломается с первого прыжка.
+      // Хрупкая посылка: малая трещина → после 1-го прыжка большая → после 2-го падает.
+      const cracked = p.hits >= 1;
       const alpha = p.falling ? 0.55 : 1;
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = "#d8c9a6";
+      ctx.fillStyle = cracked ? "#cbb896" : "#d8c9a6";
       ctx.fillRect(p.x, p.y, PLAT_W, PLAT_H);
       ctx.strokeStyle = "#a89068";
       ctx.lineWidth = 2;
       ctx.strokeRect(p.x + 1, p.y + 1, PLAT_W - 2, PLAT_H - 2);
       ctx.fillStyle = "#c4a45a"; // предупреждающая полоска «хрупкое»
       ctx.fillRect(p.x + 4, p.y + 5, PLAT_W - 8, 3);
-      ctx.strokeStyle = "#7a6550";
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = cracked ? "#5c4a38" : "#7a6550";
+      ctx.lineWidth = cracked ? 2 : 1.2;
       ctx.beginPath();
-      ctx.moveTo(p.x + 12, p.y + 2);
-      ctx.lineTo(p.x + 28, p.y + PLAT_H - 2);
-      ctx.lineTo(p.x + 40, p.y + 4);
-      ctx.lineTo(p.x + 56, p.y + PLAT_H - 3);
+      if (cracked) {
+        // Большая трещина: зигзаг через всю платформу + боковые ответвления.
+        ctx.moveTo(p.x + 8, p.y + 2);
+        ctx.lineTo(p.x + 22, p.y + PLAT_H - 2);
+        ctx.lineTo(p.x + 34, p.y + 3);
+        ctx.lineTo(p.x + 48, p.y + PLAT_H - 3);
+        ctx.lineTo(p.x + 60, p.y + 4);
+        ctx.moveTo(p.x + 22, p.y + PLAT_H - 2);
+        ctx.lineTo(p.x + 18, p.y + PLAT_H - 1);
+        ctx.moveTo(p.x + 34, p.y + 3);
+        ctx.lineTo(p.x + 38, p.y + 1);
+        ctx.moveTo(p.x + 48, p.y + PLAT_H - 3);
+        ctx.lineTo(p.x + 52, p.y + PLAT_H - 1);
+      } else {
+        // Небольшая трещина по центру.
+        ctx.moveTo(p.x + 24, p.y + 3);
+        ctx.lineTo(p.x + 32, p.y + PLAT_H - 4);
+        ctx.lineTo(p.x + 42, p.y + 5);
+      }
       ctx.stroke();
       ctx.restore();
     } else {
