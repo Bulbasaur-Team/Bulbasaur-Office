@@ -37,6 +37,8 @@ export class BootScene extends Phaser.Scene {
     for (const key of ALL_SPRITES) {
       this.load.image(key, publicPath(`assets/${SPRITE_FILES[key]}`));
     }
+    this.load.image("bulba-cat", publicPath("assets/characters/bulba-cat.png"));
+    this.load.image("bulba-cat-walk", publicPath("assets/characters/bulba-cat-walk.png"));
 
     for (const def of Object.values(ITEM_TYPES)) {
       this.load.image(def.texture, publicPath(`assets/items/${def.file}`));

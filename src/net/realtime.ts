@@ -92,6 +92,13 @@ export interface ProjectorStateView {
   index: number;
 }
 
+export interface CatStateView {
+  x: number;
+  y: number;
+  facing: boolean;
+  moving: boolean;
+}
+
 export type AirHockeySide = "red" | "blue";
 
 export interface AirHockeyLobbyWaiter {
@@ -149,6 +156,8 @@ export interface RealtimeHandlers {
   onPokerClosed?: () => void;
   onPokerError?: (message: string) => void;
   onProjectorState?: (state: ProjectorStateView) => void;
+  onCatState?: (state: CatStateView) => void;
+  onCatSay?: (text: string) => void;
   onAchievement?: (code: string, title: string, description: string, image: string) => void; // выдана ачивка
   onAirHockeyLobby?: (lobby: AirHockeyLobbyView) => void;
   onAirHockeyState?: (state: AirHockeyStateView) => void;
@@ -272,6 +281,16 @@ export class Realtime {
     this.send({ type: "projectorIndex", index });
   }
 
+  /** Диалог с Бульба Котом: пока talking=true, сервер держит кота на месте. */
+  catTalk(talking: boolean): void {
+    this.send({ type: "catTalk", talking });
+  }
+
+  /** Запросить совет у кота (ответ придёт catSay). */
+  catAdvice(): void {
+    this.send({ type: "catAdvice" });
+  }
+
   airhockeyJoin(side: AirHockeySide): void {
     this.send({ type: "airhockeyJoin", side });
   }
@@ -352,6 +371,19 @@ export class Realtime {
           ownerId: msg.ownerId ?? null,
           index: msg.index ?? 0,
         });
+        break;
+      case "catState":
+        this.handlers.onCatState?.({
+          x: Number(msg.x) || 0,
+          y: Number(msg.y) || 0,
+          facing: !!msg.facing,
+          moving: !!msg.moving,
+        });
+        break;
+      case "catSay":
+        if (typeof msg.text === "string" && msg.text) {
+          this.handlers.onCatSay?.(msg.text);
+        }
         break;
       case "achievement": this.handlers.onAchievement?.(msg.code, msg.title, msg.description, msg.image); break;
       case "airhockeyLobby":

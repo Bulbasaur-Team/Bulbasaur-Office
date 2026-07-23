@@ -3,6 +3,7 @@ import { CHARACTERS, type Character } from "../data/characters";
 import { LOCATIONS, LOC, type ExitDef } from "../data/locations";
 import { registerSpriteImages, spriteScale } from "../entities/sprites";
 import { Dialogue } from "../ui/Dialogue";
+import { CatDialogue } from "../ui/CatDialogue";
 import { SpeechBubble } from "../ui/SpeechBubble";
 import { ThoughtBubble } from "../ui/ThoughtBubble";
 import { SlideViewer } from "../ui/SlideViewer";
@@ -32,6 +33,8 @@ import { PlanningPoker } from "../ui/PlanningPoker";
 import { RemotePlayer } from "../entities/RemotePlayer";
 import { ItemsManager, type ObstacleCircle } from "../entities/ItemsManager";
 import { WallClock } from "../entities/WallClock";
+import { BulbaCat } from "../entities/BulbaCat";
+import { BULBA_CAT } from "../data/bulbaCat";
 import { LocationLoader, type Spawn, type Rect, type PlacedNpc } from "./LocationLoader";
 import { AuthGate } from "../ui/AuthGate";
 import { hideBootLoader } from "../ui/BootLoader";
@@ -124,6 +127,7 @@ export class WorldScene extends Phaser.Scene {
   private loader!: LocationLoader;
   private items!: ItemsManager;
   private dialogue!: Dialogue;
+  private catDialogue!: CatDialogue;
   private bubble!: SpeechBubble;
   private thoughtBubbles: ThoughtBubble[] = []; // облачко мыслей на каждый NPC текущей локации (по индексу npcs)
   private thoughtTimers: Phaser.Time.TimerEvent[] = []; // персональный таймер проверки на каждый NPC
@@ -196,6 +200,9 @@ export class WorldScene extends Phaser.Scene {
   private airHockeyWaiting: AirHockeySide | null = null; // ждём соперника у стола
   private airHockeyInviteIds = new Set<string>(); // sessionId с облачком приглашения
   private wallClock: WallClock | null = null;    // настенные часы (точка "clock" в interactions)
+  private bulbaCat: BulbaCat | null = null;      // Бульба Кот (только MP, main-office)
+  private nearCat = false;                       // игрок в зоне взаимодействия с котом
+  private catPoseReady = false;                  // получили ли первый catState после спавна
   private menu!: LocationMenu;
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
   private exitLabel = document.getElementById("exitLabel") as HTMLSpanElement;
@@ -248,6 +255,23 @@ export class WorldScene extends Phaser.Scene {
         // Сюжетный показ не трогает общее состояние проектора.
         if (this.projectorFromDialogue && !this.projectorOn) this.projector.hide();
         this.projectorFromDialogue = false;
+      },
+    });
+    this.catDialogue = new CatDialogue({
+      onOpen: () => {
+        // Сразу стоп анимации локально; сервер подтвердит catTalk и заморозит позу.
+        this.bulbaCat?.stopWalk();
+        this.realtime.catTalk(true);
+      },
+      onSay: (russian) => this.showCatSay(russian),
+      onAdvice: () => {
+        // Сразу показываем «думает», чтобы клик не казался пустым, пока ждём WS.
+        this.showCatSay("Сейчас подумаю.");
+        this.realtime.catAdvice();
+      },
+      onClose: () => {
+        this.bubble.hide();
+        this.realtime.catTalk(false);
       },
     });
 
@@ -393,6 +417,15 @@ export class WorldScene extends Phaser.Scene {
     this.router.register(this.airHockey);
     this.router.register(this.slidePicker);
     this.router.register(this.dialogue);
+    // Пока видна «Перевести» — Space/Enter переводят мяуканье (выше диалога кота).
+    this.router.register({
+      isActive: () => this.bubble.canTranslate(),
+      handleKey: (e) => {
+        if (e.code !== "Space" && e.code !== "Enter") return false;
+        return this.bubble.tryTranslate();
+      },
+    });
+    this.router.register(this.catDialogue);
     this.router.register(this.gameMenu);
     this.router.register(this.menu);
     // Взаимодействие в мире (NPC / TV / дверь) — ниже всех меню: срабатывает,
@@ -601,6 +634,8 @@ export class WorldScene extends Phaser.Scene {
       onPokerClosed: () => this.poker.onClosed(),
       onPokerError: (message) => this.poker.onError(message),
       onProjectorState: (state) => this.applyProjectorState(state.on, state.ownerId, state.index),
+      onCatState: (state) => this.applyCatState(state.x, state.y, state.facing, state.moving),
+      onCatSay: (text) => this.showCatSay(text),
       onAchievement: (_code, title, description, image) => this.achievementPopup.show(title, description, image),
       onAirHockeyLobby: (lobby) => this.applyAirHockeyLobby(lobby),
       onAirHockeyState: (state) => {
@@ -684,6 +719,46 @@ export class WorldScene extends Phaser.Scene {
     this.remotePlayers.clear();
   }
 
+  /** Бульба Кот только в мультиплеере и только в Главном офисе. */
+  private syncBulbaCat(locationId: string, route?: Spawn[]): void {
+    const want = this.multiplayer && locationId === BULBA_CAT.locationId;
+    if (!want) {
+      if (this.catDialogue.isOpen) this.catDialogue.close();
+      this.bulbaCat?.destroy();
+      this.bulbaCat = null;
+      this.nearCat = false;
+      this.catPoseReady = false;
+      return;
+    }
+    if (!this.bulbaCat) {
+      const start = route?.[0] ?? { x: 120, y: 550 };
+      this.bulbaCat = new BulbaCat(this, start.x, start.y, false);
+      this.catPoseReady = false;
+    }
+  }
+
+  private applyCatState(x: number, y: number, facing: boolean, moving: boolean): void {
+    if (!this.multiplayer || LOCATIONS[this.locIndex].id !== BULBA_CAT.locationId) return;
+    if (!this.bulbaCat) {
+      this.bulbaCat = new BulbaCat(this, x, y, facing);
+      this.bulbaCat.snapTo(x, y, facing, moving);
+      this.catPoseReady = true;
+      return;
+    }
+    if (!this.catPoseReady) {
+      this.bulbaCat.snapTo(x, y, facing, moving);
+      this.catPoseReady = true;
+      return;
+    }
+    this.bulbaCat.setTarget(x, y, facing, moving);
+  }
+
+  private showCatSay(russian: string): void {
+    if (!this.bulbaCat) return;
+    const a = this.bulbaCat.bubbleAnchor();
+    this.bubble.showCat(russian, a.x, a.y, () => this.bulbaCat!.bubbleAnchor());
+  }
+
   private onChatKey(e: KeyboardEvent): void {
     e.stopPropagation();
     if (e.key === "Enter") {
@@ -729,8 +804,9 @@ export class WorldScene extends Phaser.Scene {
     this.locIndex = index;
     this.atParking = !!cfg.isParking;
 
-    const { npcs, doors, spawns, interactions, rects, items, physicsWalls, tableRects } = this.loader.load(cfg, index, this.chosen.id, this.multiplayer);
+    const { npcs, doors, spawns, interactions, rects, items, physicsWalls, tableRects, routes } = this.loader.load(cfg, index, this.chosen.id, this.multiplayer);
     this.npcs = npcs;
+    this.syncBulbaCat(cfg.id, routes.get(BULBA_CAT.id));
     this.thoughtBubbles.forEach((b) => b.destroy());
     this.thoughtTimers.forEach((t) => t.remove());
     this.thoughtBubbles = npcs.map(() => new ThoughtBubble(this, DEPTH.bubble));
@@ -797,6 +873,7 @@ export class WorldScene extends Phaser.Scene {
   private modalOpen(): boolean {
     return (
       this.dialogue.isOpen ||
+      this.catDialogue.isOpen ||
       this.gameMenu.isOpen ||
       this.bulbaJump.isOpen ||
       this.bulbaPacker.isOpen ||
@@ -911,6 +988,7 @@ export class WorldScene extends Phaser.Scene {
     this.updatePlayerLabel();
     this.bubble.update(); // своё чат-облачко едет за игроком (если follow задан)
     for (const rp of this.remotePlayers.values()) rp.update();
+    this.bulbaCat?.update(delta);
     this.updateItems(delta);
 
     this.joystick?.setVisible(true);
@@ -944,6 +1022,10 @@ export class WorldScene extends Phaser.Scene {
         this.nearest = c;
       }
     }
+    this.nearCat = !!(
+      this.bulbaCat &&
+      Phaser.Math.Distance.Between(this.player.x, this.player.y, this.bulbaCat.x, this.bulbaCat.y) < INTERACT_DIST
+    );
 
     this.showExit(this.findExit());
 
@@ -1004,12 +1086,17 @@ export class WorldScene extends Phaser.Scene {
       const npcDist = this.nearest
         ? Phaser.Math.Distance.Between(this.player.x, this.player.y, this.nearest.x, this.nearest.y)
         : Infinity;
-      if (nearLaptop && laptopDist <= npcDist) {
+      const catDist = this.nearCat && this.bulbaCat
+        ? Phaser.Math.Distance.Between(this.player.x, this.player.y, this.bulbaCat.x, this.bulbaCat.y)
+        : Infinity;
+      if (nearLaptop && laptopDist <= npcDist && laptopDist <= catDist) {
         this.showPrompt(
           "Пробел / Enter — включить компьютер",
           nearLaptop.x + nearLaptop.w / 2,
           nearLaptop.y + nearLaptop.h,
         );
+      } else if (this.nearCat && this.bulbaCat && catDist <= npcDist) {
+        this.showPrompt("Пробел / Enter — поговорить", this.bulbaCat.x, this.bulbaCat.y);
       } else if (this.nearest) {
         this.showPrompt("Пробел / Enter — поговорить", this.nearest.x, this.nearest.y);
       } else if (this.tv && this.near(this.tv)) {
@@ -1134,8 +1221,15 @@ export class WorldScene extends Phaser.Scene {
       const npcDist = this.nearest
         ? Phaser.Math.Distance.Between(this.player.x, this.player.y, this.nearest.x, this.nearest.y)
         : Infinity;
-      if (nearLaptop && laptopDist <= npcDist) {
+      const catDist = this.nearCat && this.bulbaCat
+        ? Phaser.Math.Distance.Between(this.player.x, this.player.y, this.bulbaCat.x, this.bulbaCat.y)
+        : Infinity;
+      if (nearLaptop && laptopDist <= npcDist && laptopDist <= catDist) {
         this.laptop.open();
+        return true;
+      }
+      if (this.nearCat && this.bulbaCat && catDist <= npcDist) {
+        this.catDialogue.open();
         return true;
       }
       if (this.nearest) {
