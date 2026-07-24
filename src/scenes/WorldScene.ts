@@ -385,7 +385,7 @@ export class WorldScene extends Phaser.Scene {
       this.joystick.onAction = () => void this.tryInteract();
     }
 
-    this.gameMenu = new GameMenu((id) => this.openGame(id));
+    this.gameMenu = new GameMenu((id) => void this.openGame(id));
 
     // Planning poker (только мультиплеер): модалка шлёт команды в реалтайм,
     // ответы сервера роутятся в неё из handlers в startAsRole.
@@ -462,8 +462,35 @@ export class WorldScene extends Phaser.Scene {
       }
     };
     hideBootLoader();
-    if (api.isAuthenticated()) start();
-    else void this.authGate.open().then(start);
+    if (api.isAuthenticated()) {
+      void api
+        .ensureSession()
+        .then(() => {
+          api.startSessionKeepalive();
+          start();
+        })
+        .catch(() => void this.authGate.open().then(start));
+    } else {
+      void this.authGate.open().then(start);
+    }
+  }
+
+  /** Перед мини-игрой: убедиться, что JWT жив; иначе показать вход. */
+  private async requireSession(): Promise<boolean> {
+    try {
+      await api.ensureSession();
+      return true;
+    } catch (e) {
+      console.error("Сессия недействительна:", e);
+      void this.authGate.open();
+      return false;
+    }
+  }
+
+  /** Открыть аркаду из мира только после проверки/refresh сессии. */
+  private async openWorldGame(startGame: () => void): Promise<void> {
+    if (!(await this.requireSession())) return;
+    startGame();
   }
 
   // Старт мультиплеера: сохранённая роль — сразу в игру; нет роли (первый вход) —
@@ -490,6 +517,7 @@ export class WorldScene extends Phaser.Scene {
   // и тогда — со стрелками изменения ранга.
   private async reportScore(gameId: string, value: number): Promise<void> {
     try {
+      await api.ensureSession();
       const before = await api.fetchLeaderboard(gameId);
       const after = await api.submitScore(gameId, value);
       if (!boardChangedForYou(before, after)) return;
@@ -516,6 +544,7 @@ export class WorldScene extends Phaser.Scene {
   // Открыть игру в режиме слова дня: тянем сиды и сохранённый прогресс, передаём в игру.
   private async openDailyGame(gameId: "bulbaguess" | "bulbawordle"): Promise<void> {
     this.gameMenu.close();
+    if (!(await this.requireSession())) return;
     try {
       const [wotd, progress, boardSnap] = await Promise.all([
         api.fetchWotd(),
@@ -899,8 +928,9 @@ export class WorldScene extends Phaser.Scene {
     );
   }
 
-  private openGame(id: string): void {
+  private async openGame(id: string): Promise<void> {
     this.gameMenu.close();
+    if (!(await this.requireSession())) return;
     if (id === "bulbajump") this.bulbaJump.open(this.chosen.sprite);
     else if (id === "bulbaparking") this.bulbaParking.open();
     else if (id === "bulbatanks") this.bulbaTanks.open();
@@ -1194,17 +1224,21 @@ export class WorldScene extends Phaser.Scene {
       return true;
     }
     if (this.easelRect && this.nearRect(this.easelRect)) {
-      this.bulbaColors.open();
+      void this.openWorldGame(() => this.bulbaColors.open());
       return true;
     }
     if (this.packerRect && this.nearRect(this.packerRect)) {
-      this.bulbaPacker.open();
-      this.setPhaserAsleep(true);
+      void this.openWorldGame(() => {
+        this.bulbaPacker.open();
+        this.setPhaserAsleep(true);
+      });
       return true;
     }
     if (this.surkiRect && this.nearRect(this.surkiRect)) {
-      this.bulbaSurki.open();
-      this.setPhaserAsleep(true);
+      void this.openWorldGame(() => {
+        this.bulbaSurki.open();
+        this.setPhaserAsleep(true);
+      });
       return true;
     }
     if (this.airhockeyRedRect && this.nearRect(this.airhockeyRedRect)) {

@@ -3,6 +3,10 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 const TOKEN_KEY = "bulba_token";
 const LOGIN_KEY = "bulba_login";
+/** Фоновый refresh, пока вкладка открыта (sliding поверх TTL 7 дней). */
+const SESSION_KEEPALIVE_MS = 6 * 60 * 60 * 1000;
+
+let sessionKeepalive: ReturnType<typeof setInterval> | null = null;
 
 export interface LeaderboardEntry {
   rank: number;
@@ -40,6 +44,7 @@ export function isAuthenticated(): boolean {
 }
 
 export function logout(): void {
+  stopSessionKeepalive();
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(LOGIN_KEY);
 }
@@ -50,6 +55,76 @@ export function register(login: string, password: string): Promise<void> {
 
 export function login(login: string, password: string): Promise<void> {
   return authRequest("login", login, password);
+}
+
+/** Продлить JWT на сервере; новый токен кладётся в localStorage. */
+export async function refreshSession(): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/account/refresh`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+  });
+  if (res.status === 401 || res.status === 403) {
+    logout();
+    throw new Error("Сессия истекла — войдите заново");
+  }
+  if (!res.ok) throw new Error(await errorMessage(res));
+  const data = (await res.json()) as { token: string; login: string };
+  localStorage.setItem(TOKEN_KEY, data.token);
+  localStorage.setItem(LOGIN_KEY, data.login);
+  startSessionKeepalive();
+}
+
+/**
+ * Проверить и продлить сессию. Локально протухший JWT — сразу logout без запроса.
+ * Иначе POST /api/account/refresh (и проверка, что сервер ещё принимает токен).
+ */
+export async function ensureSession(): Promise<void> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Сессия истекла — войдите заново");
+  }
+  const expMs = tokenExpiresAtMs(token);
+  if (expMs !== null && expMs <= Date.now()) {
+    logout();
+    throw new Error("Сессия истекла — войдите заново");
+  }
+  await refreshSession();
+}
+
+/** Периодический refresh, чтобы длинная вкладка не доживала до жёсткого expiry. */
+export function startSessionKeepalive(): void {
+  stopSessionKeepalive();
+  sessionKeepalive = setInterval(() => {
+    if (!getToken()) {
+      stopSessionKeepalive();
+      return;
+    }
+    void ensureSession().catch(() => stopSessionKeepalive());
+  }, SESSION_KEEPALIVE_MS);
+}
+
+export function stopSessionKeepalive(): void {
+  if (sessionKeepalive !== null) {
+    clearInterval(sessionKeepalive);
+    sessionKeepalive = null;
+  }
+}
+
+function tokenExpiresAtMs(token: string): number | null {
+  try {
+    const payloadPart = token.split(".")[1];
+    if (!payloadPart) return null;
+    const json = base64UrlDecode(payloadPart);
+    const payload = JSON.parse(json) as { exp?: number };
+    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+function base64UrlDecode(value: string): string {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((value.length + 3) % 4);
+  return atob(padded);
 }
 
 export function submitScore(gameId: string, value: number): Promise<Leaderboard> {
@@ -250,6 +325,7 @@ async function authRequest(path: string, login: string, password: string): Promi
   const data = (await res.json()) as { token: string; login: string };
   localStorage.setItem(TOKEN_KEY, data.token);
   localStorage.setItem(LOGIN_KEY, data.login);
+  startSessionKeepalive();
 }
 
 async function leaderboardRequest(path: string, init: RequestInit): Promise<Leaderboard> {
