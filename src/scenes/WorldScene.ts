@@ -30,6 +30,7 @@ import { ROLES, spriteForRole } from "../data/roles";
 import { EMOTES, emojiForEmote } from "../data/emotes";
 import { Realtime, type RemoteState } from "../net/realtime";
 import { PlanningPoker } from "../ui/PlanningPoker";
+import { Retro } from "../ui/Retro";
 import { RemotePlayer } from "../entities/RemotePlayer";
 import { ItemsManager, type ObstacleCircle } from "../entities/ItemsManager";
 import { WallClock } from "../entities/WallClock";
@@ -149,6 +150,7 @@ export class WorldScene extends Phaser.Scene {
   private bulbaSurki!: BulbaSurki;
   private airHockey!: AirHockey;
   private poker!: PlanningPoker;
+  private retro!: Retro;
   private authGate!: AuthGate;
   private leaderboard!: Leaderboard;
   private achievements!: Achievements;
@@ -404,6 +406,26 @@ export class WorldScene extends Phaser.Scene {
       this.poker.open();
     };
 
+    this.retro = new Retro({
+      list: () => this.realtime.retroList(),
+      create: (name) => this.realtime.retroCreate(name),
+      join: (roomId) => this.realtime.retroJoin(roomId),
+      leave: () => this.realtime.retroLeave(),
+      close: () => this.realtime.retroClose(),
+      mood: (value) => this.realtime.retroMood(value),
+      addSticker: (board, text) => this.realtime.retroAddSticker(board, text),
+      editSticker: (stickerId, text) => this.realtime.retroEditSticker(stickerId, text),
+      deleteSticker: (stickerId) => this.realtime.retroDeleteSticker(stickerId),
+      groupStickers: (board, stickerIds) => this.realtime.retroGroupStickers(board, stickerIds),
+      moveSticker: (payload) => this.realtime.retroMoveSticker(payload),
+      react: (targetType, targetId, emoji) => this.realtime.retroReact(targetType, targetId, emoji),
+      deleteMeme: (memeId) => this.realtime.retroDeleteMeme(memeId),
+    });
+    document.getElementById("retroBtn")!.onclick = () => {
+      (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
+      this.retro.open();
+    };
+
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.keys = this.input.keyboard!.addKeys("W,A,S,D") as Record<string, Phaser.Input.Keyboard.Key>;
 
@@ -414,6 +436,7 @@ export class WorldScene extends Phaser.Scene {
     // разбираются в update() — там Space и Enter равноценны.
     this.router.register(this.slides);
     this.router.register(this.poker);
+    this.router.register(this.retro);
     this.router.register(this.airHockey);
     this.router.register(this.slidePicker);
     this.router.register(this.dialogue);
@@ -639,6 +662,7 @@ export class WorldScene extends Phaser.Scene {
       onOpen: () => {
         this.sendJoin();
         this.poker.onReconnect();
+        this.retro.onReconnect();
       },
       onSnapshot: (players) => this.onSnapshot(players),
       onJoined: (player) => this.addRemote(player),
@@ -662,6 +686,10 @@ export class WorldScene extends Phaser.Scene {
       onPokerState: (state) => this.poker.onState(state),
       onPokerClosed: () => this.poker.onClosed(),
       onPokerError: (message) => this.poker.onError(message),
+      onRetroRooms: (active, history) => this.retro.onRooms(active, history),
+      onRetroState: (state) => this.retro.onState(state),
+      onRetroClosed: () => this.retro.onClosed(),
+      onRetroError: (message) => this.retro.onError(message),
       onProjectorState: (state) => this.applyProjectorState(state.on, state.ownerId, state.index),
       onCatState: (state) => this.applyCatState(state.x, state.y, state.facing, state.moving),
       onCatSay: (text) => this.showCatSay(text),
@@ -922,6 +950,7 @@ export class WorldScene extends Phaser.Scene {
       this.computer.isOpen ||
       this.laptop.isOpen ||
       this.poker.isOpen ||
+      this.retro.isOpen ||
       this.airHockey.isOpen ||
       this.slidePicker.isOpen ||
       this.slides.isOpen

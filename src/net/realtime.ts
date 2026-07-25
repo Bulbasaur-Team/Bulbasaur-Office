@@ -85,6 +85,62 @@ export interface PokerStateView {
   tasks: PokerDoneTaskView[];
 }
 
+export interface RetroRoomSummary {
+  id: string;
+  name: string;
+  adminLogin: string;
+  participants: number;
+}
+
+export interface RetroHistorySummary {
+  id: string;
+  name: string;
+  adminLogin: string;
+  closedAt: number;
+}
+
+export interface RetroReactionView {
+  emoji: string;
+  count: number;
+  logins: string[];
+}
+
+export interface RetroStickerView {
+  id: string;
+  board: string;
+  text: string;
+  authorLogin: string;
+  mine: boolean;
+  groupId: string | null;
+  reactions: RetroReactionView[];
+}
+
+export interface RetroMemeView {
+  id: string;
+  authorLogin: string;
+  mine: boolean;
+  imageUrl: string;
+  reactions: RetroReactionView[];
+}
+
+export interface RetroMoodView {
+  login: string;
+  role: string | null;
+  value: number;
+}
+
+export interface RetroStateView {
+  id: string;
+  name: string;
+  isAdmin: boolean;
+  readOnly: boolean;
+  remainingMs: number;
+  participants: { login: string; role: string; admin: boolean }[];
+  moods: RetroMoodView[];
+  stickers: Record<string, RetroStickerView[]>;
+  memes: RetroMemeView[];
+}
+
 /** Состояние проектора в локации (владелец колоды — id персонажа). */
 export interface ProjectorStateView {
   on: boolean;
@@ -155,6 +211,10 @@ export interface RealtimeHandlers {
   onPokerState?: (state: PokerStateView) => void;
   onPokerClosed?: () => void;
   onPokerError?: (message: string) => void;
+  onRetroRooms?: (active: RetroRoomSummary[], history: RetroHistorySummary[]) => void;
+  onRetroState?: (state: RetroStateView) => void;
+  onRetroClosed?: () => void;
+  onRetroError?: (message: string) => void;
   onProjectorState?: (state: ProjectorStateView) => void;
   onCatState?: (state: CatStateView) => void;
   onCatSay?: (text: string) => void;
@@ -269,6 +329,65 @@ export class Realtime {
     this.send({ type: "pokerClose" });
   }
 
+  retroList(): void {
+    this.send({ type: "retroList" });
+  }
+
+  retroCreate(name: string): void {
+    this.send({ type: "retroCreate", name });
+  }
+
+  retroJoin(roomId: string): void {
+    this.send({ type: "retroJoin", roomId });
+  }
+
+  retroLeave(): void {
+    this.send({ type: "retroLeave" });
+  }
+
+  retroClose(): void {
+    this.send({ type: "retroClose" });
+  }
+
+  retroMood(value: number): void {
+    this.send({ type: "retroMood", value });
+  }
+
+  retroAddSticker(board: string, text: string): void {
+    this.send({ type: "retroAddSticker", board, text });
+  }
+
+  retroEditSticker(stickerId: string, text: string): void {
+    this.send({ type: "retroEditSticker", stickerId, text });
+  }
+
+  retroDeleteSticker(stickerId: string): void {
+    this.send({ type: "retroDeleteSticker", stickerId });
+  }
+
+  retroGroupStickers(board: string, stickerIds: string[]): void {
+    this.send({ type: "retroGroupStickers", board, stickerIds });
+  }
+
+  retroMoveSticker(payload: {
+    stickerId: string;
+    board: string;
+    ontoStickerId?: string | null;
+    ontoGroupId?: string | null;
+    toBoard?: boolean;
+    beforeStickerId?: string | null;
+  }): void {
+    this.send({ type: "retroMoveSticker", ...payload });
+  }
+
+  retroReact(targetType: string, targetId: string, emoji: string): void {
+    this.send({ type: "retroReact", targetType, targetId, emoji });
+  }
+
+  retroDeleteMeme(memeId: string): void {
+    this.send({ type: "retroDeleteMeme", memeId });
+  }
+
   projectorOn(ownerId: string): void {
     this.send({ type: "projectorOn", ownerId });
   }
@@ -365,6 +484,12 @@ export class Realtime {
       case "pokerState": this.handlers.onPokerState?.(msg); break;
       case "pokerClosed": this.handlers.onPokerClosed?.(); break;
       case "pokerError": this.handlers.onPokerError?.(msg.message); break;
+      case "retroRooms":
+        this.handlers.onRetroRooms?.(msg.active ?? [], msg.history ?? []);
+        break;
+      case "retroState": this.handlers.onRetroState?.(normalizeRetroState(msg)); break;
+      case "retroClosed": this.handlers.onRetroClosed?.(); break;
+      case "retroError": this.handlers.onRetroError?.(msg.message); break;
       case "projectorState":
         this.handlers.onProjectorState?.({
           on: !!msg.on,
@@ -498,4 +623,54 @@ function parseAirHockeyState(msg: any): AirHockeyStateView {
 function num(v: unknown, fallback: number): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
+}
+
+export function normalizeRetroState(msg: any): RetroStateView {
+  const stickersRaw = msg.stickers && typeof msg.stickers === "object" ? msg.stickers : {};
+  const stickers: Record<string, RetroStickerView[]> = {};
+  for (const board of ["good", "improve", "actions"]) {
+    const list = Array.isArray(stickersRaw[board]) ? stickersRaw[board] : [];
+    stickers[board] = list.map((s: any) => ({
+      id: String(s.id),
+      board: String(s.board ?? board),
+      text: String(s.text ?? ""),
+      authorLogin: String(s.authorLogin ?? "?"),
+      mine: !!s.mine,
+      groupId: s.groupId == null ? null : String(s.groupId),
+      reactions: normalizeReactions(s.reactions),
+    }));
+  }
+  const memes = Array.isArray(msg.memes) ? msg.memes : [];
+  return {
+    id: String(msg.id),
+    name: String(msg.name ?? ""),
+    isAdmin: !!msg.isAdmin,
+    readOnly: !!msg.readOnly,
+    remainingMs: Number(msg.remainingMs) || 0,
+    participants: Array.isArray(msg.participants) ? msg.participants : [],
+    moods: Array.isArray(msg.moods)
+      ? msg.moods.map((m: any) => ({
+          login: String(m.login ?? "?"),
+          role: m.role ?? null,
+          value: Math.max(0, Math.min(1, Number(m.value) || 0)),
+        }))
+      : [],
+    stickers,
+    memes: memes.map((m: any) => ({
+      id: String(m.id),
+      authorLogin: String(m.authorLogin ?? "?"),
+      mine: !!m.mine,
+      imageUrl: String(m.imageUrl ?? ""),
+      reactions: normalizeReactions(m.reactions),
+    })),
+  };
+}
+
+function normalizeReactions(raw: unknown): RetroReactionView[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((r: any) => ({
+    emoji: String(r.emoji ?? ""),
+    count: Number(r.count) || 0,
+    logins: Array.isArray(r.logins) ? r.logins.map(String) : [],
+  }));
 }

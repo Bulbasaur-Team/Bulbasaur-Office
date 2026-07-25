@@ -400,6 +400,208 @@
     html.bp-640 .poker-card { width: 60px; height: 84px; }
     html.bp-640 .poker-hand-card { width: 44px; height: 62px; font-size: 17px; }
 
+    /* Retro */
+    #retro { position: fixed; inset: 0; z-index: 40; background: rgba(8,10,14,.82); display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .retro-box {
+      position: relative; width: min(980px, calc(var(--sw) * .94)); max-height: calc(var(--sh) - 48px);
+      overflow-y: auto; border: 3px solid var(--accent); border-radius: 16px; padding: 24px 28px;
+      display: flex; flex-direction: column; gap: 12px; box-shadow: 0 12px 44px rgba(0,0,0,.55);
+      background: linear-gradient(180deg, #1a1f28 0%, #151920 100%);
+    }
+    #retro.maximized { padding: 0; }
+    #retro.maximized .retro-box { width: var(--sw); height: var(--sh); max-height: none; border: none; border-radius: 0; }
+    .retro-full-btn { position: absolute; top: 10px; left: 10px; }
+    .retro-close-btn { position: absolute; top: 10px; right: 10px; }
+    .retro-full-btn .ic-compress { display: none; }
+    #retro.maximized .retro-full-btn .ic-expand { display: none; }
+    #retro.maximized .retro-full-btn .ic-compress { display: block; }
+    .retro-title { margin: 4px 0 0; text-align: center; }
+    .retro-error { min-height: 18px; color: #e6807a; font-size: 14px; text-align: center; }
+    #retroLobby, #retroRoomView { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; }
+    .retro-section-label { font-size: 13px; opacity: .7; margin-top: 6px; }
+    .retro-rooms { display: flex; flex-direction: column; gap: 8px; max-height: calc(var(--sh) * .28); overflow-y: auto; }
+    .retro-empty { text-align: center; opacity: .7; font-size: 14px; padding: 12px 0; }
+    .retro-room-btn {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      background: rgba(38,43,51,.85); border: 2px solid var(--accent); border-radius: 12px;
+      padding: 12px 16px; color: var(--text); font-family: inherit; font-size: 15px; cursor: pointer; transition: .12s;
+    }
+    .retro-room-btn:hover { background: var(--accent); color: #14210f; }
+    .retro-room-btn.history { border-color: #555c68; opacity: .9; }
+    .retro-room-btn.history:hover { background: #3a414c; color: var(--text); }
+    .retro-room-title { font-weight: bold; }
+    .retro-room-meta { font-size: 12px; opacity: .75; }
+    .retro-form { display: flex; gap: 8px; justify-content: center; }
+    .retro-input { flex: 1; max-width: 380px; background: #f4f1e8; border: 2px solid var(--accent); border-radius: 10px; padding: 9px 14px; color: #1b1f24; font-family: inherit; font-size: 15px; }
+    .retro-input:focus { outline: none; border-color: #8fd06b; }
+    .retro-btn { background: var(--accent); border: 2px solid #5aa05a; border-radius: 10px; padding: 9px 16px; color: #14210f; font-family: inherit; font-size: 14px; font-weight: bold; cursor: pointer; }
+    .retro-btn:hover { filter: brightness(1.08); }
+    .retro-btn-danger { background: transparent; border-color: #6b3535; color: #e6807a; }
+    .retro-btn-danger:hover { background: #c94f4f; border-color: #c94f4f; color: #fff; filter: none; }
+    .retro-btn-ghost { background: transparent; border: 2px solid #555c68; color: var(--text); }
+    .retro-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-right: 88px; padding-left: 48px; }
+    .retro-room-name { font-size: 18px; font-weight: bold; }
+    .retro-timer { font-size: 13px; opacity: .8; white-space: nowrap; }
+    .retro-stepper {
+      display: flex; flex-wrap: wrap; gap: clamp(6px, 0.9vw, 14px); justify-content: center;
+      padding: 0 clamp(8px, 2vw, 24px);
+    }
+    .retro-step {
+      border: 2px solid #555c68; background: rgba(38,43,51,.85); color: var(--text);
+      border-radius: 999px;
+      padding: clamp(6px, 0.9vh, 14px) clamp(12px, 1.6vw, 28px);
+      font-family: inherit;
+      font-size: clamp(13px, 1.35vw, 22px);
+      cursor: pointer; line-height: 1.2;
+    }
+    .retro-step.active { border-color: var(--accent); background: var(--accent); color: #14210f; font-weight: bold; }
+    #retro.maximized .retro-step {
+      font-size: clamp(15px, 1.55vw, 24px);
+      padding: clamp(8px, 1.1vh, 16px) clamp(14px, 1.8vw, 32px);
+    }
+    .retro-stage { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
+    .retro-stage.hidden { display: none; }
+    .retro-mood-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px 12px; width: min(480px, 100%); margin: 0 auto; }
+    .retro-mood-faces { display: flex; justify-content: space-between; width: 100%; font-size: 28px; }
+    .retro-mood-bar {
+      position: relative; width: 100%; height: 22px; border-radius: 11px;
+      background: linear-gradient(to right, #ff0000 0%, #ffea00 50%, #00e676 100%);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.25);
+    }
+    .retro-mood-slider {
+      position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+      background: transparent; cursor: pointer; appearance: none; -webkit-appearance: none;
+    }
+    .retro-mood-slider:disabled { cursor: default; }
+    .retro-mood-slider::-webkit-slider-runnable-track { height: 22px; background: transparent; border: none; }
+    .retro-mood-slider::-moz-range-track { height: 22px; background: transparent; border: none; }
+    .retro-mood-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none; width: 18px; height: 18px; margin-top: 2px;
+      border-radius: 50%; background: #fff; border: 2px solid #1b1f24; box-shadow: 0 1px 4px rgba(0,0,0,.4);
+      cursor: pointer;
+    }
+    .retro-mood-slider::-moz-range-thumb {
+      width: 18px; height: 18px; border-radius: 50%; background: #fff;
+      border: 2px solid #1b1f24; box-shadow: 0 1px 4px rgba(0,0,0,.4); cursor: pointer;
+    }
+    .retro-mood-markers {
+      position: relative; width: 100%; height: 48px;
+    }
+    .retro-mood-dot {
+      position: absolute; top: 0; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      pointer-events: none; z-index: 2;
+    }
+    .retro-mood-dot-arrow {
+      width: 0; height: 0;
+      border-left: 6px solid transparent; border-right: 6px solid transparent;
+      border-bottom: 8px solid var(--accent);
+    }
+    .retro-mood-dot-label {
+      font-size: 12px; white-space: nowrap; max-width: 90px; overflow: hidden; text-overflow: ellipsis;
+      background: rgba(20,24,30,.95); border: 1px solid var(--accent); border-radius: 6px;
+      padding: 2px 7px; color: var(--text);
+    }
+    .retro-mood-dot-label.mine { border-color: #fff; font-weight: bold; }
+    .retro-board {
+      position: relative; flex: 1; min-height: 280px; border-radius: 12px; padding: 12px;
+      display: flex; flex-wrap: wrap; gap: 10px; align-content: flex-start; overflow: auto;
+    }
+    #retro.maximized #retroRoomView { flex: 1; min-height: 0; overflow: hidden; }
+    #retro.maximized .retro-stage:not(.hidden) { flex: 1; min-height: 0; }
+    #retro.maximized .retro-board { min-height: 0; }
+    .retro-board.good { background: #d8f0d8; }
+    .retro-board.improve { background: #f5d6d6; }
+    .retro-board.actions { background: #d6e4f5; }
+    .retro-board.memes { background: #ece6f5; }
+    .retro-board-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .retro-sticker-compose {
+      display: flex; flex-direction: column; gap: 8px; width: 100%;
+      background: rgba(38,43,51,.85); border: 2px solid var(--accent); border-radius: 10px; padding: 10px 12px;
+    }
+    .retro-sticker-compose textarea {
+      width: 100%; min-height: 72px; resize: vertical; box-sizing: border-box;
+      background: #f4f1e8; border: 2px solid #5aa05a; border-radius: 8px;
+      padding: 8px 10px; color: #1b1f24; font-family: inherit; font-size: 14px;
+    }
+    .retro-sticker-compose textarea:focus { outline: none; border-color: #8fd06b; }
+    .retro-sticker-compose-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .retro-sticker {
+      background: #ffe566; color: #1b1f24; border: 1px solid #e0c84a; border-radius: 4px;
+      padding: 8px; box-shadow: 2px 2px 0 rgba(0,0,0,.12); display: flex; flex-direction: column; gap: 6px;
+      width: var(--sticker-size, 140px); min-height: calc(var(--sticker-size, 140px) * .7);
+      cursor: grab; position: relative; font-size: calc(var(--sticker-size, 140px) * .11);
+      touch-action: none;
+    }
+    .retro-sticker.dragging { opacity: .45; cursor: grabbing; }
+    .retro-sticker.drag-over { outline: 3px dashed #2f6fed; }
+    .retro-sticker.selected { outline: 3px solid #2f6fed; }
+    .retro-sticker-text { white-space: pre-wrap; word-break: break-word; flex: 1; line-height: 1.25; }
+    .retro-sticker-author { font-size: .85em; opacity: .65; }
+    .retro-sticker-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+    .retro-sticker-actions button {
+      border: none; background: rgba(0,0,0,.08); border-radius: 4px; cursor: pointer;
+      font-family: inherit; font-size: 12px; padding: 2px 6px;
+    }
+    .retro-group {
+      display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border: 2px dashed #5a6a7a;
+      border-radius: 8px; background: rgba(255,255,255,.25); align-content: flex-start;
+      min-width: calc(var(--sticker-size, 140px) + 20px); min-height: calc(var(--sticker-size, 140px) * .7 + 16px);
+    }
+    .retro-group.drag-over { border-color: #2f6fed; background: rgba(47,111,237,.12); }
+    .retro-board.drag-over-board { box-shadow: inset 0 0 0 3px rgba(47,111,237,.45); }
+    .retro-reactions { display: flex; flex-wrap: wrap; gap: 4px; min-height: 0; }
+    .retro-reactions:empty { display: none; }
+    .retro-react {
+      border: 1px solid rgba(0,0,0,.15); background: rgba(255,255,255,.7); border-radius: 999px;
+      padding: 1px 6px; font-size: 12px; cursor: pointer; font-family: inherit;
+    }
+    .retro-react.mine { background: #fff; border-color: #2f6fed; }
+    .retro-react:disabled { cursor: default; opacity: .85; }
+    .retro-react-menu {
+      position: fixed; z-index: 60; display: flex; gap: 4px; flex-wrap: wrap;
+      background: #1b212b; border: 2px solid var(--accent); border-radius: 10px;
+      padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.45);
+    }
+    .retro-react-menu button {
+      width: 34px; height: 34px; border: none; border-radius: 8px; background: rgba(255,255,255,.08);
+      font-size: 18px; cursor: pointer; line-height: 1;
+    }
+    .retro-react-menu button:hover { background: var(--accent); }
+    .retro-meme {
+      background: #fff; border-radius: 8px; padding: 6px; box-shadow: 2px 2px 0 rgba(0,0,0,.12);
+      width: var(--meme-size, 160px); display: flex; flex-direction: column; gap: 6px;
+      color: #1b1f24; cursor: zoom-in;
+    }
+    .retro-meme img { width: 100%; height: auto; border-radius: 4px; display: block; max-height: 200px; object-fit: contain; background: #f0f0f0; }
+    .retro-meme-meta { color: #1b1f24; font-size: 13px; opacity: 1; }
+    .retro-summary { display: flex; flex-direction: column; gap: 16px; overflow: auto; }
+    .retro-summary-block { background: rgba(38,43,51,.7); border: 1px solid #353c46; border-radius: 12px; padding: 14px 16px; }
+    .retro-summary-block h3 { margin: 0 0 10px; font-size: 16px; }
+    .retro-summary-mood { font-size: 22px; display: flex; align-items: center; gap: 10px; }
+    .retro-best-memes { display: flex; flex-wrap: wrap; gap: 12px; }
+    .retro-best-memes .retro-meme-meta { color: #1b1f24; font-weight: 600; }
+    #retroMemeViewer {
+      position: fixed; inset: 0; z-index: 70; background: rgba(8,10,14,.88);
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    #retroMemeViewer.hidden { display: none !important; }
+    .retro-meme-viewer-box {
+      position: relative; max-width: min(960px, calc(var(--sw) * .92)); max-height: calc(var(--sh) - 48px);
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+    }
+    .retro-meme-viewer-box img {
+      max-width: 100%; max-height: calc(var(--sh) - 120px); object-fit: contain;
+      border-radius: 8px; background: #111; box-shadow: 0 12px 40px rgba(0,0,0,.5);
+    }
+    .retro-meme-viewer-close {
+      position: absolute; top: -8px; right: -8px; z-index: 1;
+    }
+    .retro-admin { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .retro-readonly-badge { text-align: center; font-size: 13px; opacity: .75; }
+    html.bp-640 .retro-box { padding: 16px 12px; }
+    html.bp-640 .retro-stepper { gap: 6px; }
+
     /* Стартовый лоадер (до появления экрана входа) */
     #bootLoader {
       position: fixed; inset: 0; z-index: 55;
@@ -1378,6 +1580,7 @@
         <div id="workGroup" class="hud-group hidden">
           <div class="hud-label">Работа</div>
           <button id="pokerBtn" class="hud-btn" aria-label="planning poker">🃏 Planning Poker</button>
+          <button id="retroBtn" class="hud-btn" aria-label="ретроспектива">📋 Ретро</button>
         </div>
         <div class="hud-group">
           <div class="hud-label">Слово дня</div>
@@ -1446,6 +1649,53 @@
             <button class="poker-btn" type="submit">Начать голосование</button>
           </form>
         </div>
+      </div>
+    </div>
+
+    <div id="retro" class="hidden">
+      <div class="retro-box">
+        <button class="slides-icon retro-full-btn" id="retroFull" aria-label="свернуть или развернуть">
+          <svg class="ic-expand" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+          <svg class="ic-compress" viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+        </button>
+        <button class="slides-icon retro-close-btn" id="retroClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <div class="retro-error" id="retroError"></div>
+        <div id="retroLobby">
+          <h2 class="retro-title">Retro</h2>
+          <div class="retro-rooms" id="retroActiveRooms"></div>
+          <form id="retroCreateForm" class="retro-form" autocomplete="off">
+            <input id="retroName" class="retro-input" type="text" maxlength="60" value="Retro WDM" />
+            <button class="retro-btn" type="submit">Создать комнату</button>
+          </form>
+          <div class="retro-section-label">Прошедшие</div>
+          <div class="retro-rooms" id="retroHistoryRooms"></div>
+        </div>
+        <div id="retroRoomView" class="hidden">
+          <div class="retro-head">
+            <div class="retro-room-name" id="retroRoomName"></div>
+            <div class="retro-timer" id="retroTimer"></div>
+          </div>
+          <div class="retro-readonly-badge hidden" id="retroReadonly">Только просмотр</div>
+          <div class="retro-stepper" id="retroStepper"></div>
+          <div id="retroStageMood" class="retro-stage"></div>
+          <div id="retroStageGood" class="retro-stage hidden"></div>
+          <div id="retroStageImprove" class="retro-stage hidden"></div>
+          <div id="retroStageActions" class="retro-stage hidden"></div>
+          <div id="retroStageMemes" class="retro-stage hidden"></div>
+          <div id="retroStageSummary" class="retro-stage hidden"></div>
+          <div class="retro-admin" id="retroAdmin"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="retroMemeViewer" class="hidden" role="dialog" aria-modal="true" aria-label="Просмотр мема">
+      <div class="retro-meme-viewer-box">
+        <button class="slides-icon retro-meme-viewer-close" id="retroMemeViewerClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <img id="retroMemeViewerImg" alt="мем" />
       </div>
     </div>
 

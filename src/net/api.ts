@@ -261,6 +261,50 @@ export async function changePassword(oldPassword: string, newPassword: string): 
   });
 }
 
+export interface RetroMemeUploadResult {
+  id: string;
+  imageUrl: string;
+}
+
+export async function uploadRetroMeme(roomId: string, file: File): Promise<RetroMemeUploadResult> {
+  const dataBase64 = await fileToBase64(file);
+  return authedJson<RetroMemeUploadResult>(`/api/retro/rooms/${encodeURIComponent(roomId)}/memes`, {
+    method: "POST",
+    body: JSON.stringify({ mimeType: file.type || "image/png", dataBase64 }),
+  });
+}
+
+export async function fetchRetroRoom(roomId: string): Promise<unknown> {
+  return authedJson<unknown>(`/api/retro/rooms/${encodeURIComponent(roomId)}`);
+}
+
+export async function fetchRetroMemeBlob(imageUrl: string): Promise<string> {
+  const path = imageUrl.startsWith("http") ? imageUrl : `${API_BASE}${imageUrl}`;
+  const res = await fetch(path, {
+    headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+  });
+  if (res.status === 401 || res.status === 403) {
+    logout();
+    throw new Error("Сессия истекла — войдите заново");
+  }
+  if (!res.ok) throw new Error(await errorMessage(res));
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? "");
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
+    reader.readAsDataURL(file);
+  });
+}
+
 // Как authedJson, но для эндпоинтов без тела ответа (204).
 async function authedVoid(path: string, init: RequestInit): Promise<void> {
   const res = await fetch(`${API_BASE}${path}`, {
