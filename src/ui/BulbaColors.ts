@@ -1,5 +1,5 @@
 // Bulba Colors — мини-игра у мольберта в главном офисе.
-// Референс-цвет сверху, снизу четыре очень похожих оттенка; верный только один.
+// Референс-цвет сверху, снизу четыре похожих оттенка; верный только один.
 // 30 секунд на партию; ошибка или истечение таймера — конец. За каждый верный ответ — 1 очко.
 
 const ROUND_MS = 30_000;
@@ -52,7 +52,7 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-// Референс + три близких, но различных отвлекающих оттенка.
+// Референс + три заметно отличимых отвлекающих оттенка.
 function makeRound(): { target: Rgb; options: Rgb[] } {
   const h = Math.random() * 360;
   const s = 0.35 + Math.random() * 0.55;
@@ -67,9 +67,10 @@ function makeRound(): { target: Rgb; options: Rgb[] } {
     let dh = h;
     let ds = s;
     let dl = l;
-    if (kind === 0) dh += (Math.random() < 0.5 ? -1 : 1) * (4 + Math.random() * 8);
-    else if (kind === 1) ds += (Math.random() < 0.5 ? -1 : 1) * (0.06 + Math.random() * 0.1);
-    else dl += (Math.random() < 0.5 ? -1 : 1) * (0.04 + Math.random() * 0.08);
+    // Средний разброс: между «слишком похоже» (~4–12°) и «слишком легко» (~18–40°).
+    if (kind === 0) dh += (Math.random() < 0.5 ? -1 : 1) * (10 + Math.random() * 14);
+    else if (kind === 1) ds += (Math.random() < 0.5 ? -1 : 1) * (0.10 + Math.random() * 0.14);
+    else dl += (Math.random() < 0.5 ? -1 : 1) * (0.07 + Math.random() * 0.11);
     const c = hslToRgb(dh, ds, dl);
     const key = rgbKey(c);
     if (used.has(key)) continue;
@@ -77,7 +78,7 @@ function makeRound(): { target: Rgb; options: Rgb[] } {
     distractors.push(c);
   }
   while (distractors.length < 3) {
-    const c = hslToRgb(h + distractors.length * 7 + 5, s, l + (distractors.length - 1) * 0.05);
+    const c = hslToRgb(h + distractors.length * 14 + 10, s, l + (distractors.length - 1) * 0.08);
     if (!used.has(rgbKey(c))) {
       used.add(rgbKey(c));
       distractors.push(c);
