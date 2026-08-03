@@ -1,16 +1,16 @@
 import { fetchCommunity, type CommunityPlayer } from "../net/api";
-import { publicPath } from "../publicPath";
-import { spriteForRole } from "../data/roles";
-import { SPRITE_FILES } from "../entities/sprites";
+import { defaultAppearance } from "../data/wardrobe";
+import { drawAppearance, loadWardrobeDomImages } from "../entities/PlayerAvatar";
 
-// Окно «Сообщество»: все игроки в порядке регистрации. У каждого аватар (картинка
-// выбранной роли), ник и кнопка «Ачивки: X/Y», открывающая ачивки этого игрока.
+// Окно «Сообщество»: все игроки в порядке регистрации. У каждого аватар
+// с надетой одеждой, ник и кнопка «Ачивки: X/Y».
 export class Community {
   isOpen = false;
 
   private root = document.getElementById("community")!;
   private statusEl = document.getElementById("commStatus")!;
   private listEl = document.getElementById("commList")!;
+  private images: Map<string, HTMLImageElement> | null = null;
 
   constructor(private onShowAchievements: (login: string) => void) {
     document.getElementById("commClose")!.onclick = () => this.close();
@@ -23,6 +23,7 @@ export class Community {
     this.listEl.innerHTML = "";
     this.statusEl.textContent = "Загрузка...";
     try {
+      if (!this.images) this.images = await loadWardrobeDomImages();
       const data = await fetchCommunity();
       this.statusEl.textContent = data.players.length === 0 ? "Пока никого нет" : "";
       for (const player of data.players) {
@@ -43,11 +44,14 @@ export class Community {
     const row = document.createElement("div");
     row.className = "comm-row";
 
-    // Аватар — спрайт выбранной роли; роль не выбрана — дефолтный скин.
-    const avatar = document.createElement("img");
+    const avatar = document.createElement("canvas");
     avatar.className = "comm-avatar";
-    avatar.src = publicPath(`assets/${SPRITE_FILES[spriteForRole(player.role ?? "")]}`);
-    avatar.alt = player.login;
+    avatar.width = 40;
+    avatar.height = 40;
+    const ctx = avatar.getContext("2d");
+    if (ctx && this.images) {
+      drawAppearance(ctx, 40, player.appearance ?? defaultAppearance(), this.images);
+    }
 
     const dot = document.createElement("span");
     dot.className = player.online ? "comm-dot comm-dot-online" : "comm-dot";

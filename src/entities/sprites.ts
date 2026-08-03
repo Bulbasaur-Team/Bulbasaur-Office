@@ -35,7 +35,7 @@ export function registerSpriteImages(scene: Phaser.Scene): void {
 export const getSpriteImage = (k: SpriteKey) => images.get(k)!;
 
 // Масштаб спрайта, чтобы его высота на экране равнялась targetH пикселям.
-export function spriteScale(scene: Phaser.Scene, sprite: SpriteKey, targetH: number): number {
+export function spriteScale(scene: Phaser.Scene, sprite: string, targetH: number): number {
   return targetH / scene.textures.get(sprite).getSourceImage().height;
 }
 

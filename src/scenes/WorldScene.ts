@@ -24,14 +24,13 @@ import { AirHockey, type AirHockeySide } from "../ui/AirHockey";
 import { KeyboardRouter } from "../ui/KeyboardRouter";
 import { showCharacterSelect } from "../ui/CharacterSelect";
 import { showModeSelect } from "../ui/ModeSelect";
-import { showRoleSelect } from "../ui/RoleSelect";
-import type { RoleDef } from "../data/roles";
-import { ROLES, spriteForRole } from "../data/roles";
 import { EMOTES, emojiForEmote } from "../data/emotes";
 import { Realtime, type RemoteState } from "../net/realtime";
 import { PlanningPoker } from "../ui/PlanningPoker";
 import { Retro } from "../ui/Retro";
 import { RemotePlayer } from "../entities/RemotePlayer";
+import { PlayerAvatar } from "../entities/PlayerAvatar";
+import { BODY_TEXTURE, defaultAppearance, type PlayerAppearance } from "../data/wardrobe";
 import { ItemsManager, type ObstacleCircle } from "../entities/ItemsManager";
 import { WallClock } from "../entities/WallClock";
 import { BulbaCat } from "../entities/BulbaCat";
@@ -44,6 +43,8 @@ import { Achievements } from "../ui/Achievements";
 import { AchievementPopup } from "../ui/AchievementPopup";
 import { Community } from "../ui/Community";
 import { PasswordChange } from "../ui/PasswordChange";
+import { BulbaCoins, BC_COIN_SRC } from "../ui/BulbaCoins";
+import { Wardrobe } from "../ui/Wardrobe";
 import { Ancestors } from "../ui/Ancestors";
 import { Logs } from "../ui/Logs";
 import { Monitoring } from "../ui/Monitoring";
@@ -103,7 +104,7 @@ const BODY_RADIUS = 26; // радиус круга персонажа (игро�
 const CHAT_HOLD_MS = 4000; // сколько держать облачко своего чата после печати
 const EMOTE_HOLD_MS = 2500; // сколько держать свою реакцию
 const EMOTE_FONT = 30;      // размер эмодзи-реакции
-const TARGET_H = 74;       // экранная высота персонажа в пикселях
+const TARGET_H = 94;       // экранная высота персонажа в пикселях (+10% к 85)
 const EXIT_ZONE_HALF = 52; // полразмера зоны срабатывания выхода вокруг точки двери
 
 const THOUGHT_INTERVAL_MS = 5000;        // базовый интервал проверки «не подумать ли»
@@ -157,6 +158,8 @@ export class WorldScene extends Phaser.Scene {
   private achievementPopup!: AchievementPopup;
   private community!: Community;
   private passwordChange!: PasswordChange;
+  private bulbaCoins!: BulbaCoins;
+  private wardrobe!: Wardrobe;
   private ancestors!: Ancestors;
   private logs!: Logs;
   private monitoring!: Monitoring;
@@ -173,13 +176,15 @@ export class WorldScene extends Phaser.Scene {
   private started = false;
 
   private multiplayer = false;
-  private role: RoleDef | null = null;
+  private appearance: PlayerAppearance = defaultAppearance();
+  private avatar: PlayerAvatar | null = null;
   private realtime = new Realtime();
   private remotePlayers = new Map<string, RemotePlayer>(); // чужие игроки текущей комнаты, ключ — id сессии
   private moveAcc = 0;             // накопитель времени для троттлинга отправки move
   private lastSentX = -1;
   private lastSentY = -1;
   private lastSentFacing = false;
+  private bcBalanceEl = document.getElementById("bcBalance")!;
 
   private chosen!: Character;
   private locIndex = 0;
@@ -317,6 +322,13 @@ export class WorldScene extends Phaser.Scene {
     this.community = new Community((login) => void this.achievements.open(login));
     document.getElementById("communityBtn")!.onclick = () => void this.community.open();
     this.passwordChange = new PasswordChange();
+    this.bulbaCoins = new BulbaCoins((balance) => this.setBcBalance(balance));
+    this.wardrobe = new Wardrobe({
+      onBalance: (balance) => this.setBcBalance(balance),
+      onAppearance: (appearance) => this.applyLocalAppearance(appearance),
+    });
+    const bcIcon = document.getElementById("bcIcon") as HTMLImageElement | null;
+    if (bcIcon) bcIcon.src = BC_COIN_SRC;
     this.ancestors = new Ancestors();
     this.logs = new Logs();
     this.monitoring = new Monitoring();
@@ -326,16 +338,13 @@ export class WorldScene extends Phaser.Scene {
       (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
       this.passwordChange.open();
     };
-    // Сменить Бульбазавра: тот же экран выбора роли; после сохранения — перезагрузка,
-    // чтобы чисто применить новый скин (как при смене режима).
-    document.getElementById("roleBtn")!.onclick = () => {
+    document.getElementById("bcBtn")!.onclick = () => {
       (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
-      showRoleSelect((role) => {
-        api.saveRole(role.id).then(
-          () => window.location.reload(),
-          (e) => console.error("Не удалось сохранить роль:", e),
-        );
-      });
+      void this.bulbaCoins.open();
+    };
+    document.getElementById("wardrobeBtn")!.onclick = () => {
+      (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
+      void this.wardrobe.open();
     };
     document.getElementById("logoutBtn")!.onclick = () => {
       api.logout();
@@ -516,24 +525,26 @@ export class WorldScene extends Phaser.Scene {
     startGame();
   }
 
-  // Старт мультиплеера: сохранённая роль — сразу в игру; нет роли (первый вход) —
-  // экран выбора, выбор запоминается на сервере.
+  // Старт мультиплеера: профиль (баланс + внешность), сразу в игру.
   private async startMultiplayer(): Promise<void> {
-    let savedRole: RoleDef | undefined;
     try {
       const profile = await api.fetchProfile();
-      savedRole = ROLES.find((r) => r.id === profile.role);
+      this.appearance = profile.appearance ?? defaultAppearance();
+      this.setBcBalance(profile.bulbaCoinBalance);
     } catch (e) {
       console.error("Не удалось получить профиль:", e);
+      this.appearance = defaultAppearance();
     }
-    if (savedRole) {
-      this.startAsRole(savedRole);
-      return;
-    }
-    showRoleSelect((role) => {
-      api.saveRole(role.id).catch((e) => console.error("Не удалось сохранить роль:", e));
-      this.startAsRole(role);
-    });
+    this.startAsMp();
+  }
+
+  private setBcBalance(balance: number): void {
+    this.bcBalanceEl.textContent = String(balance);
+  }
+
+  private applyLocalAppearance(appearance: PlayerAppearance): void {
+    this.appearance = appearance;
+    this.avatar?.setAppearance(appearance);
   }
 
   // Отправить результат: лидерборд показываем только если попытка изменила таблицу,
@@ -630,34 +641,34 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  // Старт в мультиплеере: скин по роли, NPC скрыты, подключаемся к реалтайму.
-  private startAsRole(role: RoleDef): void {
-    this.role = role;
+  // Старт в мультиплеере: единый Бульбазавр с одеждой, NPC скрыты, реалтайм.
+  private startAsMp(): void {
     this.multiplayer = true;
-    // Игрок в MP — не один из NPC, а роль. Собираем «пустышку» Character, чтобы
-    // переиспользовать общий путь запуска (скин, спавн, переходы между локациями).
     const me: Character = {
       id: "__me__",
       name: api.getLogin() ?? "Игрок",
-      sprite: role.sprite,
-      roleLabel: role.label,
+      sprite: "dev",
+      roleLabel: "Бульбазавр",
       areaLabel: "",
       slideCount: 0,
       lines: { greet: "", who: "", doing: "", did: "" },
       thoughts: [],
     };
     this.startAs(me);
+    // Физический спрайт невидим — рисуем layered-аватар.
+    this.player.setTexture(BODY_TEXTURE);
+    this.playerBaseScale = spriteScale(this, BODY_TEXTURE, TARGET_H);
+    this.player.setScale(this.playerBaseScale).setAlpha(0);
+    this.avatar = new PlayerAvatar(this, this.player.x, this.player.y, this.appearance, TARGET_H);
+    this.avatar.setDepth(DEPTH.player);
     this.showEmoteBar();
     document.getElementById("workGroup")!.classList.remove("hidden");
-    // Предметы: удары, стрим позиции, захват/бросок/постановка уходят на сервер
-    // (в одиночке колбэки не заданы — предметы живут только локально).
     this.items.onKick = (itemId, kickId, x, y, vx, vy) => this.realtime.itemKick(itemId, kickId, x, y, vx, vy);
     this.items.onSync = (itemId, x, y, vx, vy) => this.realtime.itemMove(itemId, x, y, vx, vy);
     this.items.onGrab = (itemId, itemType) => this.realtime.itemGrab(itemId, itemType);
     this.items.onDrop = (itemId, itemType, x, y) => this.realtime.itemDrop(itemId, itemType, x, y);
     this.items.onPlace = (itemId, itemType, table, x, y) => this.realtime.itemPlace(itemId, itemType, table, x, y);
     this.items.onGone = (itemId) => this.realtime.itemGone(itemId);
-    // Чат временно отключён: поле ввода не показываем. Реакции (фиксированный набор) — есть.
     this.realtime.connect({
       onOpen: () => {
         this.sendJoin();
@@ -667,6 +678,7 @@ export class WorldScene extends Phaser.Scene {
       onSnapshot: (players) => this.onSnapshot(players),
       onJoined: (player) => this.addRemote(player),
       onMoved: (id, x, y, facing) => this.remotePlayers.get(id)?.setTarget(x, y, facing),
+      onAppearance: (id, appearance) => this.remotePlayers.get(id)?.setAppearance(appearance),
       onEmote: (id, code) => this.showRemoteEmote(id, code),
       onLeft: (id) => this.removeRemote(id),
       onItems: (items) => this.items.applySnapshot(items),
@@ -677,7 +689,6 @@ export class WorldScene extends Phaser.Scene {
       onItemPlaced: (item) => this.items.applyPlaced(item),
       onItemRemoved: (itemId) => this.items.applyRemoved(itemId),
       onItemHeld: (id, itemId, itemType) => {
-        // Предмет уехал в лапы другого игрока — из мира его убираем, рисует его он сам.
         this.items.applyHeldByOther(itemId);
         this.remotePlayers.get(id)?.setHeldItem(itemType);
       },
@@ -693,7 +704,10 @@ export class WorldScene extends Phaser.Scene {
       onProjectorState: (state) => this.applyProjectorState(state.on, state.ownerId, state.index),
       onCatState: (state) => this.applyCatState(state.x, state.y, state.facing, state.moving),
       onCatSay: (text) => this.showCatSay(text),
-      onAchievement: (_code, title, description, image) => this.achievementPopup.show(title, description, image),
+      onAchievement: (_code, title, description, image) => {
+        this.achievementPopup.show(title, description, image);
+        void api.fetchProfile().then((p) => this.setBcBalance(p.bulbaCoinBalance)).catch(() => {});
+      },
       onAirHockeyLobby: (lobby) => this.applyAirHockeyLobby(lobby),
       onAirHockeyState: (state) => {
         if (state.phase === "playing" || state.phase === "ended") {
@@ -755,7 +769,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.atParking) return;
     this.remotePlayers.get(player.id)?.destroy();
     const remote = new RemotePlayer(
-      this, spriteForRole(player.role), player.login,
+      this, player.appearance ?? defaultAppearance(), player.login,
       player.x, player.y, player.facing, TARGET_H, DEPTH.bubble,
     );
     this.remotePlayers.set(player.id, remote);
@@ -840,11 +854,10 @@ export class WorldScene extends Phaser.Scene {
     }));
   }
 
-  // Отправить роль/локацию/позицию как вход в мир (в т.ч. после реконнекта).
+  // Отправить локацию/позицию как вход в мир (в т.ч. после реконнекта).
   private sendJoin(): void {
-    if (!this.role) return;
+    if (!this.multiplayer) return;
     this.realtime.join(
-      this.role.id,
       LOCATIONS[this.locIndex].id,
       Math.round(this.player.x),
       Math.round(this.player.y),
@@ -944,6 +957,8 @@ export class WorldScene extends Phaser.Scene {
       this.achievements.isOpen ||
       this.community.isOpen ||
       this.passwordChange.isOpen ||
+      this.bulbaCoins.isOpen ||
+      this.wardrobe.isOpen ||
       this.ancestors.isOpen ||
       this.logs.isOpen ||
       this.monitoring.isOpen ||
@@ -1353,6 +1368,14 @@ export class WorldScene extends Phaser.Scene {
       this.walkPhase = 0;
       this.player.setAngle(0);
       this.player.scaleY = this.playerBaseScale;
+    }
+    if (this.avatar) {
+      this.avatar.setPosition(this.player.x, this.player.y);
+      this.avatar.setFlipX(this.player.flipX);
+      this.avatar.setDepth(this.player.depth);
+      this.avatar.setVisible(this.player.visible);
+      this.avatar.container.setAngle(this.player.angle);
+      this.avatar.container.setScale(1, this.player.scaleY / this.playerBaseScale);
     }
   }
 

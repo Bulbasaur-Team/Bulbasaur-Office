@@ -192,11 +192,11 @@ export function fetchPlayerAchievements(login: string): Promise<Achievements> {
   return authedJson<Achievements>(`/api/achievements/${encodeURIComponent(login)}`);
 }
 
-// Сообщество: игроки в порядке регистрации; role == null — роль ещё не выбрана;
+// Сообщество: игроки в порядке регистрации;
 // online — игрок сейчас в игре (есть открытое соединение).
 export interface CommunityPlayer {
   login: string;
-  role: string | null;
+  appearance: import("../data/wardrobe").PlayerAppearance;
   owned: number;
   online: boolean;
 }
@@ -237,20 +237,81 @@ export function fetchOfficeMetrics(): Promise<OfficeMetrics> {
   return authedJson<OfficeMetrics>(`/api/metrics`);
 }
 
-// Профиль: сохранённая роль (null — игрок ещё не выбирал Бульбазавра).
+// Профиль: баланс BC и надетая одежда.
 export interface Profile {
   login: string;
-  role: string | null;
+  bulbaCoinBalance: number;
+  appearance: import("../data/wardrobe").PlayerAppearance;
 }
 
 export function fetchProfile(): Promise<Profile> {
   return authedJson<Profile>(`/api/account/profile`);
 }
 
-export async function saveRole(role: string): Promise<void> {
-  await authedVoid(`/api/account/role`, {
-    method: "PUT",
-    body: JSON.stringify({ role }),
+export interface BulbaCoinTransaction {
+  id: string;
+  amount: number;
+  kind: string;
+  title: string;
+  createdAt: string;
+}
+
+export interface BulbaCoinHistory {
+  balance: number;
+  transactions: BulbaCoinTransaction[];
+}
+
+export function fetchBulbaCoinHistory(before?: string): Promise<BulbaCoinHistory> {
+  const q = before ? `?before=${encodeURIComponent(before)}` : "";
+  return authedJson<BulbaCoinHistory>(`/api/account/bulba-coins/transactions${q}`);
+}
+
+export interface WardrobeCatalogItem {
+  code: string;
+  category: import("../data/wardrobe").WardrobeCategory;
+  name: string;
+  price: number;
+  sellable: boolean;
+  owned: boolean;
+  equipped: boolean;
+  purchasedAt: string | null;
+}
+
+export interface WardrobeCatalog {
+  balance: number;
+  appearance: import("../data/wardrobe").PlayerAppearance;
+  items: WardrobeCatalogItem[];
+}
+
+export function fetchWardrobeCatalog(): Promise<WardrobeCatalog> {
+  return authedJson<WardrobeCatalog>(`/api/wardrobe/catalog`);
+}
+
+export function buyWardrobeItem(itemCode: string): Promise<{ balance: number; item: WardrobeCatalogItem }> {
+  return authedJson(`/api/wardrobe/buy`, {
+    method: "POST",
+    body: JSON.stringify({ itemCode }),
+  });
+}
+
+export function equipWardrobeItem(
+  category: string,
+  itemCode: string | null,
+): Promise<{ appearance: import("../data/wardrobe").PlayerAppearance }> {
+  return authedJson(`/api/wardrobe/equip`, {
+    method: "POST",
+    body: JSON.stringify({ category, itemCode }),
+  });
+}
+
+export function sellWardrobeItem(itemCode: string): Promise<{
+  balance: number;
+  refund: number;
+  appearance: import("../data/wardrobe").PlayerAppearance;
+}> {
+  return authedJson(`/api/wardrobe/sell`, {
+    method: "POST",
+    body: JSON.stringify({ itemCode }),
   });
 }
 

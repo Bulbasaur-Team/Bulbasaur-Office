@@ -1,5 +1,5 @@
-import { spriteForRole } from "../data/roles";
-import { drawContain, getSpriteImage } from "../entities/sprites";
+import { defaultAppearance, type PlayerAppearance } from "../data/wardrobe";
+import { drawAppearance, loadWardrobeDomImages } from "../entities/PlayerAvatar";
 import { getLogin } from "../net/api";
 import type { PokerRoomSummary, PokerStateView } from "../net/realtime";
 import type { KeyConsumer } from "./KeyboardRouter";
@@ -56,6 +56,7 @@ export class PlanningPoker implements KeyConsumer {
   private joinedRoomId: string | null = null;
   private deadline = 0; // локальный дедлайн закрытия комнаты (из remainingMs сервера)
   private timerId: number | null = null;
+  private images: Map<string, HTMLImageElement> | null = null;
 
   constructor(private net: PokerNet) {
     document.getElementById("pokerClose")!.onclick = () => this.close();
@@ -86,6 +87,12 @@ export class PlanningPoker implements KeyConsumer {
     this.showLobby();
     this.root.classList.remove("hidden");
     this.net.list();
+    void this.ensureImages();
+  }
+
+  private async ensureImages(): Promise<void> {
+    if (!this.images) this.images = await loadWardrobeDomImages();
+    if (this.isOpen && this.state) this.renderCards(this.state);
   }
 
   close(): void {
@@ -254,13 +261,13 @@ export class PlanningPoker implements KeyConsumer {
   }
 
   // Карточки участников: до вскрытия — рубашки (своя карта видна себе),
-  // после — иконка бульбазавра выбранной роли и значение.
+  // после — аватар с одеждой и значение.
   private renderCards(state: PokerStateView): void {
     this.cardsEl.innerHTML = "";
     const current = state.current;
     if (current?.revealed) {
       for (const vote of current.votes) {
-        this.cardsEl.appendChild(this.slot(vote.login, this.faceCard(vote.role, vote.value)));
+        this.cardsEl.appendChild(this.slot(vote.login, this.faceCard(vote.appearance, vote.value)));
       }
       return;
     }
@@ -269,7 +276,7 @@ export class PlanningPoker implements KeyConsumer {
       const mine = p.login === myLogin;
       let card: HTMLElement;
       if (!current || !p.voted) card = this.emptyCard();
-      else if (mine && state.myVote) card = this.faceCard(p.role, state.myVote);
+      else if (mine && state.myVote) card = this.faceCard(p.appearance, state.myVote);
       else card = this.backCard();
       this.cardsEl.appendChild(this.slot(p.login + (p.admin ? " ★" : ""), card));
     }
@@ -286,13 +293,16 @@ export class PlanningPoker implements KeyConsumer {
     return slot;
   }
 
-  private faceCard(role: string, value: string): HTMLElement {
+  private faceCard(appearance: PlayerAppearance | null | undefined, value: string): HTMLElement {
     const card = document.createElement("div");
     card.className = "poker-card";
     const cv = document.createElement("canvas");
     cv.width = ICON_SIZE;
     cv.height = ICON_SIZE;
-    drawContain(cv.getContext("2d")!, getSpriteImage(spriteForRole(role)), ICON_SIZE);
+    const ctx = cv.getContext("2d");
+    if (ctx && this.images) {
+      drawAppearance(ctx, ICON_SIZE, appearance ?? defaultAppearance(), this.images);
+    }
     card.appendChild(cv);
     const val = document.createElement("div");
     val.className = "poker-card-val";

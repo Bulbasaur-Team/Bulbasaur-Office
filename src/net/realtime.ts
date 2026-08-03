@@ -9,7 +9,7 @@ const RECONNECT_DELAY = 1000;
 export interface RemoteState {
   id: string;
   login: string;
-  role: string;
+  appearance: import("../data/wardrobe").PlayerAppearance;
   x: number;
   y: number;
   facing: boolean;
@@ -47,7 +47,7 @@ export interface PokerRoomSummary {
 
 export interface PokerParticipantView {
   login: string;
-  role: string;
+  appearance: import("../data/wardrobe").PlayerAppearance;
   admin: boolean;
   voted: boolean;
 }
@@ -55,7 +55,7 @@ export interface PokerParticipantView {
 // Вскрытый голос (после завершения голосования).
 export interface PokerVoteView {
   login: string;
-  role: string;
+  appearance: import("../data/wardrobe").PlayerAppearance;
   value: string;
 }
 
@@ -194,6 +194,7 @@ export interface RealtimeHandlers {
   onOpen?: () => void; // соединение открыто (в т.ч. после реконнекта) — здесь шлём join
   onSnapshot?: (players: RemoteState[]) => void;
   onJoined?: (player: RemoteState) => void;
+  onAppearance?: (id: string, appearance: import("../data/wardrobe").PlayerAppearance) => void;
   onMoved?: (id: string, x: number, y: number, facing: boolean) => void;
   onChat?: (id: string, login: string, text: string) => void;
   onEmote?: (id: string, emote: string) => void;
@@ -247,8 +248,8 @@ export class Realtime {
     this.ws = null;
   }
 
-  join(role: string, locationId: string, x: number, y: number, facing: boolean): void {
-    this.send({ type: "join", role, locationId, x, y, facing });
+  join(locationId: string, x: number, y: number, facing: boolean): void {
+    this.send({ type: "join", locationId, x, y, facing });
   }
 
   room(locationId: string, x: number, y: number, facing: boolean): void {
@@ -467,6 +468,7 @@ export class Realtime {
     switch (msg.type) {
       case "snapshot": this.handlers.onSnapshot?.(msg.players); break;
       case "joined": this.handlers.onJoined?.(msg.player); break;
+      case "appearance": this.handlers.onAppearance?.(msg.id, msg.appearance); break;
       case "moved": this.handlers.onMoved?.(msg.id, msg.x, msg.y, msg.facing); break;
       case "chat": this.handlers.onChat?.(msg.id, msg.login, msg.text); break;
       case "emote": this.handlers.onEmote?.(msg.id, msg.emote); break;
