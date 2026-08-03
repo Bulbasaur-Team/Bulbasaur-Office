@@ -9,11 +9,16 @@ import {
   CATEGORIES,
   CATEGORY_LABELS,
   defaultAppearance,
+  groupWardrobeItems,
   withSlot,
   type PlayerAppearance,
   type WardrobeCategory,
+  type WardrobeColorGroup,
 } from "../data/wardrobe";
 import { drawAppearance, loadWardrobeDomImages } from "../entities/PlayerAvatar";
+
+type CatalogColorGroup = WardrobeColorGroup<WardrobeCatalogItem>;
+type CatalogVariant = CatalogColorGroup["variants"][number];
 
 /** Гардероб: единый каталог — примерка, покупка, надевание, продажа. */
 export class Wardrobe {
@@ -114,16 +119,30 @@ export class Wardrobe {
       this.listEl.appendChild(empty);
       return;
     }
-    for (const item of items) {
-      this.listEl.appendChild(this.card(item));
+    for (const group of groupWardrobeItems(items)) {
+      this.listEl.appendChild(this.card(group));
     }
   }
 
-  private card(item: WardrobeCatalogItem): HTMLDivElement {
+  private activeVariant(group: CatalogColorGroup): CatalogVariant {
+    const selected = group.variants.find((v) => v.code === this.selectedCode);
+    if (selected) return selected;
+    const equipped = group.variants.find((v) => v.equipped);
+    if (equipped) return equipped;
+    const owned = group.variants.find((v) => v.owned);
+    if (owned) return owned;
+    return group.variants[0]!;
+  }
+
+  private card(group: CatalogColorGroup): HTMLDivElement {
+    const item = this.activeVariant(group);
+    const anyEquipped = group.variants.some((v) => v.equipped);
+    const anySelected = group.variants.some((v) => v.code === this.selectedCode);
+
     const card = document.createElement("div");
     card.className = "wardrobe-card";
-    if (this.selectedCode === item.code) card.classList.add("sel");
-    if (item.equipped) card.classList.add("equipped");
+    if (anySelected) card.classList.add("sel");
+    if (anyEquipped) card.classList.add("equipped");
 
     const preview = document.createElement("canvas");
     preview.className = "wardrobe-card-preview";
@@ -133,7 +152,33 @@ export class Wardrobe {
 
     const name = document.createElement("div");
     name.className = "wardrobe-card-name";
-    name.textContent = item.name;
+    name.textContent = group.displayName;
+
+    if (group.variants.length > 1) {
+      const swatches = document.createElement("div");
+      swatches.className = "wardrobe-color-swatches";
+      for (const variant of group.variants) {
+        const swatch = document.createElement("button");
+        swatch.type = "button";
+        swatch.className = "wardrobe-color-swatch";
+        swatch.title = variant.name;
+        swatch.setAttribute("aria-label", variant.name);
+        if (variant.colorHex) swatch.style.background = variant.colorHex;
+        if (variant.code === item.code) swatch.classList.add("active");
+        if (variant.owned) swatch.classList.add("owned");
+        swatch.onclick = (e) => {
+          e.stopPropagation();
+          this.selectedCode = variant.code;
+          this.tryOnAppearance = withSlot(this.tryOnAppearance, variant.category, variant.code);
+          this.drawPreviews();
+          this.renderList();
+        };
+        swatches.appendChild(swatch);
+      }
+      card.append(preview, name, swatches);
+    } else {
+      card.append(preview, name);
+    }
 
     const meta = document.createElement("div");
     meta.className = "wardrobe-card-meta";
@@ -203,7 +248,7 @@ export class Wardrobe {
       actions.appendChild(buyBtn);
     }
 
-    card.append(preview, name, meta, actions);
+    card.append(meta, actions);
     card.onclick = () => {
       this.selectedCode = item.code;
       this.renderList();
@@ -239,7 +284,7 @@ export class Wardrobe {
     try {
       const res = await buyWardrobeItem(item.code);
       this.setBalance(res.balance);
-      this.selectedCode = null;
+      this.selectedCode = item.code;
       await this.reload({ keepTryOn: true });
       this.statusEl.textContent = `Куплено: ${item.name}`;
     } catch (e) {
@@ -250,7 +295,7 @@ export class Wardrobe {
   private async equip(category: WardrobeCategory, itemCode: string | null): Promise<void> {
     try {
       const res = await equipWardrobeItem(category, itemCode);
-      this.selectedCode = null;
+      if (itemCode) this.selectedCode = itemCode;
       this.items = this.items.map((item) => (
         item.category === category
           ? { ...item, equipped: item.code === (itemCode ?? "") }
