@@ -24,11 +24,15 @@ export class Wardrobe {
   private listEl = document.getElementById("wardrobeList")!;
   private statusEl = document.getElementById("wardrobeStatus")!;
   private balanceEl = document.getElementById("wardrobeBalance")!;
-  private preview = document.getElementById("wardrobePreview") as HTMLCanvasElement;
+  private equippedCanvas = document.getElementById("wardrobeEquippedPreview") as HTMLCanvasElement;
+  private tryOnCanvas = document.getElementById("wardrobeTryOnPreview") as HTMLCanvasElement;
   private category: WardrobeCategory = "TOP";
   private items: WardrobeCatalogItem[] = [];
   private balance = 0;
-  private previewAppearance: PlayerAppearance = defaultAppearance();
+  /** Реально надетая одежда («Твой Бульбазавр»). */
+  private equippedAppearance: PlayerAppearance = defaultAppearance();
+  /** Локальная примерка («Примерка»). */
+  private tryOnAppearance: PlayerAppearance = defaultAppearance();
   private images: Map<string, HTMLImageElement> | null = null;
   private selectedCode: string | null = null;
 
@@ -52,11 +56,13 @@ export class Wardrobe {
       if (!this.images) this.images = await loadWardrobeDomImages();
       const data = await fetchWardrobeCatalog();
       this.items = data.items;
-      this.previewAppearance = { ...data.appearance };
+      this.equippedAppearance = { ...data.appearance };
+      this.tryOnAppearance = { ...data.appearance };
+      this.selectedCode = null;
       this.setBalance(data.balance);
       this.statusEl.textContent = "";
       this.renderList();
-      this.drawPreview();
+      this.drawPreviews();
     } catch (e) {
       this.statusEl.textContent = (e as Error).message;
     }
@@ -100,19 +106,7 @@ export class Wardrobe {
 
   private renderList(): void {
     this.listEl.innerHTML = "";
-    const items = this.items
-      .filter((i) => i.category === this.category)
-      .sort((a, b) => {
-        if (a.owned !== b.owned) return a.owned ? -1 : 1;
-        if (a.owned && b.owned) {
-          const at = a.purchasedAt ? Date.parse(a.purchasedAt) : 0;
-          const bt = b.purchasedAt ? Date.parse(b.purchasedAt) : 0;
-          if (at !== bt) return at - bt;
-        } else if (!a.owned && !b.owned) {
-          if (a.price !== b.price) return a.price - b.price;
-        }
-        return a.code.localeCompare(b.code);
-      });
+    const items = this.items.filter((i) => i.category === this.category);
     if (items.length === 0) {
       const empty = document.createElement("div");
       empty.className = "wardrobe-empty";
@@ -164,8 +158,8 @@ export class Wardrobe {
     tryBtn.onclick = (e) => {
       e.stopPropagation();
       this.selectedCode = item.code;
-      this.previewAppearance = withSlot(this.previewAppearance, item.category, item.code);
-      this.drawPreview();
+      this.tryOnAppearance = withSlot(this.tryOnAppearance, item.category, item.code);
+      this.drawPreviews();
       this.renderList();
     };
     actions.appendChild(tryBtn);
@@ -217,10 +211,15 @@ export class Wardrobe {
     return card;
   }
 
-  private drawPreview(): void {
-    const ctx = this.preview.getContext("2d");
+  private drawPreviews(): void {
+    this.drawOn(this.equippedCanvas, this.equippedAppearance);
+    this.drawOn(this.tryOnCanvas, this.tryOnAppearance);
+  }
+
+  private drawOn(canvas: HTMLCanvasElement, appearance: PlayerAppearance): void {
+    const ctx = canvas.getContext("2d");
     if (!ctx || !this.images) return;
-    drawAppearance(ctx, this.preview.width, this.previewAppearance, this.images);
+    drawAppearance(ctx, canvas.width, appearance, this.images);
   }
 
   private drawCardPreview(canvas: HTMLCanvasElement, item: WardrobeCatalogItem): void {
@@ -240,9 +239,8 @@ export class Wardrobe {
     try {
       const res = await buyWardrobeItem(item.code);
       this.setBalance(res.balance);
-      // Покупка не примеряет и не надевает — превью остаётся с реальной экипировкой.
       this.selectedCode = null;
-      await this.reload();
+      await this.reload({ keepTryOn: true });
       this.statusEl.textContent = `Куплено: ${item.name}`;
     } catch (e) {
       this.statusEl.textContent = (e as Error).message;
@@ -258,12 +256,12 @@ export class Wardrobe {
           ? { ...item, equipped: item.code === (itemCode ?? "") }
           : item
       ));
-      this.previewAppearance = { ...res.appearance };
+      this.equippedAppearance = { ...res.appearance };
       this.hooks.onAppearance(res.appearance);
       this.renderList();
-      this.drawPreview();
+      this.drawPreviews();
       this.statusEl.textContent = itemCode ? "Одежда надета" : "Одежда снята";
-      void this.reload();
+      void this.reload({ keepTryOn: true });
     } catch (e) {
       this.statusEl.textContent = (e as Error).message;
     }
@@ -275,29 +273,34 @@ export class Wardrobe {
       const res = await sellWardrobeItem(item.code);
       if (this.selectedCode === item.code) this.selectedCode = null;
       this.setBalance(res.balance);
-      this.previewAppearance = { ...res.appearance };
+      this.equippedAppearance = { ...res.appearance };
+      this.tryOnAppearance = { ...res.appearance };
       this.hooks.onAppearance(res.appearance);
-      await this.reload();
-      this.drawPreview();
+      await this.reload({ keepTryOn: false });
       this.statusEl.textContent = `Продано: ${item.name} (+${res.refund} BC)`;
     } catch (e) {
       this.statusEl.textContent = (e as Error).message;
     }
   }
 
-  private async reload(): Promise<void> {
+  private async reload(opts: { keepTryOn: boolean }): Promise<void> {
+    const tryOnBefore = this.tryOnAppearance;
     const data = await fetchWardrobeCatalog();
     this.items = data.items;
     this.setBalance(data.balance);
-    this.previewAppearance = { ...data.appearance };
-    if (this.selectedCode) {
+    this.equippedAppearance = { ...data.appearance };
+    if (opts.keepTryOn) {
+      this.tryOnAppearance = { ...tryOnBefore };
+    } else if (this.selectedCode) {
       const selected = data.items.find((i) => i.code === this.selectedCode);
-      if (selected) {
-        this.previewAppearance = withSlot(data.appearance, selected.category, selected.code);
-      }
+      this.tryOnAppearance = selected
+        ? withSlot(data.appearance, selected.category, selected.code)
+        : { ...data.appearance };
+    } else {
+      this.tryOnAppearance = { ...data.appearance };
     }
     this.renderList();
-    this.drawPreview();
+    this.drawPreviews();
   }
 
   private onKey = (e: KeyboardEvent): void => {

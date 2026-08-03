@@ -70,6 +70,8 @@ function apply(): void {
   root.classList.toggle("bp-640", stage.width <= 640);
   root.classList.toggle("bp-560", stage.width <= 560);
   root.classList.toggle("bp-400", stage.width <= 400);
+  // Низкая сцена (телефон в landscape-мире): высота часто ~360–430 при ширине >640.
+  root.classList.toggle("bp-short", stage.height <= 480);
 
   for (const fn of listeners) fn();
 }
