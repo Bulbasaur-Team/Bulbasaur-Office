@@ -1,4 +1,5 @@
-import { getSpriteImage, type SpriteKey } from "../entities/sprites";
+import { defaultAppearance, type PlayerAppearance } from "../data/wardrobe";
+import { composeAppearanceCanvas, loadWardrobeDomImages } from "../entities/PlayerAvatar";
 import { publicPath } from "../publicPath";
 import { screenToStage } from "./orientation";
 
@@ -51,7 +52,7 @@ interface Platform {
 
 // Bulba Jump — аналог Doodle Jump в антураже склада: посылки-платформы,
 // ленты-конвейеры, батуты, хрупкие коробки, шапочка-вертолёт и реактивный ранец.
-// Игрок — спрайт выбранного персонажа.
+// Игрок — текущий аватар с одеждой из гардероба.
 export class BulbaJump {
   isOpen = false;
   onClose: (() => void) | null = null;
@@ -64,7 +65,8 @@ export class BulbaJump {
   private ctx = this.canvas.getContext("2d")!;
   private statusEl = document.getElementById("bjStatus")!;
 
-  private sprite: HTMLImageElement | null = null;
+  private wardrobeImages: Map<string, HTMLImageElement> | null = null;
+  private sprite: HTMLCanvasElement | null = null;
   private heliImg = new Image();
   private jetImg = new Image();
   private px = 0;
@@ -166,8 +168,9 @@ export class BulbaJump {
     else if (e.code === "ArrowRight" || e.code === "KeyD") this.keyRight = false;
   };
 
-  open(spriteKey: SpriteKey): void {
-    this.sprite = getSpriteImage(spriteKey);
+  async open(appearance: PlayerAppearance = defaultAppearance()): Promise<void> {
+    if (!this.wardrobeImages) this.wardrobeImages = await loadWardrobeDomImages();
+    this.sprite = composeAppearanceCanvas(appearance, this.wardrobeImages);
     this.isOpen = true;
     this.root.classList.remove("hidden");
     window.addEventListener("keydown", this.onKeyDown);

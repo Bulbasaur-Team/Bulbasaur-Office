@@ -1,7 +1,10 @@
 import Phaser from "phaser";
 import {
   BODY_FILE,
+  BODY_NO_EARS_FILE,
+  BODY_NO_EARS_TEXTURE,
   BODY_TEXTURE,
+  bodyTextureFor,
   LAYER_ORDER,
   textureKeyForItem,
   WARDROBE_ITEMS,
@@ -88,7 +91,7 @@ export class PlayerAvatar {
 
     let z = 0;
     for (const slot of LAYER_ORDER) {
-      const key = slot === "body" ? BODY_TEXTURE : this.textureForSlot(slot);
+      const key = slot === "body" ? bodyTextureFor(this.appearance) : this.textureForSlot(slot);
       if (!key || !this.scene.textures.exists(key)) continue;
       const img = this.scene.add
         .image(0, 0, key)
@@ -122,12 +125,40 @@ export function drawAppearance(
     const h = img.height * scale;
     ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
   };
-  draw(images.get(BODY_TEXTURE));
+  draw(images.get(bodyTextureFor(appearance)));
   for (const slot of LAYER_ORDER) {
     if (slot === "body") continue;
     const code = appearance[slot];
     if (code) draw(images.get(textureKeyForItem(code)));
   }
+}
+
+/** Собирает layered-аватар в canvas нативного размера тела (для аркад вроде Bulba Jump). */
+export function composeAppearanceCanvas(
+  appearance: PlayerAppearance,
+  images: Map<string, HTMLImageElement>,
+): HTMLCanvasElement | null {
+  const body = images.get(bodyTextureFor(appearance));
+  if (!body || !body.complete || body.naturalWidth === 0) return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = body.naturalWidth;
+  canvas.height = body.naturalHeight;
+  const ctx = canvas.getContext("2d")!;
+  ctx.imageSmoothingEnabled = false;
+  const draw = (img: HTMLImageElement | undefined) => {
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+    const w = img.width * scale;
+    const h = img.height * scale;
+    ctx.drawImage(img, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+  };
+  draw(body);
+  for (const slot of LAYER_ORDER) {
+    if (slot === "body") continue;
+    const code = appearance[slot];
+    if (code) draw(images.get(textureKeyForItem(code)));
+  }
+  return canvas;
 }
 
 /** Предзагрузка картинок гардероба для DOM-канвасов. */
@@ -143,6 +174,7 @@ export function loadWardrobeDomImages(): Promise<Map<string, HTMLImageElement>> 
     }));
   };
   add(BODY_TEXTURE, BODY_FILE);
+  add(BODY_NO_EARS_TEXTURE, BODY_NO_EARS_FILE);
   for (const item of WARDROBE_ITEMS) {
     add(textureKeyForItem(item.code), item.file);
   }

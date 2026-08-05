@@ -35,6 +35,15 @@ export interface WardrobeColorGroup<T extends { code: string; name: string } = {
 export const BODY_TEXTURE = "wardrobe_body";
 export const BODY_FILE = "wardrobe/body/bulbasaur_body.png";
 
+/** Тело без ушей — под шляпу/кепку, чтобы уши не торчали из-под головного убора. */
+export const BODY_NO_EARS_TEXTURE = "wardrobe_body_no_ears";
+export const BODY_NO_EARS_FILE = "wardrobe/body/bulbasaur_body_no_ears.png";
+
+/** Базовый спрайт тела: без ушей, если надет HAT. */
+export function bodyTextureFor(appearance: PlayerAppearance): string {
+  return appearance.hat ? BODY_NO_EARS_TEXTURE : BODY_TEXTURE;
+}
+
 export const WARDROBE_ITEMS: WardrobeItemDef[] = [
   { code: "bottom_beach_shorts", category: "BOTTOM", name: "Пляжные шорты", price: 500, sellable: true, file: "wardrobe/bottom/bottom_beach_shorts.png" },
   { code: "bottom_beige_shorts", category: "BOTTOM", name: "Бежевые шорты", price: 500, sellable: true, file: "wardrobe/bottom/bottom_beige_shorts.png", colorGroup: "basic_shorts", colorHex: "#c6b092", displayName: "Шорты" },
@@ -56,6 +65,7 @@ export const WARDROBE_ITEMS: WardrobeItemDef[] = [
   { code: "hat_wdm_green_cap", category: "HAT", name: "Зелёная кепка WDM", price: 5000, sellable: true, file: "wardrobe/hat/hat_wdm_green_cap.png", colorGroup: "wdm_cap", colorHex: "#419353", displayName: "Кепка WDM" },
   { code: "hat_wdm_orange_cap", category: "HAT", name: "Оранжевая кепка WDM", price: 5000, sellable: true, file: "wardrobe/hat/hat_wdm_orange_cap.png", colorGroup: "wdm_cap", colorHex: "#d7863a", displayName: "Кепка WDM" },
   { code: "hat_wdm_pink_cap", category: "HAT", name: "Розовая кепка WDM", price: 5000, sellable: true, file: "wardrobe/hat/hat_wdm_pink_cap.png", colorGroup: "wdm_cap", colorHex: "#d76e9d", displayName: "Кепка WDM" },
+  { code: "hat_non_la", category: "HAT", name: "Вьетнамская шляпа", price: 5000, sellable: true, file: "wardrobe/hat/hat_non_la.png" },
   { code: "glasses_black", category: "GLASSES", name: "Чёрные очки", price: 1500, sellable: true, file: "wardrobe/glasses/glasses_black.png", colorGroup: "glasses", colorHex: "#1a1a1a", displayName: "Очки" },
   { code: "glasses_orange", category: "GLASSES", name: "Оранжевые очки", price: 2000, sellable: true, file: "wardrobe/glasses/glasses_orange.png", colorGroup: "glasses", colorHex: "#ffa028", displayName: "Очки" },
   { code: "glasses_blue", category: "GLASSES", name: "Синие очки", price: 2000, sellable: true, file: "wardrobe/glasses/glasses_blue.png", colorGroup: "glasses", colorHex: "#468cff", displayName: "Очки" },

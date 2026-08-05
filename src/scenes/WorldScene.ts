@@ -924,7 +924,12 @@ export class WorldScene extends Phaser.Scene {
       if (paths) this.projector.showDeck(paths, this.projectorIndex);
     }
 
-    this.player.setVisible(!this.atParking);
+    // Прячем и физический спрайт, и layered-аватар с ником: sync видимости аватара/
+    // бейджа живёт в update(), а на парковке update рано выходит.
+    const showPlayer = !this.atParking;
+    this.player.setVisible(showPlayer);
+    this.avatar?.setVisible(showPlayer);
+    this.playerLabel?.setVisible(showPlayer);
     if (this.atParking) {
       // На парковке ходить нельзя — прячем игрока и показываем меню локаций.
       this.player.setVelocity(0);
@@ -975,7 +980,7 @@ export class WorldScene extends Phaser.Scene {
   private async openGame(id: string): Promise<void> {
     this.gameMenu.close();
     if (!(await this.requireSession())) return;
-    if (id === "bulbajump") this.bulbaJump.open(this.chosen.sprite);
+    if (id === "bulbajump") await this.bulbaJump.open(this.appearance);
     else if (id === "bulbaparking") this.bulbaParking.open();
     else if (id === "bulbatanks") this.bulbaTanks.open();
     else if (id === "bulbaguess") void this.bulbaGuess.open();

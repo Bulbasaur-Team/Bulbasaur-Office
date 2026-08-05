@@ -3,7 +3,14 @@ import { ALL_SPRITES, SPRITE_FILES } from "../entities/sprites";
 import { CLOCK_ASSETS } from "../entities/WallClock";
 import { LOCATIONS } from "../data/locations";
 import { ITEM_TYPES } from "../data/items";
-import { BODY_FILE, BODY_TEXTURE, textureKeyForItem, WARDROBE_ITEMS } from "../data/wardrobe";
+import {
+  BODY_FILE,
+  BODY_NO_EARS_FILE,
+  BODY_NO_EARS_TEXTURE,
+  BODY_TEXTURE,
+  textureKeyForItem,
+  WARDROBE_ITEMS,
+} from "../data/wardrobe";
 import { publicPath } from "../publicPath";
 import { setBootProgress } from "../ui/BootLoader";
 
@@ -42,6 +49,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image("bulba-cat-walk", publicPath("assets/characters/bulba-cat-walk.png"));
 
     this.load.image(BODY_TEXTURE, publicPath(`assets/${BODY_FILE}`));
+    this.load.image(BODY_NO_EARS_TEXTURE, publicPath(`assets/${BODY_NO_EARS_FILE}`));
     for (const item of WARDROBE_ITEMS) {
       this.load.image(textureKeyForItem(item.code), publicPath(`assets/${item.file}`));
     }
