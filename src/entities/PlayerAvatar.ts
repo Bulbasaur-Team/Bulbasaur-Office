@@ -123,7 +123,8 @@ export function drawAppearance(
     ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
   };
   draw(images.get(BODY_TEXTURE));
-  for (const slot of ["bottom", "top", "shoes", "hat", "glasses"] as const) {
+  for (const slot of LAYER_ORDER) {
+    if (slot === "body") continue;
     const code = appearance[slot];
     if (code) draw(images.get(textureKeyForItem(code)));
   }
