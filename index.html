@@ -143,7 +143,7 @@
     /* Полноэкранное окно игры */
     /* safe center — второй строкой: если окно игры выше экрана, верх не уезжает
        за край (иначе flex-центрирование делает его недоступным для скролла). */
-    #bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki, #airhockey { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; align-items: safe center; justify-content: center; padding: 24px; overflow: auto; }
+    #bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki, #bulbaquiz, #airhockey { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; align-items: safe center; justify-content: center; padding: 24px; overflow: auto; }
     #bjCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 420 / 640; touch-action: none; }
     #bulbajump { touch-action: none; }
     #bpCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(600px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 600; }
@@ -231,6 +231,249 @@
     .bc-opt:disabled { cursor: default; }
     .bc-opt.bc-wrong { border-color: #e85d5d; box-shadow: 0 0 0 2px #e85d5d55; }
     .bc-opt.bc-right { border-color: #8fd06b; box-shadow: 0 0 0 2px #8fd06b55; }
+
+    /* Bulba Quiz */
+    #bulbaquiz .arcade-frame {
+      width: min(880px, calc(var(--sw) * .94));
+      min-height: min(620px, calc(var(--sh) * .88));
+      box-sizing: border-box;
+      overflow: visible;
+      justify-content: center;
+    }
+    #bqConfetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
+    .bq-corner-actions {
+      position: absolute; left: 18px; top: 18px; display: flex; gap: 8px; z-index: 3;
+    }
+    .bq-corner-actions .arcade-lb { background: rgba(24,29,35,.92); font-size: 20px; }
+    .bq-screen { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+    .bq-screen.hidden { display: none; }
+    .bq-energy {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 8px 20px; border-radius: 16px; background: rgba(249,199,79,.08);
+    }
+    .bq-energy-main {
+      display: flex; align-items: center; gap: 8px; font-size: 30px; font-weight: 900;
+      color: #f9c74f; text-shadow: 0 2px 10px rgba(249,199,79,.25);
+    }
+    .bq-energy-bolt { font-size: 36px; line-height: 1; }
+    .bq-track-wrap {
+      position: relative; width: 100%; padding: 48px 8px 4px; box-sizing: border-box;
+    }
+    .bq-track {
+      position: relative; display: flex; justify-content: space-between; align-items: flex-start;
+      width: 100%; gap: 0; z-index: 1;
+    }
+    .bq-track-rail {
+      position: absolute; left: 8.33%; right: 8.33%; top: 12px; height: 8px;
+      background: #2a313a; border-radius: 5px; z-index: 0;
+    }
+    .bq-track-fill {
+      position: absolute; left: 8.33%; top: 12px; height: 8px; width: 0;
+      background: var(--accent); border-radius: 5px; z-index: 0;
+      transition: width .25s ease;
+    }
+    .bq-mark {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;
+      opacity: .45; position: relative; z-index: 1;
+    }
+    .bq-mark.bq-reached { opacity: .9; color: var(--accent); }
+    .bq-mark.bq-here { opacity: 1; }
+    .bq-marker {
+      width: 42px; height: 32px; display: flex; align-items: center; justify-content: center;
+    }
+    .bq-mark-dot {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #2a313a; border: 3px solid #4a5462; box-sizing: border-box;
+    }
+    .bq-mark.bq-reached .bq-mark-dot { background: var(--accent); border-color: #9fd88a; }
+    .bq-chest-icon { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; opacity: .55; }
+    .bq-mark.bq-reached .bq-chest-icon { opacity: 1; filter: drop-shadow(0 2px 5px rgba(249,199,79,.35)); }
+    .bq-mark-n { font-size: 14px; font-weight: 700; }
+    #bqAvatar {
+      position: absolute; top: 0; width: 56px; height: 56px;
+      transform: translateX(-50%);
+      image-rendering: pixelated; pointer-events: none; z-index: 2;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,.55));
+      transition: left .25s ease;
+    }
+    .bq-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; width: 100%; }
+    .bq-play {
+      width: 116px; height: 116px; border-radius: 50%; border: 4px solid #a8dc8f;
+      background: linear-gradient(145deg, #8fd06b, #5da848); color: #14210f; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 12px 28px rgba(93,168,72,.32), inset 0 2px 0 rgba(255,255,255,.3);
+      transition: transform .15s, filter .15s;
+    }
+    .bq-play:hover:not(:disabled) { transform: scale(1.06); filter: brightness(1.08); }
+    .bq-play:active:not(:disabled) { transform: scale(.98); }
+    .bq-play:disabled { opacity: .4; cursor: default; }
+    .bq-play svg { width: 52px; height: 52px; fill: currentColor; margin-left: 7px; }
+    .bq-topics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; width: 100%; }
+    .bq-topic, .bq-opt, .bq-shop-btn {
+      width: 100%; text-align: left; background: rgba(255,255,255,.04); color: var(--text);
+      border: 2px solid #3a414c; border-radius: 12px; padding: 12px 14px; font-family: inherit;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+    }
+    .bq-topic {
+      min-height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; text-align: center; font-size: 20px; border-radius: 20px;
+      background: linear-gradient(145deg, rgba(122,192,122,.18), rgba(61,80,68,.18));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 22px rgba(0,0,0,.2);
+      transition: transform .15s, border-color .15s, background .15s;
+    }
+    .bq-topic-icon { font-size: 46px; line-height: 1; }
+    .bq-topic:hover { transform: translateY(-4px); border-color: var(--accent); background: rgba(122,192,122,.22); }
+    .bq-topic:active { transform: translateY(0); }
+    .bq-topic:hover, .bq-opt:hover:not(:disabled), .bq-shop-btn:hover { border-color: var(--accent); background-color: rgba(122,192,122,.12); }
+    .bq-opt {
+      min-height: 112px; text-align: left; display: flex; align-items: center; gap: 14px;
+      border-radius: 18px; padding: 18px; font-size: 17px; line-height: 1.3;
+      background: linear-gradient(145deg, rgba(255,255,255,.065), rgba(255,255,255,.025));
+      transition: transform .12s, border-color .12s, background .12s, box-shadow .12s;
+    }
+    .bq-opt:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,.22); }
+    .bq-opt-letter {
+      flex: 0 0 34px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 10px; background: rgba(122,192,122,.15); color: var(--accent); font-weight: 900;
+    }
+    .bq-opt.bq-correct { border-color: #8fd06b; background: rgba(143,208,107,.2); box-shadow: 0 0 24px rgba(143,208,107,.22); }
+    .bq-opt.bq-wrong { border-color: #e85d5d; background: rgba(232,93,93,.2); box-shadow: 0 0 24px rgba(232,93,93,.2); }
+    .bq-opt:disabled, .bq-opt.bq-masked { opacity: .35; cursor: default; text-decoration: line-through; }
+    .bq-opt.bq-correct:disabled, .bq-opt.bq-wrong:disabled { opacity: 1; text-decoration: none; }
+    .bq-q-hud { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 10px; font-size: 15px; }
+    .bq-q-text { width: 100%; font-size: 22px; font-weight: 700; line-height: 1.4; text-align: center; min-height: 62px; }
+    .bq-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; }
+    .bq-boosters { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; }
+    .bq-booster {
+      position: relative; min-height: 76px; display: flex; align-items: center; justify-content: center;
+      gap: 12px; padding: 12px 46px 12px 16px; border: 2px solid #3a414c; border-radius: 16px;
+      background: linear-gradient(145deg, rgba(122,192,122,.13), rgba(255,255,255,.035));
+      color: var(--text); font: 700 15px inherit; cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 6px 18px rgba(0,0,0,.18);
+      transition: transform .12s, border-color .12s, background .12s;
+    }
+    .bq-booster:hover:not(:disabled) { transform: translateY(-2px); border-color: var(--accent); background: rgba(122,192,122,.18); }
+    .bq-booster:disabled { opacity: .38; cursor: default; }
+    .bq-booster-icon { font-size: 30px; line-height: 1; }
+    .bq-booster-count {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      min-width: 26px; height: 26px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 13px; background: var(--accent); color: #14210f; font-size: 13px; font-weight: 900;
+    }
+    .bq-feedback { font-size: 15px; font-weight: 700; text-align: center; }
+    .bq-feedback:empty { display: none; }
+    .bq-feedback.wrong { color: #ff8a7a; }
+    .bq-question-menu { margin-top: 4px; }
+    .bq-question-timer { display: inline-flex; align-items: center; gap: 7px; font-size: 20px; }
+    .bq-timer { font-size: 26px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .bq-timer.bq-urgent { color: #ff8a7a; }
+    .bq-energy-timer { font-size: 13px; opacity: .8; font-variant-numeric: tabular-nums; color: var(--text); min-height: 16px; }
+    #bqStatus:empty { display: none; }
+    .bq-error { color: #ff8a7a; font-size: 14px; text-align: center; min-height: 0; width: 100%; }
+    .bq-error.hidden { display: none; }
+    .bq-shop-summary { display: flex; align-items: stretch; justify-content: center; gap: 18px; width: 100%; }
+    .bq-shop-summary .bq-energy { min-width: 180px; justify-content: center; }
+    .bq-balance {
+      min-width: 180px; display: flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 10px 20px; border-radius: 16px; background: rgba(249,199,79,.08);
+      color: #f9c74f; font-size: 30px; font-weight: 900;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    .bq-balance img { width: 40px; height: 40px; image-rendering: pixelated; }
+    .bq-shop-grid { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .bq-shop-btn {
+      position: relative; min-height: 190px; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; gap: 12px; text-align: center;
+      border-radius: 20px; padding: 22px 14px;
+      background: linear-gradient(145deg, rgba(249,199,79,.1), rgba(122,192,122,.07));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 22px rgba(0,0,0,.2);
+      transition: transform .15s, border-color .15s, background .15s;
+    }
+    .bq-shop-btn:hover { transform: translateY(-4px); }
+    .bq-shop-icon { font-size: 48px; line-height: 1; }
+    .bq-shop-name { font-size: 17px; line-height: 1.25; }
+    .bq-shop-count {
+      position: absolute; top: 10px; right: 10px; min-width: 28px; height: 28px;
+      display: inline-flex; align-items: center; justify-content: center; padding: 0 7px;
+      border-radius: 14px; background: var(--accent); color: #14210f; font-size: 14px; font-weight: 900;
+    }
+    .bq-price {
+      display: inline-flex; align-items: center; gap: 6px; color: #f9c74f;
+      font-size: 16px; font-weight: 900;
+    }
+    .bq-price img { width: 23px; height: 23px; image-rendering: pixelated; }
+    .bq-chest-stage { position: relative; display: flex; align-items: center; justify-content: center; min-height: 300px; }
+    .bq-chest-art { width: min(320px, calc(var(--sw) * .55)); height: auto; image-rendering: pixelated; filter: drop-shadow(0 16px 24px rgba(0,0,0,.45)); }
+    .bq-chest-info { position: absolute; right: -36px; top: 18px; }
+    .bq-info-btn {
+      width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--accent);
+      color: var(--accent); background: var(--panel); font: bold 16px inherit; cursor: help;
+    }
+    .bq-info-tip {
+      position: absolute; right: 0; top: 42px; width: min(320px, calc(var(--sw) * .72));
+      max-height: min(420px, 55vh); padding: 12px 14px;
+      background: #20262d; border: 2px solid var(--accent); border-radius: 12px;
+      box-shadow: 0 10px 26px rgba(0,0,0,.5); font-size: 13px; line-height: 1.45;
+      opacity: 0; visibility: hidden; transform: translateY(-4px); transition: .15s; z-index: 4;
+      display: flex; flex-direction: column; gap: 10px; overflow: hidden;
+    }
+    .bq-chest-info:hover .bq-info-tip, .bq-info-btn:focus + .bq-info-tip,
+    .bq-chest-info:focus-within .bq-info-tip { opacity: 1; visibility: visible; transform: translateY(0); }
+    .bq-info-tip-head { font-size: 12px; opacity: .9; line-height: 1.4; }
+    .bq-info-tip-list {
+      display: flex; flex-direction: column; gap: 6px; overflow-y: auto;
+      margin: 0 -4px; padding: 0 4px 2px; min-height: 0;
+    }
+    .bq-loot-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,.04);
+    }
+    .bq-loot-row img {
+      width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated;
+      flex-shrink: 0; background: #1b1f24; border-radius: 8px;
+    }
+    .bq-loot-name { flex: 1; min-width: 0; font-weight: 700; font-size: 13px; }
+    .bq-loot-chance { flex-shrink: 0; color: #f9c74f; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .bq-chest-rewards {
+      display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%;
+    }
+    .bq-reward-pills {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;
+    }
+    .bq-reward-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 16px; border-radius: 14px; background: #1b1f24;
+      border: 2px solid rgba(157,221,123,.45); font-size: 28px; font-weight: 900;
+      color: #f9c74f; text-shadow: 0 2px 10px rgba(249,199,79,.25);
+    }
+    .bq-reward-pill.bq-reward-energy { color: #f9c74f; border-color: rgba(249,199,79,.45); text-shadow: 0 2px 10px rgba(249,199,79,.25); }
+    .bq-reward-pill img { width: 36px; height: 36px; image-rendering: pixelated; }
+    .bq-dup-note {
+      max-width: 320px; padding: 10px 14px; border-radius: 12px;
+      background: rgba(249,199,79,.12); border: 1px solid rgba(249,199,79,.35);
+      color: #f9c74f; font-size: 14px; font-weight: 700; text-align: center; line-height: 1.35;
+    }
+    #bqChestPreview {
+      width: min(280px, calc(var(--sw) * .58)); height: min(280px, calc(var(--sw) * .58));
+      border: 4px solid #9ddd7b; border-radius: 20px; background: #1b1f24; image-rendering: pixelated;
+      box-shadow: 0 0 18px rgba(143,208,107,.5), 0 0 45px rgba(143,208,107,.2);
+      animation: bqRewardGlow 1.6s ease-in-out infinite alternate;
+    }
+    #bqChestPreview.hidden { display: none; }
+    @keyframes bqRewardGlow { from { box-shadow: 0 0 14px rgba(143,208,107,.4); } to { box-shadow: 0 0 28px rgba(143,208,107,.75), 0 0 55px rgba(143,208,107,.25); } }
+    @media (max-width: 620px) {
+      .bq-topics { gap: 8px; }
+      .bq-topic { min-height: 120px; font-size: 16px; }
+      .bq-topic-icon { font-size: 34px; }
+      .bq-opt { min-height: 90px; padding: 12px; font-size: 14px; }
+      .bq-chest-info { right: 0; }
+      .bq-shop-grid { gap: 8px; }
+      .bq-shop-btn { min-height: 150px; padding: 16px 8px; }
+      .bq-shop-icon { font-size: 38px; }
+      .bq-shop-name { font-size: 14px; }
+      .bq-shop-summary { gap: 8px; }
+      .bq-shop-summary .bq-energy, .bq-balance { min-width: 0; flex: 1; padding: 8px; }
+    }
 
     /* Bulba Guess */
     #bgCanvas { display: none; }
@@ -687,6 +930,28 @@
       0%, 100% { box-shadow: 0 0 4px 1px rgba(217,164,65,.35); }
       50% { box-shadow: 0 0 10px 3px rgba(217,164,65,.75); }
     }
+
+    /* Bulba Games — выбор мини-игры из HUD */
+    #bulbaGames { position: fixed; inset: 0; z-index: 70; background: rgba(8,10,14,.85); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .bgames-box { position: relative; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 22px 26px; width: min(560px, calc(var(--sw) * .92)); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
+    .bgames-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px; max-height: calc(var(--sh) * .62); overflow-y: auto; padding: 2px; }
+    .bgames-card {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 14px 10px 12px; border: 2px solid #353c46; border-radius: 12px;
+      background: rgba(255,255,255,.04); color: var(--text); font-family: inherit;
+      cursor: pointer; transition: border-color .12s, background .12s, transform .12s;
+    }
+    .bgames-card:hover { border-color: var(--accent); background: rgba(122,192,122,.16); transform: translateY(-2px); }
+    .bgames-card:active { transform: translateY(0); }
+    .bgames-icon { font-size: 28px; line-height: 1; }
+    .bgames-icon-img { width: 32px; height: 32px; object-fit: contain; image-rendering: pixelated; display: block; }
+    .bgames-name { font-size: 13px; font-weight: bold; text-align: center; line-height: 1.2; }
+    html.bp-560 .bgames-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    html.bp-560 .bgames-card { padding: 12px 8px 10px; }
+    html.bp-560 .bgames-icon { font-size: 24px; }
+    html.bp-560 .bgames-icon-img { width: 28px; height: 28px; }
+    html.bp-560 .bgames-name { font-size: 12px; }
+    html.bp-400 .bgames-box { padding: 16px 14px; }
 
     /* Сообщество */
     #community { position: fixed; inset: 0; z-index: 70; background: rgba(8,10,14,.85); display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -1425,7 +1690,7 @@
        а сцена может быть повёрнута на 90°). Классы ставит orientation.ts. */
     html.bp-640 h1 { font-size: 16px; margin: 6px 0 2px; }
     html.bp-640 #game canvas { border-width: 2px; }
-    html.bp-640 :is(#bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki, #airhockey, #slides) { padding: 10px; }
+    html.bp-640 :is(#bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki, #bulbaquiz, #airhockey, #slides) { padding: 10px; }
     html.bp-640 #bcRef { width: 96px; height: 96px; }
     html.bp-640 .bc-options { gap: 10px; width: min(240px, calc(var(--sw) * .78)); }
     html.bp-640 .arcade-frame { padding: 16px 14px; gap: 10px; }
@@ -1670,6 +1935,161 @@
       </div>
     </div>
 
+    <div id="bulbaquiz" class="hidden">
+      <div class="arcade-frame">
+        <button class="arcade-close" id="bqClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <h2 class="arcade-title">Bulba Quiz</h2>
+        <div class="bq-corner-actions">
+          <button class="arcade-lb" id="bqShopBtn" type="button" aria-label="лавка" title="Лавка">🛒</button>
+          <button class="arcade-lb" id="bqLb" aria-label="лидерборд" title="Лидерборд">
+            <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
+          </button>
+        </div>
+        <div class="bq-error hidden" id="bqError"></div>
+
+        <div class="bq-screen" id="bqHub">
+          <div class="bq-energy">
+            <div class="bq-energy-main">
+              <span class="bq-energy-bolt">⚡</span>
+              <strong id="bqEnergy">5/5</strong>
+            </div>
+            <span class="bq-energy-timer" id="bqEnergyTimer"></span>
+          </div>
+          <div class="bq-track-wrap">
+            <canvas id="bqAvatar" width="56" height="56" aria-hidden="true"></canvas>
+            <div class="bq-track" id="bqTrack"></div>
+          </div>
+          <div class="ttt-status" id="bqStatus">Загрузка…</div>
+          <div class="bq-actions">
+            <button class="bq-play" id="bqPlay" type="button" aria-label="Играть" title="Играть">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>
+            </button>
+            <button class="ttt-restart hidden" id="bqOpenChest" type="button">Открыть сундук</button>
+          </div>
+        </div>
+
+        <div class="bq-screen hidden" id="bqTopics">
+          <h3 class="arcade-title">Выбери тему</h3>
+          <div class="bq-topics" id="bqTopicsList"></div>
+          <button class="ttt-restart" id="bqTopicsBack" type="button">Назад</button>
+        </div>
+
+        <div class="bq-screen hidden" id="bqShop">
+          <h3 class="arcade-title">Лавка</h3>
+          <div class="bq-shop-summary">
+            <div class="bq-energy">
+              <div class="bq-energy-main">
+                <span class="bq-energy-bolt">⚡</span>
+                <strong id="bqShopEnergy">5/5</strong>
+              </div>
+              <span class="bq-energy-timer" id="bqShopEnergyTimer"></span>
+            </div>
+            <div class="bq-balance" title="Bulba Coins">
+              <span id="bqShopBalance">0</span>
+              <img src="assets/wardrobe/ui/bc_coin.png" alt="Bulba Coin" />
+            </div>
+          </div>
+          <div class="bq-shop-grid">
+            <button class="bq-shop-btn" id="bqBuyEnergy" type="button">
+              <span class="bq-shop-icon">⚡</span>
+              <span class="bq-shop-name">+1 энергия</span>
+              <span class="bq-price">
+                <span id="bqEnergyPrice">100</span>
+                <img src="assets/wardrobe/ui/bc_coin.png" alt="BC" />
+              </span>
+            </button>
+            <button class="bq-shop-btn" id="bqBuyReroll" type="button">
+              <span class="bq-shop-count" id="bqRerollCount">0</span>
+              <span class="bq-shop-icon">🔄</span>
+              <span class="bq-shop-name">Другой вопрос</span>
+              <span class="bq-price">
+                <span id="bqRerollPrice">200</span>
+                <img src="assets/wardrobe/ui/bc_coin.png" alt="BC" />
+              </span>
+            </button>
+            <button class="bq-shop-btn" id="bqBuyFifty" type="button">
+              <span class="bq-shop-count" id="bqFiftyCount">0</span>
+              <span class="bq-shop-icon">✂️</span>
+              <span class="bq-shop-name">50/50</span>
+              <span class="bq-price">
+                <span id="bqFiftyPrice">150</span>
+                <img src="assets/wardrobe/ui/bc_coin.png" alt="BC" />
+              </span>
+            </button>
+          </div>
+          <button class="ttt-restart" id="bqShopBack" type="button">Назад</button>
+        </div>
+
+        <div class="bq-screen hidden" id="bqQuestion">
+          <div class="bq-q-hud">
+            <span id="bqQProgress">Вопрос 1 из 3</span>
+            <span class="bq-question-timer">⏱️ <span class="bq-timer" id="bqQTimer">20.0</span></span>
+          </div>
+          <div class="bq-q-text" id="bqQText"></div>
+          <div class="bq-opts" id="bqQOptions"></div>
+          <div class="bq-feedback" id="bqFeedback"></div>
+          <div class="bq-boosters">
+            <button class="bq-booster" id="bqReroll" type="button">
+              <span class="bq-booster-icon">🔄</span>
+              <span>Другой вопрос</span>
+              <span class="bq-booster-count" id="bqRerollPlayCount">0</span>
+            </button>
+            <button class="bq-booster" id="bqFifty" type="button">
+              <span class="bq-booster-icon">✂️</span>
+              <span>50/50</span>
+              <span class="bq-booster-count" id="bqFiftyPlayCount">0</span>
+            </button>
+          </div>
+          <button class="ttt-restart bq-question-menu hidden" id="bqQuestionMenu" type="button">В меню игры</button>
+        </div>
+
+        <div class="bq-screen hidden" id="bqResult">
+          <div class="arcade-title" id="bqResultTitle">Результат</div>
+          <div class="ttt-status" id="bqResultText"></div>
+          <button class="ttt-restart" id="bqResultOk" type="button">Далее</button>
+        </div>
+
+        <div class="bq-screen hidden" id="bqChest">
+          <div class="arcade-title hidden" id="bqChestTitle"></div>
+          <div class="bq-chest-stage" id="bqChestStage">
+            <img class="bq-chest-art" src="assets/bulbaquiz/chest.png" alt="Сундук с призом" />
+            <div class="bq-chest-info">
+              <button class="bq-info-btn" type="button" aria-label="Вероятности наград">i</button>
+              <div class="bq-info-tip" id="bqChestInfoTip">
+                <div class="bq-info-tip-head">
+                  Всегда: 300–1000 Bulba Coins и 1–3⚡ (если есть место до максимума).<br />
+                  Одежда — 25%. Дубликат автоматически продаётся за половину цены.
+                </div>
+                <div class="bq-info-tip-list" id="bqChestLootList"></div>
+              </div>
+            </div>
+          </div>
+          <div class="bq-chest-rewards hidden" id="bqChestRewards">
+            <div class="bq-reward-pills">
+              <div class="bq-reward-pill" id="bqRewardCoins">
+                <span id="bqCoinAmount">+0</span>
+                <img src="assets/wardrobe/ui/bc_coin.png" alt="Bulba Coin" />
+              </div>
+              <div class="bq-reward-pill bq-reward-energy" id="bqRewardEnergy">
+                <span id="bqEnergyAmount">+0</span>
+                <span aria-hidden="true">⚡</span>
+              </div>
+            </div>
+            <canvas id="bqChestPreview" class="hidden" width="280" height="280"></canvas>
+            <div class="bq-dup-note hidden" id="bqDupNote"></div>
+          </div>
+          <div class="ttt-status" id="bqChestText"></div>
+          <div class="bq-actions">
+            <button class="ttt-restart" id="bqChestOpen" type="button">Открыть</button>
+            <button class="ttt-restart hidden" id="bqChestOk" type="button">Ура!</button>
+          </div>
+        </div>
+      </div>
+      <canvas id="bqConfetti"></canvas>
+    </div>
+
     <div id="bulbasurki" class="hidden">
       <div class="arcade-frame">
         <button class="arcade-close" id="bsClose" aria-label="закрыть">
@@ -1783,6 +2203,7 @@
         <div class="hud-group">
           <div class="hud-label">Игра</div>
           <button id="lbBtn" class="hud-btn" aria-label="лидерборд">🏆 Лидерборд</button>
+          <button id="bulbaGamesBtn" class="hud-btn" aria-label="bulba games">🎮 Bulba Games</button>
           <button id="achBtn" class="hud-btn" aria-label="мои ачивки">🎖 Мои ачивки</button>
           <button id="communityBtn" class="hud-btn" aria-label="сообщество">👥 Сообщество</button>
           <button id="wardrobeBtn" class="hud-btn" aria-label="гардероб">👔 Гардероб</button>
@@ -1907,6 +2328,16 @@
         <h2 class="lb-title" id="lbTitle">Лидерборд</h2>
         <div class="lb-status" id="lbStatus"></div>
         <div class="lb-list" id="lbList"></div>
+      </div>
+    </div>
+
+    <div id="bulbaGames" class="hidden">
+      <div class="bgames-box">
+        <button class="lb-close" id="bgamesClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <h2 class="lb-title">Bulba Games</h2>
+        <div class="bgames-grid" id="bgamesGrid"></div>
       </div>
     </div>
 

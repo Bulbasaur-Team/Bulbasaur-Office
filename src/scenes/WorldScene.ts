@@ -20,6 +20,8 @@ import { BulbaGuess } from "../ui/BulbaGuess";
 import { BulbaWordle } from "../ui/BulbaWordle";
 import { BulbaColors } from "../ui/BulbaColors";
 import { BulbaSurki } from "../ui/BulbaSurki";
+import { BulbaQuiz } from "../ui/BulbaQuiz";
+import { BulbaGames } from "../ui/BulbaGames";
 import { AirHockey, type AirHockeySide } from "../ui/AirHockey";
 import { KeyboardRouter } from "../ui/KeyboardRouter";
 import { showCharacterSelect } from "../ui/CharacterSelect";
@@ -84,6 +86,7 @@ const GAMES: LeaderboardGame[] = [
   { id: "bulbatanks", title: "Bulba Tanks", format: (v) => String(v) },
   { id: "bulbacolors", title: "Bulba Colors", format: (v) => String(v) },
   { id: "bulbasurki", title: "Bulba Surki", format: (v) => String(v) },
+  { id: "bulbaquiz", title: "Bulba Quiz", format: (v) => `уровень ${v}` },
   { id: "bulbaguess", title: "Bulba Guess", format: formatWords },
   { id: "bulbawordle", title: "Bulba Wordle", format: formatWords },
 ];
@@ -149,6 +152,8 @@ export class WorldScene extends Phaser.Scene {
   private bulbaWordle!: BulbaWordle;
   private bulbaColors!: BulbaColors;
   private bulbaSurki!: BulbaSurki;
+  private bulbaQuiz!: BulbaQuiz;
+  private bulbaGames!: BulbaGames;
   private airHockey!: AirHockey;
   private poker!: PlanningPoker;
   private retro!: Retro;
@@ -201,6 +206,7 @@ export class WorldScene extends Phaser.Scene {
   private projectorRect: Rect | null = null;     // зона проектора в главном офисе (объект "projector")
   private easelRect: Rect | null = null;         // мольберт Bulba Colors в главном офисе (объект "easel")
   private packerRect: Rect | null = null;        // склад Bulba Packer в кладовой главного офиса (объект "bulbapacker")
+  private quizRect: Rect | null = null;          // ТВ Bulba Quiz на средней стене чилл-зоны (объект "bulbaquiz")
   private surkiRect: Rect | null = null;         // автомат Bulba Surki в чилл-зоне (объект "bulbasurki")
   private airhockeyRedRect: Rect | null = null;  // красная сторона аэрохоккея (объект "airhockey-red")
   private airhockeyBlueRect: Rect | null = null; // синяя сторона аэрохоккея (объект "airhockey-blue")
@@ -302,11 +308,14 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaWordle = new BulbaWordle();
     this.bulbaColors = new BulbaColors();
     this.bulbaSurki = new BulbaSurki();
+    this.bulbaQuiz = new BulbaQuiz();
     this.airHockey = new AirHockey();
     // Закрытие fullscreen-аркады будит Phaser: update() во сне не крутится.
-    for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaTanks, this.bulbaGuess, this.bulbaWordle, this.bulbaSurki, this.airHockey]) {
+    for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaTanks, this.bulbaGuess, this.bulbaWordle, this.bulbaColors, this.bulbaSurki, this.airHockey]) {
       g.onClose = () => this.setPhaserAsleep(false);
     }
+    this.bulbaQuiz.onClose = () => this.setPhaserAsleep(false);
+    this.bulbaQuiz.onBalance = (balance) => this.setBcBalance(balance);
     this.airHockey.onLeave = () => this.realtime.airhockeyLeave();
     this.airHockey.onPaddle = (x, y) => this.realtime.airhockeyPaddle(x, y);
     this.airHockey.onRematchRequest = () => this.realtime.airhockeyRematchRequest();
@@ -374,10 +383,16 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaTanks.onLeaderboard = () => void this.leaderboard.open("bulbatanks");
     this.bulbaColors.onLeaderboard = () => void this.leaderboard.open("bulbacolors");
     this.bulbaSurki.onLeaderboard = () => void this.leaderboard.open("bulbasurki");
+    this.bulbaQuiz.onLeaderboard = () => void this.leaderboard.open("bulbaquiz");
     this.bulbaGuess.onLeaderboard = () =>
       void this.leaderboard.open(this.bulbaGuess.isDaily ? "wotd-bulbaguess" : "bulbaguess");
     this.bulbaWordle.onLeaderboard = () =>
       void this.leaderboard.open(this.bulbaWordle.isDaily ? "wotd-bulbawordle" : "bulbawordle");
+    this.bulbaGames = new BulbaGames((id) => void this.openGame(id));
+    document.getElementById("bulbaGamesBtn")!.onclick = () => {
+      (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
+      this.bulbaGames.open();
+    };
     this.bulbaGuess.onDailyOver = () => void this.reportDailyBoard("bulbaguess");
     this.bulbaWordle.onDailyOver = () => void this.reportDailyBoard("bulbawordle");
     // Возвращаем промис (а не void): игра ждёт подтверждения сохранения перед показом
@@ -545,6 +560,7 @@ export class WorldScene extends Phaser.Scene {
   private applyLocalAppearance(appearance: PlayerAppearance): void {
     this.appearance = appearance;
     this.avatar?.setAppearance(appearance);
+    this.bulbaQuiz.setAppearance(appearance);
   }
 
   // Отправить результат: лидерборд показываем только если попытка изменила таблицу,
@@ -578,6 +594,7 @@ export class WorldScene extends Phaser.Scene {
   // Открыть игру в режиме слова дня: тянем сиды и сохранённый прогресс, передаём в игру.
   private async openDailyGame(gameId: "bulbaguess" | "bulbawordle"): Promise<void> {
     this.gameMenu.close();
+    this.bulbaGames.close();
     if (!(await this.requireSession())) return;
     try {
       const [wotd, progress, boardSnap] = await Promise.all([
@@ -907,6 +924,7 @@ export class WorldScene extends Phaser.Scene {
     this.projectorRect = rects.get("projector") ?? null;
     this.easelRect = rects.get("easel") ?? null;
     this.packerRect = rects.get("bulbapacker") ?? null;
+    this.quizRect = rects.get("bulbaquiz") ?? null;
     this.surkiRect = rects.get("bulbasurki") ?? null;
     this.airhockeyRedRect = this.multiplayer ? rects.get("airhockey-red") ?? null : null;
     this.airhockeyBlueRect = this.multiplayer ? rects.get("airhockey-blue") ?? null : null;
@@ -950,6 +968,7 @@ export class WorldScene extends Phaser.Scene {
       this.dialogue.isOpen ||
       this.catDialogue.isOpen ||
       this.gameMenu.isOpen ||
+      this.bulbaGames.isOpen ||
       this.bulbaJump.isOpen ||
       this.bulbaPacker.isOpen ||
       this.bulbaParking.isOpen ||
@@ -958,6 +977,7 @@ export class WorldScene extends Phaser.Scene {
       this.bulbaWordle.isOpen ||
       this.bulbaSurki.isOpen ||
       this.bulbaColors.isOpen ||
+      this.bulbaQuiz.isOpen ||
       this.leaderboard.isOpen ||
       this.achievements.isOpen ||
       this.community.isOpen ||
@@ -979,12 +999,17 @@ export class WorldScene extends Phaser.Scene {
 
   private async openGame(id: string): Promise<void> {
     this.gameMenu.close();
+    this.bulbaGames.close();
     if (!(await this.requireSession())) return;
     if (id === "bulbajump") await this.bulbaJump.open(this.appearance);
+    else if (id === "bulbapacker") this.bulbaPacker.open();
     else if (id === "bulbaparking") this.bulbaParking.open();
     else if (id === "bulbatanks") this.bulbaTanks.open();
+    else if (id === "bulbacolors") this.bulbaColors.open();
+    else if (id === "bulbasurki") this.bulbaSurki.open();
     else if (id === "bulbaguess") void this.bulbaGuess.open();
     else if (id === "bulbawordle") void this.bulbaWordle.open();
+    else if (id === "bulbaquiz") this.bulbaQuiz.open(this.appearance);
     this.setPhaserAsleep(true);
   }
 
@@ -1140,6 +1165,12 @@ export class WorldScene extends Phaser.Scene {
         this.packerRect.x + this.packerRect.w / 2,
         this.packerRect.y + this.packerRect.h,
       );
+    } else if (this.quizRect && this.nearRect(this.quizRect)) {
+      this.showPrompt(
+        "Пробел / Enter — сыграть в Bulba Quiz",
+        this.quizRect.x + this.quizRect.w / 2,
+        this.quizRect.y + this.quizRect.h,
+      );
     } else if (this.surkiRect && this.nearRect(this.surkiRect)) {
       this.showPrompt(
         "Пробел / Enter — сыграть в Bulba Surki",
@@ -1279,6 +1310,13 @@ export class WorldScene extends Phaser.Scene {
     if (this.packerRect && this.nearRect(this.packerRect)) {
       void this.openWorldGame(() => {
         this.bulbaPacker.open();
+        this.setPhaserAsleep(true);
+      });
+      return true;
+    }
+    if (this.quizRect && this.nearRect(this.quizRect)) {
+      void this.openWorldGame(() => {
+        this.bulbaQuiz.open(this.appearance);
         this.setPhaserAsleep(true);
       });
       return true;

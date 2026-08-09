@@ -315,6 +315,102 @@ export function sellWardrobeItem(itemCode: string): Promise<{
   });
 }
 
+// —— Bulba Quiz ——
+
+export interface QuizState {
+  level: number;
+  energy: number;
+  maxEnergy: number;
+  nextEnergyAt: string | null;
+  boosterReroll: number;
+  boosterFifty: number;
+  pendingChest: boolean;
+  bulbaCoinBalance: number;
+  energyPrice: number;
+  rerollPrice: number;
+  fiftyPrice: number;
+}
+
+export interface QuizTopic {
+  code: string;
+  name: string;
+}
+
+export interface QuizQuestion {
+  text: string;
+  options: string[];
+  maskedIndices: number[];
+}
+
+export interface QuizAttempt {
+  attemptId: string;
+  topicCode: string;
+  topicName: string;
+  status: "ACTIVE" | "WON" | "LOST" | string;
+  currentIndex: number;
+  totalQuestions: number;
+  question: QuizQuestion | null;
+  deadlineAt: string;
+  correct: boolean;
+  state: QuizState;
+}
+
+export interface QuizChestReward {
+  item: { code: string; name: string; price: number } | null;
+  duplicateSold: boolean;
+  sellRefund: number | null;
+  coins: number;
+  energy: number;
+  bulbaCoinBalance: number;
+  state: QuizState;
+}
+
+export type QuizBoosterCode = "reroll" | "fifty";
+
+export function fetchQuizState(): Promise<QuizState> {
+  return authedJson<QuizState>("/api/quiz/state");
+}
+
+export function fetchQuizTopics(): Promise<{ topics: QuizTopic[] }> {
+  return authedJson<{ topics: QuizTopic[] }>("/api/quiz/topics");
+}
+
+export function buyQuizEnergy(): Promise<QuizState> {
+  return authedJson<QuizState>("/api/quiz/energy/buy", { method: "POST", body: "{}" });
+}
+
+export function buyQuizBooster(type: QuizBoosterCode): Promise<QuizState> {
+  return authedJson<QuizState>("/api/quiz/boosters/buy", {
+    method: "POST",
+    body: JSON.stringify({ type }),
+  });
+}
+
+export function startQuizAttempt(topicCode: string): Promise<QuizAttempt> {
+  return authedJson<QuizAttempt>("/api/quiz/attempt/start", {
+    method: "POST",
+    body: JSON.stringify({ topicCode }),
+  });
+}
+
+export function answerQuizAttempt(attemptId: string, optionIndex: number): Promise<QuizAttempt> {
+  return authedJson<QuizAttempt>("/api/quiz/attempt/answer", {
+    method: "POST",
+    body: JSON.stringify({ attemptId, optionIndex }),
+  });
+}
+
+export function useQuizBooster(attemptId: string, type: QuizBoosterCode): Promise<QuizAttempt> {
+  return authedJson<QuizAttempt>("/api/quiz/attempt/booster", {
+    method: "POST",
+    body: JSON.stringify({ attemptId, type }),
+  });
+}
+
+export function openQuizChest(): Promise<QuizChestReward> {
+  return authedJson<QuizChestReward>("/api/quiz/chest/open", { method: "POST", body: "{}" });
+}
+
 export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
   await authedVoid(`/api/account/password`, {
     method: "POST",

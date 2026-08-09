@@ -90,6 +90,7 @@ function makeRound(): { target: Rgb; options: Rgb[] } {
 
 export class BulbaColors {
   isOpen = false;
+  onClose: (() => void) | null = null;
   onGameOver: ((value: number) => void) | null = null;
   onLeaderboard: (() => void) | null = null;
 
@@ -131,6 +132,7 @@ export class BulbaColors {
     this.stopTimer();
     window.removeEventListener("keydown", this.onKeyDown);
     this.root.classList.add("hidden");
+    this.onClose?.();
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {

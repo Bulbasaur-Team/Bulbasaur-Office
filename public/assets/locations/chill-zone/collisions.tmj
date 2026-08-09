@@ -608,6 +608,18 @@
                  "width":422.890493619547,
                  "x":955.089524186369,
                  "y":456.523889603324
+                }, 
+                {
+                 "height":100,
+                 "id":251,
+                 "name":"bulbaquiz",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":120,
+                 "x":650,
+                 "y":410
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -1204,7 +1216,7 @@
          "y":0
         }],
  "nextlayerid":9,
- "nextobjectid":251,
+ "nextobjectid":252,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",
