@@ -352,6 +352,7 @@ export interface QuizAttempt {
   question: QuizQuestion | null;
   deadlineAt: string;
   correct: boolean;
+  correctIndex: number | null;
   state: QuizState;
 }
 

@@ -506,6 +506,11 @@ export class BulbaQuiz {
 
       if (res.status === "LOST") {
         selected?.classList.add("bq-wrong");
+        const correctIndex = res.correctIndex;
+        if (correctIndex != null && correctIndex >= 0) {
+          const opts = this.qOptions.querySelectorAll<HTMLButtonElement>(".bq-opt");
+          opts[correctIndex]?.classList.add("bq-correct");
+        }
         this.feedbackEl.textContent = "";
         this.boostersEl.classList.add("hidden");
         this.questionMenuBtn.classList.remove("hidden");
