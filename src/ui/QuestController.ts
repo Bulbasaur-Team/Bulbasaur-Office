@@ -31,7 +31,8 @@ export class QuestController implements KeyConsumer {
       onHangup: () => this.hangup(),
     });
     this.call = new QuestCall({
-      onBriefingComplete: () => void this.afterBriefingComplete(),
+      onBriefingAccepted: () => void this.afterBriefingAccepted(),
+      onBriefingComplete: () => this.afterBriefingCallEnded(),
       onBriefingAbort: () => this.afterBriefingAbort(),
       onStatusRemoteHangup: () => this.afterStatusRemoteHangup(),
       onStatusAbort: () => this.afterStatusAbort(),
@@ -174,7 +175,7 @@ export class QuestController implements KeyConsumer {
     if (this.phone.isOpen) this.phone.close();
   }
 
-  private async afterBriefingComplete(): Promise<void> {
+  private async afterBriefingAccepted(): Promise<void> {
     try {
       const res = await api.startQuest(FRIDGE_QUEST.code);
       this.status = res.status;
@@ -182,7 +183,12 @@ export class QuestController implements KeyConsumer {
       console.error("Не удалось стартовать квест:", e);
       this.status = "IN_PROGRESS";
     }
+  }
+
+  /** Трубка сброшена после принятия квеста — запускаем цикл статус-звонков. */
+  private afterBriefingCallEnded(): void {
     if (this.status === "COMPLETED") return;
+    if (this.status !== "IN_PROGRESS") this.status = "IN_PROGRESS";
     this.schedule("status", FRIDGE_QUEST.timings.statusIntervalMs);
   }
 

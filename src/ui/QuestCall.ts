@@ -33,6 +33,8 @@ function typeText(el: HTMLElement, text: string, onDone: () => void, delay = CHA
 }
 
 export interface QuestCallHandlers {
+  /** Игрок нажал «Хорошо, я выясню пин-код!» — квест стартует на сервере. */
+  onBriefingAccepted: () => void;
   /** Брифинг завершён Бульбовым (экран «звонок завершён» уже показан). */
   onBriefingComplete: () => void;
   /** Игрок сбросил трубку до завершения брифинга. */
@@ -66,6 +68,8 @@ export class QuestCall {
   private lineTimer = 0;
   private token = 0;
   private awaitingPin = false;
+  /** Уже нажали «выясню пин-код» — abort не откатывает квест. */
+  private briefingAccepted = false;
 
   constructor(private handlers: QuestCallHandlers) {
     this.pinSubmit.onclick = () => void this.submitPin();
@@ -95,6 +99,7 @@ export class QuestCall {
     this.resetUi();
     this.mode = "briefing";
     this.asked.clear();
+    this.briefingAccepted = false;
     // После приветствия ждём вопрос игрока — иначе вторая реплика сменит первую слишком рано.
     this.say(greeting(playerName), () => this.showHelpPrompt(), { awaitReply: true });
   }
@@ -113,8 +118,10 @@ export class QuestCall {
       return;
     }
     if (this.mode === "briefing") {
+      const accepted = this.briefingAccepted;
       this.stop();
-      this.handlers.onBriefingAbort();
+      if (accepted) this.handlers.onBriefingComplete();
+      else this.handlers.onBriefingAbort();
       return;
     }
     if (this.mode === "status") {
@@ -136,6 +143,7 @@ export class QuestCall {
     this.cancelTyping = null;
     this.mode = "idle";
     this.awaitingPin = false;
+    this.briefingAccepted = false;
     this.resetUi();
   }
 
@@ -224,6 +232,8 @@ export class QuestCall {
     if (this.mode !== "briefing") return;
     this.hideReplies();
     this.playerLine.textContent = BRIEFING_ACCEPT_PROMPT;
+    this.briefingAccepted = true;
+    this.handlers.onBriefingAccepted();
     const token = ++this.token;
     this.lineTimer = window.setTimeout(() => {
       if (token !== this.token) return;
