@@ -48,6 +48,7 @@ import { PasswordChange } from "../ui/PasswordChange";
 import { BulbaCoins, BC_COIN_SRC } from "../ui/BulbaCoins";
 import { Wardrobe } from "../ui/Wardrobe";
 import { Ancestors } from "../ui/Ancestors";
+import { QuestController } from "../ui/QuestController";
 import { Logs } from "../ui/Logs";
 import { Monitoring } from "../ui/Monitoring";
 import { Computer } from "../ui/Computer";
@@ -133,6 +134,7 @@ export class WorldScene extends Phaser.Scene {
   private items!: ItemsManager;
   private dialogue!: Dialogue;
   private catDialogue!: CatDialogue;
+  private quest!: QuestController;
   private bubble!: SpeechBubble;
   private thoughtBubbles: ThoughtBubble[] = []; // облачко мыслей на каждый NPC текущей локации (по индексу npcs)
   private thoughtTimers: Phaser.Time.TimerEvent[] = []; // персональный таймер проверки на каждый NPC
@@ -286,6 +288,11 @@ export class WorldScene extends Phaser.Scene {
         this.bubble.hide();
         this.realtime.catTalk(false);
       },
+      questActive: () => this.multiplayer && this.quest.questStatus === "IN_PROGRESS",
+    });
+    this.quest = new QuestController({
+      onBalance: (balance) => this.setBcBalance(balance),
+      canRing: () => this.started && !this.modalOpenExceptQuest(),
     });
 
     this.prompt = this.add
@@ -462,6 +469,7 @@ export class WorldScene extends Phaser.Scene {
     this.router.register(this.poker);
     this.router.register(this.retro);
     this.router.register(this.airHockey);
+    this.router.register(this.quest);
     this.router.register(this.slidePicker);
     this.router.register(this.dialogue);
     // Пока видна «Перевести» — Space/Enter переводят мяуканье (выше диалога кота).
@@ -686,6 +694,7 @@ export class WorldScene extends Phaser.Scene {
     this.items.onDrop = (itemId, itemType, x, y) => this.realtime.itemDrop(itemId, itemType, x, y);
     this.items.onPlace = (itemId, itemType, table, x, y) => this.realtime.itemPlace(itemId, itemType, table, x, y);
     this.items.onGone = (itemId) => this.realtime.itemGone(itemId);
+    void this.quest.start();
     this.realtime.connect({
       onOpen: () => {
         this.sendJoin();
@@ -724,6 +733,8 @@ export class WorldScene extends Phaser.Scene {
       onAchievement: (_code, title, description, image) => {
         this.achievementPopup.show(title, description, image);
         void api.fetchProfile().then((p) => this.setBcBalance(p.bulbaCoinBalance)).catch(() => {});
+        // 5-я ачивка могла только что открыть квест — перепроверим статус.
+        void this.quest.refreshFromServer();
       },
       onAirHockeyLobby: (lobby) => this.applyAirHockeyLobby(lobby),
       onAirHockeyState: (state) => {
@@ -964,6 +975,11 @@ export class WorldScene extends Phaser.Scene {
 
   // Открыта ли модалка, перехватывающая ввод (диалог, меню игры или окно игры).
   private modalOpen(): boolean {
+    return this.quest.isOpen || this.modalOpenExceptQuest();
+  }
+
+  /** Для входящего звонка: не звонить поверх других окон (телефон сам не считается). */
+  private modalOpenExceptQuest(): boolean {
     return (
       this.dialogue.isOpen ||
       this.catDialogue.isOpen ||

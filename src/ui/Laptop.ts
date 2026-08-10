@@ -1,4 +1,5 @@
 import { BulbaTalk } from "./BulbaTalk";
+import { FRIDGE_QUEST, claudePinReply, matchesClaudePhrase } from "../data/quests";
 
 type ChatAppId = "claude" | "cursor";
 type AppId = ChatAppId | "bulbatalk";
@@ -462,6 +463,11 @@ export class Laptop {
     this.sendBtn.disabled = true;
     const typing = this.addBubble("assistant", "● ● ●", true);
 
+    const secretReply =
+      app === "claude" && matchesClaudePhrase(text)
+        ? claudePinReply(FRIDGE_QUEST.pinHint)
+        : null;
+
     // Короткая пауза — имитация «думает».
     this.replyTimer = window.setTimeout(() => {
       // Пока ждали ответ, могли переключиться на другое приложение.
@@ -472,7 +478,7 @@ export class Laptop {
         return;
       }
       typing.remove();
-      this.addBubble("assistant", inventRefusal(app));
+      this.addBubble("assistant", secretReply ?? inventRefusal(app));
       this.sessions[app].messagesHtml = this.messagesEl.innerHTML;
       this.busy = false;
       this.sendBtn.disabled = false;

@@ -125,6 +125,191 @@
     #slidePicker .slides-icon { position: absolute; top: -14px; right: -14px; }
     .opt { background: #f4f1e8; border: 2px solid var(--accent); border-radius: 999px; padding: 9px 20px; cursor: pointer; color: #1b1f24; font-size: 17px; font-family: inherit; transition: .12s; }
     .opt:hover, .opt.sel { background: var(--accent); color: #14210f; transform: translateY(-2px); }
+    .dlg-input-wrap {
+      display: flex; gap: 8px; justify-content: center; align-items: center;
+      margin-top: 10px; width: min(420px, 100%);
+    }
+    .dlg-input-wrap.hidden { display: none; }
+    .dlg-input {
+      flex: 1; min-width: 0; padding: 9px 14px; border-radius: 999px;
+      border: 2px solid var(--accent); background: #f4f1e8; color: #1b1f24;
+      font-family: inherit; font-size: 16px; outline: none;
+    }
+    .dlg-input-submit {
+      flex-shrink: 0; border: 2px solid var(--accent); border-radius: 999px;
+      padding: 9px 16px; background: var(--accent); color: #14210f;
+      font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+
+    /* BulbaPhone — входящий / активный звонок квеста */
+    #bulbaPhone {
+      position: fixed; inset: 0; z-index: 75;
+      background: rgba(8, 10, 14, .88);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    #bulbaPhone.hidden { display: none; }
+    .bp-device {
+      /* Портретный «телефон в телефоне»: не сплющиваем в landscape-сцене. */
+      aspect-ratio: 9 / 19.5;
+      width: min(340px, calc(var(--sw) - 32px), calc((var(--sh) - 40px) * 9 / 19.5));
+      height: auto;
+      max-height: calc(var(--sh) - 40px);
+      border-radius: 44px;
+      background: linear-gradient(160deg, #2a2e36 0%, #12151b 55%, #0c0e12 100%);
+      border: 3px solid #3a404c;
+      box-shadow:
+        0 0 0 2px #0a0c10,
+        0 24px 60px rgba(0, 0, 0, .55),
+        inset 0 1px 0 rgba(255, 255, 255, .08);
+      position: relative;
+      overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    @media (pointer: coarse) {
+      #bulbaPhone { padding: 12px; }
+      .bp-device {
+        width: min(380px, calc(var(--sw) - 20px), calc((var(--sh) - 20px) * 9 / 19.5));
+        max-height: calc(var(--sh) - 20px);
+        border-radius: 36px;
+      }
+      .bp-close { top: 16px; right: 14px; }
+    }
+    .bp-notch {
+      position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+      width: 34%; height: 26px; border-radius: 16px; background: #050608; z-index: 3;
+      pointer-events: none;
+    }
+    .bp-screen {
+      flex: 1; min-height: 0; margin: 14px 10px 12px;
+      border-radius: 34px; overflow: hidden;
+      background: #0e1116; color: #eef2f8;
+      display: flex; flex-direction: column;
+      position: relative;
+    }
+    .bp-close {
+      position: absolute; top: 22px; right: 18px; z-index: 20;
+      width: 36px; height: 36px; border-radius: 50%; border: 0;
+      background: rgba(255, 255, 255, .18); color: #fff;
+      font-size: 20px; line-height: 1; cursor: pointer;
+      pointer-events: auto;
+    }
+    .bp-close:hover { background: rgba(255, 255, 255, .28); }
+    .bp-incoming, .bp-call {
+      flex: 1; min-height: 0; display: flex; flex-direction: column;
+      align-items: center; padding: 48px 18px 22px;
+      position: relative; z-index: 1;
+    }
+    .bp-incoming.hidden, .bp-call.hidden { display: none; }
+    .bp-label {
+      font-size: 13px; letter-spacing: .04em; text-transform: uppercase;
+      color: #9aa3b2; margin-bottom: 18px;
+    }
+    .bp-avatar-wrap {
+      width: 132px; height: 132px; border-radius: 50%;
+      overflow: hidden; border: 3px solid rgba(122, 192, 122, .55);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .4);
+      background: #1e2430;
+    }
+    .bp-avatar { width: 100%; height: 100%; object-fit: cover; }
+    .bp-caller { margin-top: 16px; font-size: 22px; font-weight: 700; text-align: center; }
+    .bp-actions {
+      margin-top: auto; display: flex; gap: 36px; align-items: center; justify-content: center;
+      padding-bottom: 12px;
+    }
+    .bp-action {
+      width: 64px; height: 64px; border-radius: 50%; border: 0;
+      display: grid; place-items: center; cursor: pointer;
+      font-size: 26px; color: #fff;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, .35);
+    }
+    .bp-decline { background: #e5484d; }
+    .bp-accept { background: #2f9e57; }
+    .bp-action:hover { filter: brightness(1.08); }
+    .bp-action-cap {
+      display: block; margin-top: 8px; font-size: 11px; color: #aeb6c4; text-align: center;
+    }
+    .bp-action-col { display: flex; flex-direction: column; align-items: center; }
+    .bp-call-stage {
+      flex: 1; min-height: 0; width: 100%;
+      display: flex; flex-direction: column; align-items: stretch; gap: 10px;
+    }
+    .bp-participant {
+      position: relative; flex: 1; min-height: 160px; border-radius: 18px;
+      overflow: hidden; background: #1e2430; border: 1px solid #2c3340;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .bp-participant-img {
+      width: 100%; height: 100%; object-fit: contain; background: #1e2430;
+    }
+    .bp-participant-name {
+      position: absolute; left: 8px; bottom: 8px;
+      padding: 3px 8px; border-radius: 8px;
+      background: rgba(0, 0, 0, .55); font-size: 11px; font-weight: 600;
+    }
+    .bp-bubble {
+      position: absolute; left: 8px; right: 8px; top: 8px; z-index: 2;
+      padding: 8px 10px; border-radius: 12px;
+      background: #f4f1e8; border: 1.5px solid #7ac07a;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .25);
+      max-height: 55%; overflow: auto;
+    }
+    .bp-bubble.hidden { display: none; }
+    .bp-bubble-text {
+      color: #1b1f24; font-size: 14px; line-height: 1.35;
+      font-family: "Trebuchet MS", sans-serif;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .bp-player-line {
+      min-height: 28px; text-align: center; font-size: 13px; color: #c5cedb;
+      padding: 0 4px;
+    }
+    .bp-replies {
+      display: flex; flex-direction: column; gap: 8px; width: 100%;
+    }
+    .bp-replies.hidden { display: none; }
+    .bp-reply {
+      border: 1px solid #3a4456; border-radius: 12px;
+      padding: 10px 12px; background: rgba(38, 43, 53, .96); color: #eef2f8;
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      text-align: left; cursor: pointer;
+    }
+    .bp-reply:hover { background: #3d8bfd; border-color: #3d8bfd; }
+    .bp-pin-wrap {
+      display: flex; flex-direction: column; gap: 8px; width: 100%; align-items: stretch;
+    }
+    .bp-pin-wrap.hidden { display: none; }
+    .bp-pin-input {
+      padding: 10px 12px; border-radius: 12px; border: 1px solid #3a4456;
+      background: #1a1f28; color: #eef2f8; font-family: inherit;
+      font-size: 20px; letter-spacing: .35em; text-align: center; outline: none;
+    }
+    .bp-pin-submit {
+      border: 0; border-radius: 12px; padding: 10px 12px;
+      background: #3d8bfd; color: #fff; font-family: inherit;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+    }
+    .bp-hangup-row {
+      display: flex; justify-content: center; padding-top: 6px;
+    }
+    .bp-hangup {
+      width: 54px; height: 54px; border-radius: 50%; border: 0;
+      background: #e5484d; color: #fff; font-size: 22px; cursor: pointer;
+      display: grid; place-items: center;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, .35);
+    }
+    .bp-hangup-icon { display: block; transform: rotate(135deg); }
+    .bp-call.is-ended .bp-hangup-row,
+    .bp-call.is-ended .bp-replies,
+    .bp-call.is-ended .bp-pin-wrap,
+    .bp-call.is-ended .bp-player-line { display: none !important; }
+    .bp-ended {
+      display: none; flex-direction: column; align-items: center; gap: 6px;
+      padding: 10px 8px 4px; text-align: center;
+    }
+    .bp-call.is-ended .bp-ended { display: flex; }
+    .bp-ended-title { font-size: 15px; font-weight: 700; color: #eef2f8; }
+    .bp-ended-sub { font-size: 12px; color: #9aa3b2; }
 
     /* Кнопка перевода реплики Бульба Кота — над облачком, поверх диалога */
     .cat-translate {
@@ -1767,6 +1952,62 @@
     <div id="dialogue" class="hidden">
       <div class="dlg-frame">
         <div class="dlg-options" id="dlgOptions"></div>
+        <div class="dlg-input-wrap hidden" id="dlgInputWrap">
+          <input id="dlgInput" class="dlg-input" type="text" maxlength="40" autocomplete="off" />
+          <button type="button" class="dlg-input-submit" id="dlgInputSubmit">Ок</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="bulbaPhone" class="hidden" aria-hidden="true">
+      <div class="bp-device">
+        <div class="bp-notch" aria-hidden="true"></div>
+        <button type="button" class="bp-close" id="bulbaPhoneClose" aria-label="сбросить">×</button>
+        <div class="bp-screen">
+          <div class="bp-incoming" id="bpIncoming">
+            <div class="bp-label">Входящий вызов</div>
+            <div class="bp-avatar-wrap">
+              <img class="bp-avatar" id="bpIncomingAvatar" alt="" draggable="false" />
+            </div>
+            <div class="bp-caller" id="bpIncomingName">Бульбов Н.Н.</div>
+            <div class="bp-actions">
+              <div class="bp-action-col">
+                <button type="button" class="bp-action bp-decline" id="bpDecline" aria-label="отклонить">✕</button>
+                <span class="bp-action-cap">Отклонить</span>
+              </div>
+              <div class="bp-action-col">
+                <button type="button" class="bp-action bp-accept" id="bpAccept" aria-label="ответить">☎</button>
+                <span class="bp-action-cap">Ответить</span>
+              </div>
+            </div>
+          </div>
+          <div class="bp-call hidden" id="bpCall">
+            <div class="bp-call-stage">
+              <div class="bp-participant">
+                <div class="bp-bubble hidden" id="bpBubble">
+                  <div class="bp-bubble-text" id="bpBubbleText"></div>
+                </div>
+                <img class="bp-participant-img" id="bpCallAvatar" alt="" draggable="false" />
+                <div class="bp-participant-name" id="bpCallName">Бульбов Н.Н.</div>
+              </div>
+              <div class="bp-player-line" id="bpPlayerLine"></div>
+              <div class="bp-replies hidden" id="bpReplies"></div>
+              <div class="bp-pin-wrap hidden" id="bpPinWrap">
+                <input class="bp-pin-input" id="bpPinInput" type="text" inputmode="numeric" maxlength="6" placeholder="______" autocomplete="off" />
+                <button type="button" class="bp-pin-submit" id="bpPinSubmit">Отправить пин</button>
+              </div>
+              <div class="bp-ended" id="bpEnded" aria-live="polite">
+                <div class="bp-ended-title">Звонок завершён</div>
+                <div class="bp-ended-sub">Бульбов Н.Н. сбросил трубку</div>
+              </div>
+              <div class="bp-hangup-row">
+                <button type="button" class="bp-hangup" id="bpHangup" aria-label="завершить звонок" title="Завершить">
+                  <span class="bp-hangup-icon" aria-hidden="true">📞</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 

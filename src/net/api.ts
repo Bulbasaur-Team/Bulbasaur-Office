@@ -248,6 +248,42 @@ export function fetchProfile(): Promise<Profile> {
   return authedJson<Profile>(`/api/account/profile`);
 }
 
+export type QuestStatus = "LOCKED" | "AVAILABLE" | "IN_PROGRESS" | "COMPLETED";
+
+export interface QuestStatusRow {
+  code: string;
+  status: QuestStatus;
+}
+
+export interface QuestsResponse {
+  quests: QuestStatusRow[];
+}
+
+export function fetchQuests(): Promise<QuestsResponse> {
+  return authedJson<QuestsResponse>(`/api/quests`);
+}
+
+export function startQuest(code: string): Promise<QuestStatusRow> {
+  return authedJson<QuestStatusRow>(`/api/quests/${encodeURIComponent(code)}/start`, {
+    method: "POST",
+    body: "{}",
+  });
+}
+
+export interface CompleteQuestResponse {
+  code: string;
+  status: QuestStatus;
+  bulbaCoinBalance: number;
+  rewarded: boolean;
+}
+
+export function completeQuest(code: string, pin: string): Promise<CompleteQuestResponse> {
+  return authedJson<CompleteQuestResponse>(`/api/quests/${encodeURIComponent(code)}/complete`, {
+    method: "POST",
+    body: JSON.stringify({ pin }),
+  });
+}
+
 export interface BulbaCoinTransaction {
   id: string;
   amount: number;
