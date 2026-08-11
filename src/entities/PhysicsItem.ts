@@ -191,6 +191,11 @@ export class PhysicsItem {
     this.shadow.setVisible(false);
   }
 
+  setCarryVisible(visible: boolean): void {
+    this.sprite.setVisible(visible);
+    if (!visible) this.shadow.setVisible(false);
+  }
+
   // Поставлен на землю/стол: вернуть тень и обычную отрисовку.
   place(x: number, y: number): void {
     this.base.setVelocity(0, 0);

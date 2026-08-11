@@ -50,7 +50,8 @@ export class LocationMenu implements KeyConsumer {
   }
 
   handleKey(e: KeyboardEvent): boolean {
-    const n = this.loc!.exits.length;
+    const n = this.list.children.length;
+    if (!n) return false;
     switch (e.code) {
       case "ArrowUp":
       case "KeyW":

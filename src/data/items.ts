@@ -71,6 +71,20 @@ export const ITEM_TYPES: Record<string, ItemTypeDef> = {
     ttlMs: 30 * 60 * 1000,
     alwaysOnTop: true,
   },
+  /** Квестовая посылка lost_package — только носить, не бросать. */
+  package: {
+    texture: "item-package",
+    file: "package.png",
+    radius: 22,
+    bounce: 0,
+    drag: 0.9,
+    kickMin: 0,
+    kickMax: 0,
+    hopFactor: 0,
+    kickable: false,
+    grabbable: false,
+    alwaysOnTop: true,
+  },
 };
 
 // Предмет, поставленный на карту (из слоя items в tmj). id стабилен, пока объект

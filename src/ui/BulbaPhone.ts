@@ -1,8 +1,12 @@
 import { publicPath } from "../publicPath";
-import { FRIDGE_QUEST } from "../data/quests";
 import type { KeyConsumer } from "./KeyboardRouter";
 
 export type PhoneMode = "incoming" | "call";
+
+export interface PhoneCaller {
+  name: string;
+  photo: string;
+}
 
 interface BulbaPhoneHandlers {
   onAccept: () => void;
@@ -22,14 +26,9 @@ export class BulbaPhone implements KeyConsumer {
   private callAvatar = document.getElementById("bpCallAvatar") as HTMLImageElement;
   private incomingName = document.getElementById("bpIncomingName")!;
   private callName = document.getElementById("bpCallName")!;
+  private endedSub = document.getElementById("bpEndedSub")!;
 
   constructor(private handlers: BulbaPhoneHandlers) {
-    const photo = publicPath(FRIDGE_QUEST.caller.photo);
-    this.incomingAvatar.src = photo;
-    this.callAvatar.src = photo;
-    this.incomingName.textContent = FRIDGE_QUEST.caller.name;
-    this.callName.textContent = FRIDGE_QUEST.caller.name;
-
     document.getElementById("bpAccept")!.onclick = () => this.handlers.onAccept();
     document.getElementById("bpDecline")!.onclick = () => this.handlers.onDecline();
     const closeBtn = document.getElementById("bulbaPhoneClose")!;
@@ -41,7 +40,17 @@ export class BulbaPhone implements KeyConsumer {
     document.getElementById("bpHangup")!.onclick = () => this.handlers.onHangup();
   }
 
-  showIncoming(): void {
+  setCaller(caller: PhoneCaller): void {
+    const photo = publicPath(caller.photo);
+    this.incomingAvatar.src = photo;
+    this.callAvatar.src = photo;
+    this.incomingName.textContent = caller.name;
+    this.callName.textContent = caller.name;
+    this.endedSub.textContent = `${caller.name} сбросил трубку`;
+  }
+
+  showIncoming(caller?: PhoneCaller): void {
+    if (caller) this.setCaller(caller);
     this.isOpen = true;
     this.root.classList.remove("hidden");
     this.root.setAttribute("aria-hidden", "false");

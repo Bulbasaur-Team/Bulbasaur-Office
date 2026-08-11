@@ -1,28 +1,40 @@
 import * as api from "../net/api";
 import { FRIDGE_QUEST, type QuestApiStatus } from "../data/quests";
+import { PACKAGE_QUEST } from "../data/packageQuest";
 import { BulbaPhone } from "./BulbaPhone";
 import { QuestCall } from "./QuestCall";
+import { PackageQuestCall } from "./PackageQuestCall";
 import type { KeyConsumer } from "./KeyboardRouter";
+
+type RingKind = "fridgeIntro" | "fridgeStatus" | "packageIntro" | "packageFinale";
 
 interface QuestControllerOpts {
   onBalance: (balance: number) => void;
   /** Можно ли сейчас показывать входящий (нет других модалок). */
   canRing: () => boolean;
+  /** Локальный прогресс посылки сброшен / обновлён — сцена может переспавнить NPC. */
+  onPackageProgress?: () => void;
 }
 
 /**
- * Мультиплеер-квест fridge_pin: таймеры звонков + BulbaPhone/QuestCall.
- * Статус и награда — через REST.
+ * Мультиплеер-квесты: fridge_pin (со статус-звонками) и lost_package (только intro + finale).
  */
 export class QuestController implements KeyConsumer {
   private phone: BulbaPhone;
-  private call: QuestCall;
-  private status: QuestApiStatus = "LOCKED";
+  private fridgeCall: QuestCall;
+  private packageCall: PackageQuestCall;
+
+  private fridgeStatus: QuestApiStatus = "LOCKED";
+  private packageStatus: QuestApiStatus = "LOCKED";
+
   private timer = 0;
-  private pendingKind: "intro" | "status" | null = null;
+  private pendingKind: RingKind | null = null;
   private started = false;
-  /** Уже ставили таймер intro в этой сессии (чтобы не дёргать повторно при refresh). */
-  private introScheduled = false;
+
+  /** Клиентский прогресс lost_package (персистится в localStorage на время IN_PROGRESS). */
+  private driverBriefed = false;
+  private waybillRead = false;
+  private hasPackage = false;
 
   constructor(private opts: QuestControllerOpts) {
     this.phone = new BulbaPhone({
@@ -30,14 +42,22 @@ export class QuestController implements KeyConsumer {
       onDecline: () => this.declineIncoming(),
       onHangup: () => this.hangup(),
     });
-    this.call = new QuestCall({
-      onBriefingAccepted: () => void this.afterBriefingAccepted(),
-      onBriefingComplete: () => this.afterBriefingCallEnded(),
-      onBriefingAbort: () => this.afterBriefingAbort(),
-      onStatusRemoteHangup: () => this.afterStatusRemoteHangup(),
-      onStatusAbort: () => this.afterStatusAbort(),
-      onSubmitPin: (pin) => this.submitPin(pin),
-      onQuestCompleted: () => this.afterQuestCompleted(),
+    this.fridgeCall = new QuestCall({
+      onBriefingAccepted: () => void this.afterFridgeBriefingAccepted(),
+      onBriefingComplete: () => this.afterFridgeBriefingCallEnded(),
+      onBriefingAbort: () => this.afterFridgeBriefingAbort(),
+      onStatusRemoteHangup: () => this.afterFridgeStatusRemoteHangup(),
+      onStatusAbort: () => this.afterFridgeStatusAbort(),
+      onSubmitPin: (pin) => this.submitFridgePin(pin),
+      onQuestCompleted: () => this.afterFridgeQuestCompleted(),
+      onDismissEnded: () => this.afterDismissEnded(),
+    });
+    this.packageCall = new PackageQuestCall({
+      onBriefingAccepted: () => void this.afterPackageBriefingAccepted(),
+      onBriefingComplete: () => this.afterPackageBriefingCallEnded(),
+      onBriefingAbort: () => this.afterPackageBriefingAbort(),
+      onFinaleComplete: () => this.afterPackageFinaleComplete(),
+      onFinaleAbort: () => this.afterPackageFinaleAbort(),
       onDismissEnded: () => this.afterDismissEnded(),
     });
   }
@@ -46,8 +66,33 @@ export class QuestController implements KeyConsumer {
     return this.phone.isOpen;
   }
 
+  /** @deprecated используй fridgeQuestStatus — для кота fridge_pin. */
   get questStatus(): QuestApiStatus {
-    return this.status;
+    return this.fridgeStatus;
+  }
+
+  get fridgeQuestStatus(): QuestApiStatus {
+    return this.fridgeStatus;
+  }
+
+  get packageQuestStatus(): QuestApiStatus {
+    return this.packageStatus;
+  }
+
+  get packageInProgress(): boolean {
+    return this.packageStatus === "IN_PROGRESS";
+  }
+
+  get packageWaybillRead(): boolean {
+    return this.waybillRead;
+  }
+
+  get packageHasItem(): boolean {
+    return this.hasPackage;
+  }
+
+  get packageDriverBriefed(): boolean {
+    return this.driverBriefed;
   }
 
   isActive(): boolean {
@@ -58,55 +103,96 @@ export class QuestController implements KeyConsumer {
     return this.phone.handleKey(e);
   }
 
-  /** Запуск после входа в MP. */
   async start(): Promise<void> {
     this.stop();
     this.started = true;
     await this.refreshFromServer({ initial: true });
   }
 
-  /**
-   * Перечитать статус с сервера. После новой ачивки квест мог только что
-   * открыться (LOCKED → AVAILABLE) — тогда планируем первый звонок.
-   */
   async refreshFromServer(opts?: { initial?: boolean }): Promise<void> {
     if (!this.started) return;
-    const prev = this.status;
+    const prevFridge = this.fridgeStatus;
+    const prevPackage = this.packageStatus;
     try {
       const list = await api.fetchQuests();
-      const row = list.quests.find((q) => q.code === FRIDGE_QUEST.code);
-      this.status = row?.status ?? "LOCKED";
+      this.fridgeStatus =
+        list.quests.find((q) => q.code === FRIDGE_QUEST.code)?.status ?? "LOCKED";
+      this.packageStatus =
+        list.quests.find((q) => q.code === PACKAGE_QUEST.code)?.status ?? "LOCKED";
     } catch (e) {
       console.error("Не удалось загрузить квесты:", e);
-      if (opts?.initial) this.status = "LOCKED";
+      if (opts?.initial) {
+        this.fridgeStatus = "LOCKED";
+        this.packageStatus = "LOCKED";
+      }
       return;
     }
     if (!this.started) return;
 
-    if (this.status === "COMPLETED") {
+    if (this.packageStatus === "IN_PROGRESS") {
+      this.loadPackageProgress();
+    } else {
+      this.resetPackageProgress({ clearStorage: true });
+    }
+
+    if (this.fridgeStatus === "COMPLETED" && this.packageStatus === "COMPLETED") {
+      // Не сбрасывать таймер финального звонка Бульбикова.
+      if (
+        this.pendingKind === "packageFinale" ||
+        this.packageCall.isBusy ||
+        this.phone.isOpen
+      ) {
+        return;
+      }
       window.clearTimeout(this.timer);
       this.timer = 0;
       this.pendingKind = null;
       return;
     }
 
-    if (this.status === "LOCKED") return;
+    const justFridgeUnlock = prevFridge === "LOCKED" && !opts?.initial;
+    const justPackageUnlock = prevPackage === "LOCKED" && !opts?.initial;
+    this.ensureRingScheduled({
+      initial: !!opts?.initial,
+      justFridgeUnlock,
+      justPackageUnlock,
+    });
+  }
 
-    if (this.status === "IN_PROGRESS") {
-      if (!this.timer && !this.phone.isOpen && !this.call.isBusy) {
-        this.schedule("status", FRIDGE_QUEST.timings.statusIntervalMs);
-      }
+  /**
+   * Поставить входящий в очередь, если квест доступен/в процессе и сейчас никто не говорит.
+   * Вызывается и после закрытия трубки — чтобы не потерять звонок, пока был открыт телефон/модалка.
+   */
+  private ensureRingScheduled(opts?: {
+    initial?: boolean;
+    justFridgeUnlock?: boolean;
+    justPackageUnlock?: boolean;
+  }): void {
+    if (!this.started) return;
+    if (this.phone.isOpen || this.anyCallBusy()) return;
+    // Уже ждём конкретный звонок — не сбрасываем таймер.
+    if (this.timer && this.pendingKind) return;
+
+    if (this.fridgeStatus === "IN_PROGRESS") {
+      this.schedule("fridgeStatus", FRIDGE_QUEST.timings.statusIntervalMs);
       return;
     }
 
-    // AVAILABLE
-    const justUnlocked = prev === "LOCKED" && !opts?.initial;
-    if (!this.introScheduled && !this.phone.isOpen && !this.call.isBusy) {
-      this.introScheduled = true;
+    if (this.fridgeStatus === "AVAILABLE") {
       this.schedule(
-        "intro",
-        justUnlocked ? 3_000 : FRIDGE_QUEST.timings.introDelayMs,
+        "fridgeIntro",
+        opts?.justFridgeUnlock ? 3_000 : FRIDGE_QUEST.timings.introDelayMs,
       );
+      return;
+    }
+
+    if (this.packageStatus === "AVAILABLE") {
+      const delay = opts?.justPackageUnlock
+        ? 3_000
+        : opts?.initial
+          ? PACKAGE_QUEST.timings.introDelayMs
+          : 3_000;
+      this.schedule("packageIntro", delay);
     }
   }
 
@@ -115,21 +201,124 @@ export class QuestController implements KeyConsumer {
     window.clearTimeout(this.timer);
     this.timer = 0;
     this.pendingKind = null;
-    this.introScheduled = false;
-    this.call.stop();
+    // Память сбрасываем, localStorage оставляем — после F5 восстановим по IN_PROGRESS.
+    this.driverBriefed = false;
+    this.waybillRead = false;
+    this.hasPackage = false;
+    this.fridgeCall.stop();
+    this.packageCall.stop();
     this.phone.close();
   }
 
-  private schedule(kind: "intro" | "status", delayMs: number): void {
+  markDriverBriefed(): void {
+    this.driverBriefed = true;
+    this.savePackageProgress();
+  }
+
+  markWaybillRead(): void {
+    if (this.waybillRead) return;
+    this.waybillRead = true;
+    this.savePackageProgress();
+    this.opts.onPackageProgress?.();
+  }
+
+  markPackageReceived(): void {
+    this.hasPackage = true;
+    this.savePackageProgress();
+    this.opts.onPackageProgress?.();
+  }
+
+  /** Сдать посылку водителю → complete API + финальный звонок. */
+  async deliverPackageToDriver(): Promise<{ ok: boolean; line: string }> {
+    if (!this.hasPackage || this.packageStatus !== "IN_PROGRESS") {
+      return { ok: false, line: "Посылки пока нет." };
+    }
+    try {
+      const res = await api.completeQuest(PACKAGE_QUEST.code, PACKAGE_QUEST.secretCode);
+      this.opts.onBalance(res.bulbaCoinBalance);
+      this.packageStatus = res.status;
+      this.hasPackage = false;
+      this.resetPackageProgress({ clearStorage: true });
+      this.opts.onPackageProgress?.();
+      if (res.status === "COMPLETED") {
+        this.schedule("packageFinale", PACKAGE_QUEST.timings.finaleDelayMs);
+      }
+      return { ok: true, line: "" };
+    } catch {
+      return { ok: false, line: "Не удалось сдать посылку. Попробуй ещё раз." };
+    }
+  }
+
+  private packageProgressKey(): string {
+    const login = api.getLogin() ?? "_";
+    return `bulba_quest_${PACKAGE_QUEST.code}_${login}`;
+  }
+
+  private savePackageProgress(): void {
+    try {
+      localStorage.setItem(
+        this.packageProgressKey(),
+        JSON.stringify({
+          driverBriefed: this.driverBriefed,
+          waybillRead: this.waybillRead,
+          hasPackage: this.hasPackage,
+        }),
+      );
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }
+
+  private loadPackageProgress(): void {
+    try {
+      const raw = localStorage.getItem(this.packageProgressKey());
+      if (!raw) return;
+      const data = JSON.parse(raw) as {
+        driverBriefed?: boolean;
+        waybillRead?: boolean;
+        hasPackage?: boolean;
+      };
+      this.driverBriefed = !!data.driverBriefed;
+      this.waybillRead = !!data.waybillRead;
+      this.hasPackage = !!data.hasPackage;
+    } catch {
+      /* ignore */
+    }
+    this.opts.onPackageProgress?.();
+  }
+
+  private resetPackageProgress(opts?: { clearStorage?: boolean }): void {
+    this.driverBriefed = false;
+    this.waybillRead = false;
+    this.hasPackage = false;
+    if (opts?.clearStorage) {
+      try {
+        localStorage.removeItem(this.packageProgressKey());
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  private anyCallBusy(): boolean {
+    return this.fridgeCall.isBusy || this.packageCall.isBusy;
+  }
+
+  private schedule(kind: RingKind, delayMs: number): void {
     window.clearTimeout(this.timer);
     this.pendingKind = kind;
     this.timer = window.setTimeout(() => this.tryRing(kind), delayMs);
   }
 
-  private tryRing(kind: "intro" | "status"): void {
+  private tryRing(kind: RingKind): void {
     this.timer = 0;
-    if (!this.started || this.status === "COMPLETED" || this.status === "LOCKED") return;
-    if (this.phone.isOpen || this.call.isBusy) {
+    if (!this.started) return;
+    if (kind.startsWith("fridge") && this.fridgeStatus === "COMPLETED") return;
+    if (kind.startsWith("fridge") && this.fridgeStatus === "LOCKED") return;
+    if (kind === "packageIntro" && this.packageStatus !== "AVAILABLE") return;
+    if (kind === "packageFinale" && this.packageStatus !== "COMPLETED") return;
+
+    if (this.phone.isOpen || this.anyCallBusy()) {
       this.schedule(kind, 5_000);
       return;
     }
@@ -138,27 +327,57 @@ export class QuestController implements KeyConsumer {
       return;
     }
     this.pendingKind = kind;
-    this.phone.showIncoming();
+    const caller =
+      kind.startsWith("package") ? PACKAGE_QUEST.caller : FRIDGE_QUEST.caller;
+    this.phone.showIncoming(caller);
   }
 
   private acceptIncoming(): void {
-    const kind = this.pendingKind ?? (this.status === "IN_PROGRESS" ? "status" : "intro");
+    const kind =
+      this.pendingKind ??
+      (this.fridgeStatus === "IN_PROGRESS"
+        ? "fridgeStatus"
+        : this.packageStatus === "AVAILABLE"
+          ? "packageIntro"
+          : "fridgeIntro");
     this.pendingKind = null;
     this.phone.showCall();
-    if (kind === "intro" && this.status === "AVAILABLE") {
-      this.call.startBriefing(api.getLogin() ?? "Игрок");
+    const login = api.getLogin() ?? "Игрок";
+
+    if (kind === "fridgeIntro" && this.fridgeStatus === "AVAILABLE") {
+      this.fridgeCall.startBriefing(login);
       return;
     }
-    this.call.startStatus();
+    if (kind === "fridgeStatus") {
+      this.fridgeCall.startStatus();
+      return;
+    }
+    if (kind === "packageIntro") {
+      this.packageCall.startBriefing(login);
+      return;
+    }
+    if (kind === "packageFinale") {
+      this.packageCall.startFinale();
+    }
   }
 
   private declineIncoming(): void {
     this.phone.close();
-    if (this.status === "IN_PROGRESS") {
-      this.schedule("status", FRIDGE_QUEST.timings.statusIntervalMs);
+    const kind = this.pendingKind;
+    this.pendingKind = null;
+    if (kind === "fridgeStatus" || this.fridgeStatus === "IN_PROGRESS") {
+      this.schedule("fridgeStatus", FRIDGE_QUEST.timings.statusIntervalMs);
       return;
     }
-    this.schedule("intro", FRIDGE_QUEST.timings.declineRetryMs);
+    if (kind === "packageFinale") {
+      this.schedule("packageFinale", PACKAGE_QUEST.timings.declineRetryMs);
+      return;
+    }
+    if (kind === "packageIntro" || this.packageStatus === "AVAILABLE") {
+      this.schedule("packageIntro", PACKAGE_QUEST.timings.declineRetryMs);
+      return;
+    }
+    this.schedule("fridgeIntro", FRIDGE_QUEST.timings.declineRetryMs);
   }
 
   private hangup(): void {
@@ -167,67 +386,111 @@ export class QuestController implements KeyConsumer {
       this.declineIncoming();
       return;
     }
-    if (this.call.isEnded) {
-      this.call.dismissEnded();
+    if (this.fridgeCall.isEnded) {
+      this.fridgeCall.dismissEnded();
       return;
     }
-    this.call.hangupByPlayer();
-    if (this.phone.isOpen) this.phone.close();
-  }
-
-  private async afterBriefingAccepted(): Promise<void> {
-    try {
-      const res = await api.startQuest(FRIDGE_QUEST.code);
-      this.status = res.status;
-    } catch (e) {
-      console.error("Не удалось стартовать квест:", e);
-      this.status = "IN_PROGRESS";
+    if (this.packageCall.isEnded) {
+      this.packageCall.dismissEnded();
+      return;
+    }
+    if (this.fridgeCall.isBusy) {
+      this.fridgeCall.hangupByPlayer();
+      if (this.phone.isOpen) this.phone.close();
+      return;
+    }
+    if (this.packageCall.isBusy) {
+      this.packageCall.hangupByPlayer();
+      if (this.phone.isOpen) this.phone.close();
     }
   }
 
-  /** Трубка сброшена после принятия квеста — запускаем цикл статус-звонков. */
-  private afterBriefingCallEnded(): void {
-    if (this.status === "COMPLETED") return;
-    if (this.status !== "IN_PROGRESS") this.status = "IN_PROGRESS";
-    this.schedule("status", FRIDGE_QUEST.timings.statusIntervalMs);
+  private async afterFridgeBriefingAccepted(): Promise<void> {
+    try {
+      const res = await api.startQuest(FRIDGE_QUEST.code);
+      this.fridgeStatus = res.status;
+    } catch (e) {
+      console.error("Не удалось стартовать квест:", e);
+      this.fridgeStatus = "IN_PROGRESS";
+    }
   }
 
-  private afterBriefingAbort(): void {
+  private afterFridgeBriefingCallEnded(): void {
+    if (this.fridgeStatus === "COMPLETED") return;
+    if (this.fridgeStatus !== "IN_PROGRESS") this.fridgeStatus = "IN_PROGRESS";
+    this.schedule("fridgeStatus", FRIDGE_QUEST.timings.statusIntervalMs);
+  }
+
+  private afterFridgeBriefingAbort(): void {
     this.phone.close();
-    this.status = "AVAILABLE";
-    this.schedule("intro", FRIDGE_QUEST.timings.declineRetryMs);
+    this.fridgeStatus = "AVAILABLE";
+    this.ensureRingScheduled();
   }
 
-  private afterStatusRemoteHangup(): void {
-    if (this.status === "COMPLETED") return;
-    this.schedule("status", FRIDGE_QUEST.timings.statusIntervalMs);
+  private afterFridgeStatusRemoteHangup(): void {
+    if (this.fridgeStatus === "COMPLETED") return;
+    this.schedule("fridgeStatus", FRIDGE_QUEST.timings.statusIntervalMs);
   }
 
-  private afterStatusAbort(): void {
+  private afterFridgeStatusAbort(): void {
     this.phone.close();
-    if (this.status === "COMPLETED") return;
-    this.schedule("status", FRIDGE_QUEST.timings.statusIntervalMs);
+    if (this.fridgeStatus === "COMPLETED") return;
+    this.schedule("fridgeStatus", FRIDGE_QUEST.timings.statusIntervalMs);
   }
 
-  private async submitPin(pin: string): Promise<boolean> {
+  private async submitFridgePin(pin: string): Promise<boolean> {
     try {
       const res = await api.completeQuest(FRIDGE_QUEST.code, pin);
       this.opts.onBalance(res.bulbaCoinBalance);
-      this.status = res.status;
+      this.fridgeStatus = res.status;
       return res.status === "COMPLETED";
     } catch {
       return false;
     }
   }
 
-  private afterQuestCompleted(): void {
-    this.status = "COMPLETED";
+  private afterFridgeQuestCompleted(): void {
+    this.fridgeStatus = "COMPLETED";
     window.clearTimeout(this.timer);
     this.timer = 0;
     this.pendingKind = null;
+    // После холодильника мог открыться второй квест.
+    void this.refreshFromServer();
+  }
+
+  private async afterPackageBriefingAccepted(): Promise<void> {
+    try {
+      const res = await api.startQuest(PACKAGE_QUEST.code);
+      this.packageStatus = res.status;
+    } catch (e) {
+      console.error("Не удалось стартовать квест посылки:", e);
+      this.packageStatus = "IN_PROGRESS";
+    }
+  }
+
+  private afterPackageBriefingCallEnded(): void {
+    if (this.packageStatus !== "IN_PROGRESS") this.packageStatus = "IN_PROGRESS";
+    this.opts.onPackageProgress?.();
+  }
+
+  private afterPackageBriefingAbort(): void {
+    this.phone.close();
+    this.packageStatus = "AVAILABLE";
+    this.ensureRingScheduled();
+  }
+
+  private afterPackageFinaleComplete(): void {
+    // already COMPLETED
+  }
+
+  private afterPackageFinaleAbort(): void {
+    this.phone.close();
+    // Финал уже после COMPLETED — перезвоним ещё раз мягко.
+    this.schedule("packageFinale", PACKAGE_QUEST.timings.finaleDelayMs);
   }
 
   private afterDismissEnded(): void {
     this.phone.close();
+    this.ensureRingScheduled();
   }
 }

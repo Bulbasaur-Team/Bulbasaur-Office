@@ -180,10 +180,46 @@ export class ItemsManager {
     return true;
   }
 
+  /** Выдать квестовую посылку в лапы. false — тип не загружен. */
+  giveQuestPackage(x: number, y: number): boolean {
+    if (!ITEM_TYPES.package) return false;
+    if (this.carried) {
+      const prev = this.carried;
+      this.carried = null;
+      prev.destroy();
+      this.onGone?.(prev.id);
+    }
+    const id = `package-${Math.random().toString(36).slice(2, 10)}`;
+    const item = new PhysicsItem(this.scene, { id, type: "package", x, y });
+    this.carried = item;
+    this.onGrab?.(id, "package");
+    return true;
+  }
+
+  carriedIsQuestPackage(): boolean {
+    return this.carried?.typeKey === "package";
+  }
+
+  /** Скрыть/показать предмет в лапах (на парковке игрока не видно). */
+  setCarriedVisible(visible: boolean): void {
+    this.carried?.setCarryVisible(visible);
+  }
+
+  /** Убрать посылку из лап без броска на пол (сдача водителю). */
+  clearQuestPackage(): void {
+    if (!this.carriedIsQuestPackage() || !this.carried) return;
+    const id = this.carried.id;
+    this.carried.destroy();
+    this.carried = null;
+    this.onGone?.(id);
+  }
+
   // Поставить/бросить предмет из лап. Чашку — только на свободное место на столе.
   releaseCarried(x: number, y: number, facing: boolean): boolean {
     const item = this.carried;
     if (!item) return false;
+    // Квестовую посылку нельзя бросить.
+    if (item.typeKey === "package") return false;
 
     if (item.type.tableOnly) {
       const table = this.freeTableNear(x, y);

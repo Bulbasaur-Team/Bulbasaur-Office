@@ -36,7 +36,9 @@ import { BODY_TEXTURE, defaultAppearance, type PlayerAppearance } from "../data/
 import { ItemsManager, type ObstacleCircle } from "../entities/ItemsManager";
 import { WallClock } from "../entities/WallClock";
 import { BulbaCat } from "../entities/BulbaCat";
+import { BeachQuestNpc } from "../entities/BeachQuestNpc";
 import { BULBA_CAT } from "../data/bulbaCat";
+import { PACKAGE_QUEST, DRIVER_QUEST } from "../data/packageQuest";
 import { LocationLoader, type Spawn, type Rect, type PlacedNpc } from "./LocationLoader";
 import { AuthGate } from "../ui/AuthGate";
 import { hideBootLoader } from "../ui/BootLoader";
@@ -49,6 +51,7 @@ import { BulbaCoins, BC_COIN_SRC } from "../ui/BulbaCoins";
 import { Wardrobe } from "../ui/Wardrobe";
 import { Ancestors } from "../ui/Ancestors";
 import { QuestController } from "../ui/QuestController";
+import { DriverDialogue, BeachNpcDialogue, DriverBubble } from "../ui/PackageNpcDialogues";
 import { Logs } from "../ui/Logs";
 import { Monitoring } from "../ui/Monitoring";
 import { Computer } from "../ui/Computer";
@@ -218,6 +221,12 @@ export class WorldScene extends Phaser.Scene {
   private bulbaCat: BulbaCat | null = null;      // Бульба Кот (только MP, main-office)
   private nearCat = false;                       // игрок в зоне взаимодействия с котом
   private catPoseReady = false;                  // получили ли первый catState после спавна
+  private beachNpc: BeachQuestNpc | null = null; // квестовый NPC на пляже
+  private nearBeachNpc = false;
+  private driverDialogue!: DriverDialogue;
+  private beachNpcDialogue!: BeachNpcDialogue;
+  private driverBubble!: DriverBubble;
+  private driverTalkBtn = document.getElementById("driverTalkBtn") as HTMLButtonElement;
   private menu!: LocationMenu;
   private exitBtn = document.getElementById("exitBtn") as HTMLButtonElement;
   private exitLabel = document.getElementById("exitLabel") as HTMLSpanElement;
@@ -288,12 +297,56 @@ export class WorldScene extends Phaser.Scene {
         this.bubble.hide();
         this.realtime.catTalk(false);
       },
-      questActive: () => this.multiplayer && this.quest.questStatus === "IN_PROGRESS",
+      questActive: () => this.multiplayer && this.quest.fridgeQuestStatus === "IN_PROGRESS",
     });
     this.quest = new QuestController({
       onBalance: (balance) => this.setBcBalance(balance),
       canRing: () => this.started && !this.modalOpenExceptQuest(),
+      onPackageProgress: () => this.onPackageQuestProgress(),
     });
+    this.driverBubble = new DriverBubble();
+    this.driverDialogue = new DriverDialogue({
+      questActive: () => this.multiplayer && this.quest.packageInProgress,
+      hasPackage: () => this.quest.packageHasItem,
+      driverBriefed: () => this.quest.packageDriverBriefed,
+      onBriefed: () => this.quest.markDriverBriefed(),
+      onSay: (text) => {
+        this.driverBubble.show(text);
+        this.layoutDriverOverlays();
+      },
+      onDeliver: async () => {
+        const res = await this.quest.deliverPackageToDriver();
+        if (res.ok) this.items.clearQuestPackage();
+        return {
+          ok: res.ok,
+          deliverLine: DRIVER_QUEST.deliver,
+          errorLine: res.line || DRIVER_QUEST.noPackageYet,
+        };
+      },
+      onClose: () => {
+        this.driverBubble.hide();
+        this.syncDriverTalkBtn();
+      },
+    });
+    this.beachNpcDialogue = new BeachNpcDialogue({
+      onSay: (text) => {
+        if (!this.beachNpc || this.beachNpc.isGone) return;
+        const a = this.beachNpc.bubbleAnchor();
+        this.bubble.show(text, a.x, a.y, undefined, () => this.beachNpc!.bubbleAnchor());
+      },
+      onCodeOk: () => {
+        this.quest.markPackageReceived();
+        this.beachNpc?.clearHeld();
+        this.items.giveQuestPackage(this.player.x, this.player.y);
+        this.beachNpc?.leave();
+        this.bubble.hide();
+      },
+      onClose: () => this.bubble.hide(),
+    });
+    this.driverTalkBtn.onclick = () => {
+      if (!this.quest.packageInProgress) return;
+      this.driverDialogue.open();
+    };
 
     this.prompt = this.add
       .text(0, 0, "Пробел / Enter — поговорить", {
@@ -348,7 +401,10 @@ export class WorldScene extends Phaser.Scene {
     this.ancestors = new Ancestors();
     this.logs = new Logs();
     this.monitoring = new Monitoring();
-    this.computer = new Computer();
+    this.computer = new Computer({
+      showWaybill: () => this.multiplayer && this.quest.packageInProgress,
+      onWaybillUnlocked: () => this.quest.markWaybillRead(),
+    });
     this.laptop = new Laptop();
     document.getElementById("passBtn")!.onclick = () => {
       (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
@@ -460,7 +516,12 @@ export class WorldScene extends Phaser.Scene {
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.keys = this.input.keyboard!.addKeys("W,A,S,D") as Record<string, Phaser.Input.Keyboard.Key>;
 
-    this.menu = new LocationMenu((to) => this.goTo(to));
+    this.menu = new LocationMenu((to) => {
+      // Уезжаем с парковки — закрываем разговор с водителем и его меню ответов.
+      if (this.driverDialogue.isOpen) this.driverDialogue.close();
+      this.driverBubble.hide();
+      this.goTo(to);
+    });
 
     // Потребители ввода по приоритету: полноэкранные окна (слайды, игра) поверх меню
     // (диалог, выбор игры, парковка). Выход в дверь и взаимодействие с NPC/TV
@@ -472,6 +533,8 @@ export class WorldScene extends Phaser.Scene {
     this.router.register(this.quest);
     this.router.register(this.slidePicker);
     this.router.register(this.dialogue);
+    this.router.register(this.driverDialogue);
+    this.router.register(this.beachNpcDialogue);
     // Пока видна «Перевести» — Space/Enter переводят мяуканье (выше диалога кота).
     this.router.register({
       isActive: () => this.bubble.canTranslate(),
@@ -482,7 +545,15 @@ export class WorldScene extends Phaser.Scene {
     });
     this.router.register(this.catDialogue);
     this.router.register(this.gameMenu);
-    this.router.register(this.menu);
+    this.router.register({
+      isActive: () =>
+        this.menu.isActive() &&
+        !this.driverDialogue.isOpen &&
+        !this.beachNpcDialogue.isOpen &&
+        !this.catDialogue.isOpen &&
+        !this.dialogue.isOpen,
+      handleKey: (e) => this.menu.handleKey(e),
+    });
     // Взаимодействие в мире (NPC / TV / дверь) — ниже всех меню: срабатывает,
     // только если модалка не перехватила клавишу первой (иначе клавиша, которой
     // закрыли меню, «протекала» бы в мир и срабатывала повторно). Space и Enter
@@ -836,6 +907,80 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /** Вьетнамец на пляже — после чтения накладной, пока посылка не забрана. */
+  private syncBeachQuestNpc(locationId: string): void {
+    const onBeach = locationId === "vietnam-beach";
+    const want =
+      this.multiplayer &&
+      onBeach &&
+      this.quest.packageInProgress &&
+      this.quest.packageWaybillRead &&
+      !this.quest.packageHasItem &&
+      !(this.beachNpc?.isLeaving || this.beachNpc?.isGone);
+
+    if (!want) {
+      if (this.beachNpcDialogue.isOpen) this.beachNpcDialogue.close();
+      // На пляже уходящего не сносим — пусть дойдёт за край. При смене локации — сносим.
+      if (this.beachNpc && (!onBeach || !this.beachNpc.isLeaving)) {
+        this.beachNpc.destroy();
+        this.beachNpc = null;
+      }
+      this.nearBeachNpc = false;
+      return;
+    }
+    if (!this.beachNpc || this.beachNpc.isGone) {
+      this.beachNpc = new BeachQuestNpc(
+        this,
+        PACKAGE_QUEST.beachNpc.spawnX,
+        PACKAGE_QUEST.beachNpc.spawnY,
+      );
+    }
+  }
+
+  private onPackageQuestProgress(): void {
+    this.computer.syncWaybillShortcut();
+    this.syncDriverTalkBtn();
+    this.syncBeachQuestNpc(LOCATIONS[this.locIndex].id);
+    // После F5 / перезахода — вернуть коробку в лапы, если квест ещё не сдан.
+    if (
+      this.multiplayer &&
+      this.quest.packageHasItem &&
+      !this.items.carriedIsQuestPackage()
+    ) {
+      this.items.giveQuestPackage(this.player.x, this.player.y);
+      if (this.atParking) this.items.setCarriedVisible(false);
+    }
+  }
+
+  private syncDriverTalkBtn(): void {
+    const show = this.atParking && this.multiplayer && this.quest.packageInProgress;
+    this.driverTalkBtn.classList.toggle("hidden", !show);
+    this.layoutDriverOverlays();
+  }
+
+  /**
+   * Phaser FIT+CENTER оставляет поля вокруг канваса внутри #game.
+   * Абсолютный bottom у #game оказывается под картинкой — якорим оверлеи к getBoundingClientRect канваса.
+   */
+  private layoutDriverOverlays(): void {
+    const canvas = this.game.canvas;
+    if (!canvas) return;
+    const r = canvas.getBoundingClientRect();
+
+    if (!this.driverTalkBtn.classList.contains("hidden")) {
+      this.driverTalkBtn.style.left = `${r.left + r.width / 2}px`;
+      this.driverTalkBtn.style.top = `${r.top + r.height * 0.88}px`;
+      this.driverTalkBtn.style.maxWidth = `${Math.min(320, r.width * 0.7)}px`;
+    }
+
+    const bubble = this.driverBubble.el;
+    if (!bubble.classList.contains("hidden")) {
+      bubble.style.left = `${r.left + r.width * 0.18}px`;
+      bubble.style.top = `${r.top + r.height * 0.30}px`;
+      bubble.style.maxWidth = `${Math.min(320, r.width * 0.36)}px`;
+    }
+  }
+
   private applyCatState(x: number, y: number, facing: boolean, moving: boolean): void {
     if (!this.multiplayer || LOCATIONS[this.locIndex].id !== BULBA_CAT.locationId) return;
     if (!this.bulbaCat) {
@@ -963,14 +1108,21 @@ export class WorldScene extends Phaser.Scene {
       // На парковке ходить нельзя — прячем игрока и показываем меню локаций.
       this.player.setVelocity(0);
       this.menu.show(cfg);
+      this.syncDriverTalkBtn();
+      this.items.setCarriedVisible(false);
     } else {
       this.menu.hide();
+      this.driverTalkBtn.classList.add("hidden");
+      this.driverBubble.hide();
+      if (this.driverDialogue.isOpen) this.driverDialogue.close();
+      this.items.setCarriedVisible(true);
       const p =
         fromId !== undefined
           ? doors.get(fromId) ?? doors.values().next().value
           : spawns.get(this.chosen.id) ?? (this.multiplayer ? spawns.values().next().value : undefined);
       if (p) this.player.setPosition(p.x, p.y);
     }
+    this.syncBeachQuestNpc(cfg.id);
   }
 
   // Открыта ли модалка, перехватывающая ввод (диалог, меню игры или окно игры).
@@ -982,6 +1134,8 @@ export class WorldScene extends Phaser.Scene {
   private modalOpenExceptQuest(): boolean {
     return (
       this.dialogue.isOpen ||
+      this.driverDialogue.isOpen ||
+      this.beachNpcDialogue.isOpen ||
       this.catDialogue.isOpen ||
       this.gameMenu.isOpen ||
       this.bulbaGames.isOpen ||
@@ -1096,6 +1250,15 @@ export class WorldScene extends Phaser.Scene {
     this.wallClock?.sync();
 
     // Модалка / парковка: не крутить анимации и физику предметов под оверлеем.
+    // Уходящий пляжный NPC продолжает идти даже под модалкой.
+    this.beachNpc?.update(delta);
+    if (this.beachNpc?.isGone) this.beachNpc = null;
+
+    if (this.atParking) {
+      // Канвас может ресайзиться (FIT) — держим кнопку/облачко над ним.
+      this.layoutDriverOverlays();
+    }
+
     if (this.atParking || this.modalOpen()) {
       this.player.setVelocity(0);
       this.prompt.setVisible(false);
@@ -1146,13 +1309,21 @@ export class WorldScene extends Phaser.Scene {
       this.bulbaCat &&
       Phaser.Math.Distance.Between(this.player.x, this.player.y, this.bulbaCat.x, this.bulbaCat.y) < INTERACT_DIST
     );
+    this.nearBeachNpc = !!(
+      this.beachNpc &&
+      !this.beachNpc.isGone &&
+      !this.beachNpc.isLeaving &&
+      Phaser.Math.Distance.Between(this.player.x, this.player.y, this.beachNpc.x, this.beachNpc.y) < INTERACT_DIST
+    );
 
     this.showExit(this.findExit());
 
     // Только подсказки: сами действия по Space/Enter выполняет консьюмер роутера
     // (tryInteract) — так клавиша, закрывшая меню, не срабатывает повторно в мире.
     const carrying = this.items.carrying();
-    if (carrying && !this.items.carriedIsCoffee()) {
+    if (carrying && this.items.carriedIsQuestPackage()) {
+      this.showPrompt("Посылку можно сдать водителю на парковке", this.player.x, this.player.y);
+    } else if (carrying && !this.items.carriedIsCoffee()) {
       this.showPrompt("Пробел / Enter — бросить предмет", this.player.x, this.player.y);
     } else if (carrying && this.items.canPlaceCarried(this.player.x, this.player.y)) {
       // Чашку подсказываем только у свободного места на столе: в остальных точках её
@@ -1215,12 +1386,17 @@ export class WorldScene extends Phaser.Scene {
       const catDist = this.nearCat && this.bulbaCat
         ? Phaser.Math.Distance.Between(this.player.x, this.player.y, this.bulbaCat.x, this.bulbaCat.y)
         : Infinity;
-      if (nearLaptop && laptopDist <= npcDist && laptopDist <= catDist) {
+      const beachDist = this.nearBeachNpc && this.beachNpc
+        ? Phaser.Math.Distance.Between(this.player.x, this.player.y, this.beachNpc.x, this.beachNpc.y)
+        : Infinity;
+      if (nearLaptop && laptopDist <= npcDist && laptopDist <= catDist && laptopDist <= beachDist) {
         this.showPrompt(
           "Пробел / Enter — включить компьютер",
           nearLaptop.x + nearLaptop.w / 2,
           nearLaptop.y + nearLaptop.h,
         );
+      } else if (this.nearBeachNpc && this.beachNpc && beachDist <= npcDist && beachDist <= catDist) {
+        this.showPrompt("Пробел / Enter — поговорить", this.beachNpc.x, this.beachNpc.y);
       } else if (this.nearCat && this.bulbaCat && catDist <= npcDist) {
         this.showPrompt("Пробел / Enter — поговорить", this.bulbaCat.x, this.bulbaCat.y);
       } else if (this.nearest) {
@@ -1301,7 +1477,10 @@ export class WorldScene extends Phaser.Scene {
         this.triggerExit();
         return true;
       }
-      if (this.items.carriedIsCoffee()) {
+      if (this.items.carriedIsQuestPackage()) {
+        // Квестовую посылку нельзя бросить — только сдать водителю на парковке.
+        // Не перехватываем Space: можно взаимодействовать с NPC и объектами.
+      } else if (this.items.carriedIsCoffee()) {
         // Чашку можно поставить только на свободное место на столе рядом; иначе не
         // мешаем другим действиям (можно, например, донести кофе до двери).
         if (this.items.releaseCarried(this.player.x, this.player.y, this.player.flipX)) return true;
@@ -1311,7 +1490,7 @@ export class WorldScene extends Phaser.Scene {
         return true;
       }
     }
-    if (this.items.grabNear(this.player.x, this.player.y)) {
+    if (!this.items.carriedIsQuestPackage() && this.items.grabNear(this.player.x, this.player.y)) {
       return true;
     }
     if (this.projectorRect && this.nearRect(this.projectorRect)) {
@@ -1361,8 +1540,15 @@ export class WorldScene extends Phaser.Scene {
       const catDist = this.nearCat && this.bulbaCat
         ? Phaser.Math.Distance.Between(this.player.x, this.player.y, this.bulbaCat.x, this.bulbaCat.y)
         : Infinity;
-      if (nearLaptop && laptopDist <= npcDist && laptopDist <= catDist) {
+      const beachDist = this.nearBeachNpc && this.beachNpc
+        ? Phaser.Math.Distance.Between(this.player.x, this.player.y, this.beachNpc.x, this.beachNpc.y)
+        : Infinity;
+      if (nearLaptop && laptopDist <= npcDist && laptopDist <= catDist && laptopDist <= beachDist) {
         this.laptop.open();
+        return true;
+      }
+      if (this.nearBeachNpc && this.beachNpc && beachDist <= npcDist && beachDist <= catDist) {
+        this.beachNpcDialogue.open();
         return true;
       }
       if (this.nearCat && this.bulbaCat && catDist <= npcDist) {
