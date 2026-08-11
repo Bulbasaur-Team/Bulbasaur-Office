@@ -959,25 +959,41 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /**
-   * Phaser FIT+CENTER оставляет поля вокруг канваса внутри #game.
-   * Абсолютный bottom у #game оказывается под картинкой — якорим оверлеи к getBoundingClientRect канваса.
+   * Десктоп: Phaser FIT+CENTER оставляет поля вокруг канваса — якорим оверлеи к getBoundingClientRect.
+   * Тач: #stage с transform — viewport-координаты для fixed внутри сцены неверны;
+   * кнопку «Поговорить с водителем» кладёт CSS над панелью эмодзи.
    */
   private layoutDriverOverlays(): void {
     const canvas = this.game.canvas;
     if (!canvas) return;
-    const r = canvas.getBoundingClientRect();
 
     if (!this.driverTalkBtn.classList.contains("hidden")) {
-      this.driverTalkBtn.style.left = `${r.left + r.width / 2}px`;
-      this.driverTalkBtn.style.top = `${r.top + r.height * 0.88}px`;
-      this.driverTalkBtn.style.maxWidth = `${Math.min(320, r.width * 0.7)}px`;
+      if (isTouch()) {
+        // Сбрасываем инлайн от десктоп-раскладки — позицию задаёт CSS (над emoteBar).
+        this.driverTalkBtn.style.left = "";
+        this.driverTalkBtn.style.top = "";
+        this.driverTalkBtn.style.maxWidth = "";
+      } else {
+        const r = canvas.getBoundingClientRect();
+        this.driverTalkBtn.style.left = `${r.left + r.width / 2}px`;
+        this.driverTalkBtn.style.top = `${r.top + r.height * 0.88}px`;
+        this.driverTalkBtn.style.maxWidth = `${Math.min(320, r.width * 0.7)}px`;
+      }
     }
 
     const bubble = this.driverBubble.el;
     if (!bubble.classList.contains("hidden")) {
-      bubble.style.left = `${r.left + r.width * 0.18}px`;
-      bubble.style.top = `${r.top + r.height * 0.30}px`;
-      bubble.style.maxWidth = `${Math.min(320, r.width * 0.36)}px`;
+      if (isTouch()) {
+        // В координатах сцены (containing block = #stage), не viewport.
+        bubble.style.left = "18%";
+        bubble.style.top = "22%";
+        bubble.style.maxWidth = "min(320px, 42%)";
+      } else {
+        const r = canvas.getBoundingClientRect();
+        bubble.style.left = `${r.left + r.width * 0.18}px`;
+        bubble.style.top = `${r.top + r.height * 0.30}px`;
+        bubble.style.maxWidth = `${Math.min(320, r.width * 0.36)}px`;
+      }
     }
   }
 

@@ -70,13 +70,27 @@
     }
     .loc-btn:hover, .loc-btn.sel { background: var(--accent); color: #14210f; transform: translateX(-3px); }
 
-    /* Отдельная кнопка разговора с водителем — координаты выставляет JS по канвасу */
+    /* Отдельная кнопка разговора с водителем — на десктопе координаты выставляет JS по канвасу */
     #driverTalkBtn {
       position: fixed; left: 50%; top: 0; z-index: 22;
       transform: translate(-50%, -50%); max-width: min(320px, 70%);
     }
     #driverTalkBtn.hidden { display: none; }
-    #driverTalkBtn:hover, #driverTalkBtn.sel { filter: brightness(1.06); }
+    #driverTalkBtn:hover, #driverTalkBtn.sel { filter: brightness(1.06); transform: translate(-50%, -50%); }
+    /* На тач: fixed внутри #stage (с transform) — viewport-координаты канваса ломают позицию.
+       Ставим кнопку над панелью эмодзи в координатах сцены. */
+    @media (pointer: coarse) {
+      #driverTalkBtn {
+        top: auto; left: 50%;
+        /* emote-bar: bottom 16px, высота ~52px → кнопка чуть выше с зазором */
+        bottom: calc(16px + 52px + 10px + env(safe-area-inset-bottom, 0px));
+        transform: translateX(-50%);
+        z-index: 31;
+        max-width: min(320px, 82%);
+        white-space: normal;
+      }
+      #driverTalkBtn:hover, #driverTalkBtn.sel { transform: translateX(-50%); }
+    }
 
     /* Облачко реплик водителя — координаты тоже от канваса */
     #driverBubble {
