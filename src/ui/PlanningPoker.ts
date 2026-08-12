@@ -1,7 +1,7 @@
 import { defaultAppearance, type PlayerAppearance } from "../data/wardrobe";
 import { drawAppearance, loadWardrobeDomImages } from "../entities/PlayerAvatar";
-import { getLogin } from "../net/api";
-import type { PokerRoomSummary, PokerStateView } from "../net/realtime";
+import { fetchPokerRoom, getLogin } from "../net/api";
+import type { PokerHistorySummary, PokerRoomSummary, PokerStateView } from "../net/realtime";
 import type { KeyConsumer } from "./KeyboardRouter";
 
 // Карты покера: числа Фибоначчи, «не знаю» и кофе-брейк.
@@ -26,6 +26,7 @@ export interface PokerNet {
   addTask(title: string): void;
   vote(value: string): void;
   finish(): void;
+  revote(): void;
   close(): void;
 }
 
@@ -40,9 +41,11 @@ export class PlanningPoker implements KeyConsumer {
   private roomEl = document.getElementById("pokerRoomView")!;
   private errorEl = document.getElementById("pokerError")!;
   private roomsEl = document.getElementById("pokerRooms")!;
+  private historyRoomsEl = document.getElementById("pokerHistoryRooms")!;
   private nameInput = document.getElementById("pokerName") as HTMLInputElement;
   private roomNameEl = document.getElementById("pokerRoomName")!;
   private timerEl = document.getElementById("pokerTimer")!;
+  private readonlyEl = document.getElementById("pokerReadonly")!;
   private doneEl = document.getElementById("pokerDone")!;
   private currentEl = document.getElementById("pokerCurrent")!;
   private cardsEl = document.getElementById("pokerCards")!;
@@ -54,6 +57,8 @@ export class PlanningPoker implements KeyConsumer {
 
   private state: PokerStateView | null = null;
   private joinedRoomId: string | null = null;
+  private viewingHistory = false;
+  private historyIndex = 0;
   private deadline = 0; // локальный дедлайн закрытия комнаты (из remainingMs сервера)
   private timerId: number | null = null;
   private images: Map<string, HTMLImageElement> | null = null;
@@ -84,6 +89,7 @@ export class PlanningPoker implements KeyConsumer {
   open(): void {
     this.isOpen = true;
     this.errorEl.textContent = "";
+    this.viewingHistory = false;
     this.showLobby();
     this.root.classList.remove("hidden");
     this.net.list();
@@ -97,41 +103,27 @@ export class PlanningPoker implements KeyConsumer {
 
   close(): void {
     if (!this.isOpen) return;
-    if (this.joinedRoomId) this.net.leave();
+    if (this.joinedRoomId && !this.viewingHistory) this.net.leave();
     this.isOpen = false;
     this.joinedRoomId = null;
+    this.viewingHistory = false;
     this.state = null;
     this.stopTimer();
     this.root.classList.remove("maximized");
     this.root.classList.add("hidden");
   }
 
-  // Список активных комнат (ответ на pokerList) — рендерим, только пока в лобби.
-  onRooms(rooms: PokerRoomSummary[]): void {
+  // Список активных и прошедших комнат — рендерим, только пока в лобби.
+  onRooms(active: PokerRoomSummary[], history: PokerHistorySummary[]): void {
     if (!this.isOpen || this.joinedRoomId) return;
-    this.roomsEl.innerHTML = "";
-    if (rooms.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "poker-empty";
-      empty.textContent = "Активных комнат нет — создайте свою.";
-      this.roomsEl.appendChild(empty);
-      return;
-    }
-    for (const room of rooms) {
-      const btn = document.createElement("button");
-      btn.className = "poker-room-btn";
-      btn.innerHTML = `<span class="poker-room-title"></span><span class="poker-room-meta"></span>`;
-      (btn.firstChild as HTMLElement).textContent = room.name;
-      (btn.lastChild as HTMLElement).textContent =
-        `админ: ${room.adminLogin} · участников: ${room.participants}`;
-      btn.onclick = () => this.net.join(room.id);
-      this.roomsEl.appendChild(btn);
-    }
+    this.renderActiveRooms(active);
+    this.renderHistoryRooms(history);
   }
 
   // Полное состояние комнаты — единственный источник правды для вида комнаты.
   onState(state: PokerStateView): void {
     if (!this.isOpen) return;
+    this.viewingHistory = false;
     this.state = state;
     this.joinedRoomId = state.id;
     this.deadline = Date.now() + state.remainingMs;
@@ -156,8 +148,8 @@ export class PlanningPoker implements KeyConsumer {
   // После реконнекта WS: вернуться в свою комнату или обновить лобби.
   onReconnect(): void {
     if (!this.isOpen) return;
-    if (this.joinedRoomId) this.net.join(this.joinedRoomId);
-    else this.net.list();
+    if (this.joinedRoomId && !this.viewingHistory) this.net.join(this.joinedRoomId);
+    else if (!this.joinedRoomId) this.net.list();
   }
 
   isActive(): boolean {
@@ -175,17 +167,82 @@ export class PlanningPoker implements KeyConsumer {
   private showLobby(): void {
     this.joinedRoomId = null;
     this.state = null;
+    this.viewingHistory = false;
     this.stopTimer();
     this.roomEl.classList.add("hidden");
     this.lobbyEl.classList.remove("hidden");
     this.nameInput.value = DEFAULT_ROOM_NAME;
     this.roomsEl.innerHTML = "";
+    this.historyRoomsEl.innerHTML = "";
   }
 
   private backToLobby(message: string): void {
     this.showLobby();
     this.errorEl.textContent = message;
     this.net.list();
+  }
+
+  private renderActiveRooms(rooms: PokerRoomSummary[]): void {
+    this.roomsEl.innerHTML = "";
+    if (rooms.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "poker-empty";
+      empty.textContent = "Активных комнат нет — создайте свою.";
+      this.roomsEl.appendChild(empty);
+      return;
+    }
+    for (const room of rooms) {
+      const btn = document.createElement("button");
+      btn.className = "poker-room-btn";
+      btn.innerHTML = `<span class="poker-room-title"></span><span class="poker-room-meta"></span>`;
+      (btn.firstChild as HTMLElement).textContent = room.name;
+      (btn.lastChild as HTMLElement).textContent =
+        `админ: ${room.adminLogin} · участников: ${room.participants}`;
+      btn.onclick = () => this.net.join(room.id);
+      this.roomsEl.appendChild(btn);
+    }
+  }
+
+  private renderHistoryRooms(rooms: PokerHistorySummary[]): void {
+    this.historyRoomsEl.innerHTML = "";
+    if (rooms.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "poker-empty";
+      empty.textContent = "Прошедших покеров пока нет.";
+      this.historyRoomsEl.appendChild(empty);
+      return;
+    }
+    for (const room of rooms) {
+      const btn = document.createElement("button");
+      btn.className = "poker-room-btn history";
+      btn.innerHTML = `<span class="poker-room-title"></span><span class="poker-room-meta"></span>`;
+      (btn.firstChild as HTMLElement).textContent = room.name;
+      const closed = new Date(room.closedAt);
+      (btn.lastChild as HTMLElement).textContent =
+        `админ: ${room.adminLogin} · ${closed.toLocaleString("ru-RU")}`;
+      btn.onclick = () => void this.openHistory(room.id);
+      this.historyRoomsEl.appendChild(btn);
+    }
+  }
+
+  private async openHistory(roomId: string): Promise<void> {
+    try {
+      this.errorEl.textContent = "";
+      const raw = await fetchPokerRoom(roomId);
+      const state = raw as PokerStateView;
+      this.viewingHistory = true;
+      this.joinedRoomId = state.id;
+      this.state = { ...state, readOnly: true, tasks: state.tasks ?? [] };
+      this.historyIndex = Math.max(0, (this.state.tasks.length || 1) - 1);
+      this.lobbyEl.classList.add("hidden");
+      this.roomEl.classList.remove("hidden");
+      this.stopTimer();
+      this.timerEl.textContent = "";
+      this.renderRoom();
+      void this.ensureImages();
+    } catch (e) {
+      this.errorEl.textContent = e instanceof Error ? e.message : "Не удалось открыть покер.";
+    }
   }
 
   private startTimer(): void {
@@ -203,6 +260,10 @@ export class PlanningPoker implements KeyConsumer {
 
   // Часы клиента не участвуют: дедлайн пересчитывается из remainingMs сервера.
   private tickTimer(): void {
+    if (this.viewingHistory || this.state?.readOnly) {
+      this.timerEl.textContent = "";
+      return;
+    }
     const left = this.deadline - Date.now();
     if (left <= 0) {
       this.backToLobby("Время комнаты истекло.");
@@ -220,6 +281,7 @@ export class PlanningPoker implements KeyConsumer {
   private renderRoom(): void {
     const state = this.state!;
     this.roomNameEl.textContent = state.name;
+    this.readonlyEl.classList.toggle("hidden", !state.readOnly);
     this.renderDone(state);
     this.renderCurrent(state);
     this.renderCards(state);
@@ -227,34 +289,62 @@ export class PlanningPoker implements KeyConsumer {
     this.renderAdmin(state);
   }
 
+  private focusedTask(state: PokerStateView): PokerStateView["current"] {
+    if (state.readOnly) {
+      if (state.tasks.length === 0) return null;
+      const i = Math.min(Math.max(this.historyIndex, 0), state.tasks.length - 1);
+      const task = state.tasks[i];
+      return {
+        title: task.title,
+        revealed: true,
+        average: task.average,
+        recommended: task.recommended,
+        votes: task.votes ?? [],
+      };
+    }
+    return state.current;
+  }
+
   // Список завершённых задач вверху: название и средняя оценка.
   private renderDone(state: PokerStateView): void {
     this.doneEl.innerHTML = "";
-    for (const task of state.tasks) {
+    state.tasks.forEach((task, i) => {
       const row = document.createElement("div");
-      row.className = "poker-done-row";
+      const selected = state.readOnly && i === this.historyIndex;
+      row.className = "poker-done-row"
+        + (state.readOnly ? " clickable" : "")
+        + (selected ? " sel" : "");
       row.innerHTML = `<span class="poker-done-title"></span><span class="poker-done-avg"></span>`;
       (row.firstChild as HTMLElement).textContent = task.title;
       (row.lastChild as HTMLElement).textContent = formatAverage(task.average);
+      if (state.readOnly) {
+        row.onclick = () => {
+          this.historyIndex = i;
+          this.renderRoom();
+        };
+      }
       this.doneEl.appendChild(row);
-    }
+    });
   }
 
   private renderCurrent(state: PokerStateView): void {
-    if (!state.current) {
-      this.currentEl.textContent = state.isAdmin
-        ? "Добавьте задачу, чтобы начать голосование."
-        : "Ждём, когда админ добавит задачу.";
+    const current = this.focusedTask(state);
+    if (!current) {
+      this.currentEl.textContent = state.readOnly
+        ? "В этой сессии нет оценённых задач."
+        : state.isAdmin
+          ? "Добавьте задачу, чтобы начать голосование."
+          : "Ждём, когда админ добавит задачу.";
       this.resultEl.textContent = "";
       return;
     }
-    this.currentEl.textContent = state.current.revealed
-      ? state.current.title
-      : `Голосуем: ${state.current.title}`;
-    if (state.current.revealed) {
-      this.resultEl.textContent = state.current.average === null
+    this.currentEl.textContent = current.revealed
+      ? current.title
+      : `Голосуем: ${current.title}`;
+    if (current.revealed) {
+      this.resultEl.textContent = current.average === null
         ? "Числовых голосов нет."
-        : `Средняя: ${formatAverage(state.current.average)} · Рекомендуемая: ${state.current.recommended}`;
+        : `Средняя: ${formatAverage(current.average)} · Рекомендуемая: ${current.recommended}`;
     } else {
       this.resultEl.textContent = "";
     }
@@ -264,7 +354,7 @@ export class PlanningPoker implements KeyConsumer {
   // после — аватар с одеждой и значение.
   private renderCards(state: PokerStateView): void {
     this.cardsEl.innerHTML = "";
-    const current = state.current;
+    const current = this.focusedTask(state);
     if (current?.revealed) {
       for (const vote of current.votes) {
         this.cardsEl.appendChild(this.slot(vote.login, this.faceCard(vote.appearance, vote.value)));
@@ -326,7 +416,9 @@ export class PlanningPoker implements KeyConsumer {
   // Своя рука: доступна во время голосования, до вскрытия можно переголосовать.
   private renderHand(state: PokerStateView): void {
     this.handEl.innerHTML = "";
-    if (!state.current || state.current.revealed) return;
+    if (state.readOnly) return;
+    const current = this.focusedTask(state);
+    if (!current || current.revealed) return;
     for (const value of CARDS) {
       const btn = document.createElement("button");
       btn.className = "poker-hand-card" + (state.myVote === value ? " sel" : "");
@@ -341,11 +433,21 @@ export class PlanningPoker implements KeyConsumer {
 
   private renderAdmin(state: PokerStateView): void {
     this.adminEl.querySelectorAll(".poker-btn").forEach((b) => b.remove());
+    if (state.readOnly) {
+      this.taskForm.classList.add("hidden");
+      const back = document.createElement("button");
+      back.className = "poker-btn poker-btn-ghost";
+      back.textContent = "К списку";
+      back.onclick = () => this.backToLobby("");
+      this.adminEl.appendChild(back);
+      return;
+    }
     if (!state.isAdmin) {
       this.taskForm.classList.add("hidden");
       return;
     }
     const voting = state.current !== null && !state.current.revealed;
+    const revealed = state.current !== null && state.current.revealed;
     if (!voting) {
       const add = document.createElement("button");
       add.className = "poker-btn";
@@ -355,6 +457,19 @@ export class PlanningPoker implements KeyConsumer {
         if (!this.taskForm.classList.contains("hidden")) this.taskInput.focus();
       };
       this.adminEl.appendChild(add);
+      if (revealed) {
+        const revote = document.createElement("button");
+        revote.className = "poker-btn poker-btn-revote";
+        revote.type = "button";
+        revote.textContent = "🔄";
+        revote.title = "Переголосовать";
+        revote.setAttribute("aria-label", "Переголосовать");
+        revote.onclick = () => {
+          this.taskForm.classList.add("hidden");
+          this.net.revote();
+        };
+        this.adminEl.appendChild(revote);
+      }
     } else {
       this.taskForm.classList.add("hidden");
       const finish = document.createElement("button");

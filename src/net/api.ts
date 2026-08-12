@@ -472,6 +472,10 @@ export async function fetchRetroRoom(roomId: string): Promise<unknown> {
   return authedJson<unknown>(`/api/retro/rooms/${encodeURIComponent(roomId)}`);
 }
 
+export async function fetchPokerRoom(roomId: string): Promise<unknown> {
+  return authedJson<unknown>(`/api/poker/rooms/${encodeURIComponent(roomId)}`);
+}
+
 export async function fetchRetroMemeBlob(imageUrl: string): Promise<string> {
   const path = imageUrl.startsWith("http") ? imageUrl : `${API_BASE}${imageUrl}`;
   const res = await fetch(path, {

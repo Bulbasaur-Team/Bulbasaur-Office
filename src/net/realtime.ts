@@ -67,10 +67,18 @@ export interface PokerCurrentView {
   votes: PokerVoteView[];
 }
 
+export interface PokerHistorySummary {
+  id: string;
+  name: string;
+  adminLogin: string;
+  closedAt: number;
+}
+
 export interface PokerDoneTaskView {
   title: string;
   average: number | null;
   recommended: number | null;
+  votes?: PokerVoteView[];
 }
 
 // Полное состояние покер-комнаты (персонализировано сервером: isAdmin, myVote).
@@ -78,6 +86,7 @@ export interface PokerStateView {
   id: string;
   name: string;
   isAdmin: boolean;
+  readOnly: boolean;
   remainingMs: number;
   myVote: string | null;
   participants: PokerParticipantView[];
@@ -208,7 +217,7 @@ export interface RealtimeHandlers {
   onItemRemoved?: (itemId: string) => void;                     // предмет убрали со стола
   onItemHeld?: (id: string, itemId: string, itemType: string) => void; // игрок взял предмет в лапы
   onItemReleased?: (id: string) => void;                        // игрок освободил лапы
-  onPokerRooms?: (rooms: PokerRoomSummary[]) => void;
+  onPokerRooms?: (active: PokerRoomSummary[], history: PokerHistorySummary[]) => void;
   onPokerState?: (state: PokerStateView) => void;
   onPokerClosed?: () => void;
   onPokerError?: (message: string) => void;
@@ -324,6 +333,10 @@ export class Realtime {
 
   pokerFinish(): void {
     this.send({ type: "pokerFinish" });
+  }
+
+  pokerRevote(): void {
+    this.send({ type: "pokerRevote" });
   }
 
   pokerClose(): void {
@@ -482,7 +495,9 @@ export class Realtime {
       case "itemRemoved": this.handlers.onItemRemoved?.(msg.itemId); break;
       case "itemHeld": this.handlers.onItemHeld?.(msg.id, msg.itemId, msg.itemType); break;
       case "itemReleased": this.handlers.onItemReleased?.(msg.id); break;
-      case "pokerRooms": this.handlers.onPokerRooms?.(msg.rooms); break;
+      case "pokerRooms":
+        this.handlers.onPokerRooms?.(msg.active ?? msg.rooms ?? [], msg.history ?? []);
+        break;
       case "pokerState": this.handlers.onPokerState?.(msg); break;
       case "pokerClosed": this.handlers.onPokerClosed?.(); break;
       case "pokerError": this.handlers.onPokerError?.(msg.message); break;

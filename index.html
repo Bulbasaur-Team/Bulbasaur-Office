@@ -819,7 +819,8 @@
     .poker-title { margin: 4px 0 0; text-align: center; }
     .poker-error { min-height: 18px; color: #e6807a; font-size: 14px; text-align: center; }
     #pokerLobby, #pokerRoomView { display: flex; flex-direction: column; gap: 14px; }
-    .poker-rooms { display: flex; flex-direction: column; gap: 8px; max-height: calc(var(--sh) * .4); overflow-y: auto; }
+    .poker-rooms { display: flex; flex-direction: column; gap: 8px; max-height: calc(var(--sh) * .28); overflow-y: auto; }
+    .poker-section-label { font-size: 13px; opacity: .7; margin-top: 6px; }
     .poker-empty { text-align: center; opacity: .7; font-size: 14px; padding: 12px 0; }
     .poker-room-btn {
       display: flex; justify-content: space-between; align-items: center; gap: 12px;
@@ -827,6 +828,8 @@
       padding: 12px 16px; color: var(--text); font-family: inherit; font-size: 15px; cursor: pointer; transition: .12s;
     }
     .poker-room-btn:hover { background: var(--accent); color: #14210f; }
+    .poker-room-btn.history { border-color: #555c68; opacity: .9; }
+    .poker-room-btn.history:hover { background: #3a414c; color: var(--text); }
     .poker-room-title { font-weight: bold; }
     .poker-room-meta { font-size: 12px; opacity: .75; }
     .poker-form { display: flex; gap: 8px; justify-content: center; }
@@ -834,13 +837,23 @@
     .poker-input:focus { outline: none; border-color: #8fd06b; }
     .poker-btn { background: var(--accent); border: 2px solid #5aa05a; border-radius: 10px; padding: 9px 16px; color: #14210f; font-family: inherit; font-size: 14px; font-weight: bold; cursor: pointer; }
     .poker-btn:hover { filter: brightness(1.08); }
+    .poker-btn-revote {
+      width: 42px; min-width: 42px; height: 42px; padding: 0; font-size: 20px; line-height: 1;
+      border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+      background: #f4f1e8; box-shadow: 0 2px 0 #5aa05a; transition: transform .15s ease;
+    }
+    .poker-btn-revote:hover { filter: none; background: var(--accent); transform: rotate(-25deg) scale(1.12); }
     .poker-btn-danger { background: transparent; border-color: #6b3535; color: #e6807a; }
     .poker-btn-danger:hover { background: #c94f4f; border-color: #c94f4f; color: #fff; filter: none; }
+    .poker-btn-ghost { background: transparent; border: 2px solid #555c68; color: var(--text); }
     .poker-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-right: 88px; }
     .poker-room-name { font-size: 18px; font-weight: bold; }
     .poker-timer { font-size: 13px; opacity: .8; white-space: nowrap; }
     .poker-done { display: flex; flex-direction: column; gap: 4px; max-height: calc(var(--sh) * .22); overflow-y: auto; }
     .poker-done-row { display: flex; justify-content: space-between; gap: 12px; border: 1px solid #353c46; border-radius: 8px; padding: 6px 12px; font-size: 14px; background: rgba(38,43,51,.6); }
+    .poker-done-row.clickable { cursor: pointer; }
+    .poker-done-row.clickable:hover { border-color: var(--accent); }
+    .poker-done-row.sel { border-color: var(--accent); background: rgba(90,160,90,.22); }
     .poker-done-avg { font-weight: bold; }
     .poker-current { text-align: center; font-size: 17px; font-weight: bold; min-height: 22px; }
     .poker-cards { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; min-height: 128px; }
@@ -864,6 +877,7 @@
     .poker-hand-card:hover { transform: translateY(-3px); }
     .poker-hand-card.sel { background: var(--accent); border-color: #5aa05a; transform: translateY(-6px); }
     .poker-admin { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .poker-readonly-badge { text-align: center; font-size: 13px; opacity: .75; }
     html.bp-640 .poker-box { padding: 16px 12px; }
     html.bp-640 .poker-card { width: 60px; height: 84px; }
     html.bp-640 .poker-hand-card { width: 44px; height: 62px; font-size: 17px; }
@@ -2566,12 +2580,15 @@
             <input id="pokerName" class="poker-input" type="text" maxlength="60" value="Planning Poker WDM" />
             <button class="poker-btn" type="submit">Создать комнату</button>
           </form>
+          <div class="poker-section-label">Прошедшие</div>
+          <div class="poker-rooms" id="pokerHistoryRooms"></div>
         </div>
         <div id="pokerRoomView" class="hidden">
           <div class="poker-head">
             <div class="poker-room-name" id="pokerRoomName"></div>
             <div class="poker-timer" id="pokerTimer"></div>
           </div>
+          <div class="poker-readonly-badge hidden" id="pokerReadonly">Только просмотр</div>
           <div class="poker-done" id="pokerDone"></div>
           <div class="poker-current" id="pokerCurrent"></div>
           <div class="poker-cards" id="pokerCards"></div>

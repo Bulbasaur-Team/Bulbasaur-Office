@@ -486,6 +486,7 @@ export class WorldScene extends Phaser.Scene {
       addTask: (title) => this.realtime.pokerAddTask(title),
       vote: (value) => this.realtime.pokerVote(value),
       finish: () => this.realtime.pokerFinish(),
+      revote: () => this.realtime.pokerRevote(),
       close: () => this.realtime.pokerClose(),
     });
     document.getElementById("pokerBtn")!.onclick = () => {
@@ -790,7 +791,7 @@ export class WorldScene extends Phaser.Scene {
         this.remotePlayers.get(id)?.setHeldItem(itemType);
       },
       onItemReleased: (id) => this.remotePlayers.get(id)?.setHeldItem(null),
-      onPokerRooms: (rooms) => this.poker.onRooms(rooms),
+      onPokerRooms: (active, history) => this.poker.onRooms(active, history),
       onPokerState: (state) => this.poker.onState(state),
       onPokerClosed: () => this.poker.onClosed(),
       onPokerError: (message) => this.poker.onError(message),
