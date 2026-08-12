@@ -399,9 +399,8 @@ export class Retro implements KeyConsumer {
     };
     bar.appendChild(slider);
     wrap.appendChild(bar);
-
-    this.renderMoodMarkers(wrap, state, value);
     this.stageMood.appendChild(wrap);
+    this.renderMoodMarkers(wrap, state, value);
   }
 
   private renderMoodMarkers(wrap: HTMLElement, state: RetroStateView, myValue: number): void {
@@ -415,22 +414,56 @@ export class Retro implements KeyConsumer {
       entries.push({ login: myLogin, role: null, value: myValue });
     }
 
-    for (const mood of entries) {
+    const bar = wrap.querySelector(".retro-mood-bar") as HTMLElement | null;
+    const barWidth = Math.max(bar?.clientWidth || wrap.clientWidth || 480, 160);
+    const labelWidthPx = (text: string) => Math.min(90, Math.max(32, text.length * 7.2 + 16));
+    const laneH = 28;
+    const gapPx = 6;
+
+    const items = entries.map((mood) => {
       const isMine = mood.login === myLogin;
-      const v = isMine ? myValue : mood.value;
+      const value = isMine ? myValue : mood.value;
+      const text = isMine ? "Вы" : mood.login;
+      return { isMine, value, text, width: labelWidthPx(text) };
+    });
+    items.sort((a, b) => a.value - b.value || a.text.localeCompare(b.text));
+
+    const laneRight: number[] = [];
+    const lanes: number[] = [];
+    for (const item of items) {
+      const cx = item.value * barWidth;
+      const left = cx - item.width / 2;
+      const right = cx + item.width / 2;
+      let lane = 0;
+      while (lane < laneRight.length && left < laneRight[lane] + gapPx) lane++;
+      if (lane === laneRight.length) laneRight.push(right);
+      else laneRight[lane] = right;
+      lanes.push(lane);
+    }
+
+    const laneCount = Math.max(1, laneRight.length);
+    markers.style.height = `${36 + (laneCount - 1) * laneH}px`;
+
+    items.forEach((item, i) => {
+      const lane = lanes[i];
       const dot = document.createElement("div");
-      dot.className = "retro-mood-dot";
-      dot.style.left = `${v * 100}%`;
+      dot.className = "retro-mood-dot" + (item.isMine ? " mine" : "");
+      dot.style.left = `${item.value * 100}%`;
+      if (lane > 0) {
+        const stem = document.createElement("div");
+        stem.className = "retro-mood-dot-stem";
+        stem.style.height = `${lane * laneH}px`;
+        dot.appendChild(stem);
+      }
       const arrow = document.createElement("div");
       arrow.className = "retro-mood-dot-arrow";
       const label = document.createElement("div");
-      label.className = "retro-mood-dot-label" + (isMine ? " mine" : "");
-      label.textContent = isMine ? "Вы" : mood.login;
-      // Стрелка вверх к шкале, подпись ниже.
+      label.className = "retro-mood-dot-label" + (item.isMine ? " mine" : "");
+      label.textContent = item.text;
       dot.appendChild(arrow);
       dot.appendChild(label);
       markers.appendChild(dot);
-    }
+    });
 
     wrap.appendChild(markers);
   }
@@ -766,10 +799,15 @@ export class Retro implements KeyConsumer {
       add.textContent = "+";
       add.onclick = () => this.openMemePicker();
       toolbar.appendChild(add);
+      const paste = document.createElement("button");
+      paste.className = "retro-btn retro-btn-ghost";
+      paste.textContent = "Вставить картинку из буфера обмена";
+      paste.onclick = () => void this.pasteMemeFromClipboard();
+      toolbar.appendChild(paste);
       const hint = document.createElement("span");
       hint.style.opacity = "0.7";
       hint.style.fontSize = "13px";
-      hint.textContent = "Файл или вставка из буфера (Ctrl/⌘+V) · реакция — ПКМ";
+      hint.textContent = "или Ctrl/⌘+V · реакция — ПКМ";
       toolbar.appendChild(hint);
     }
     this.stageMemes.appendChild(toolbar);
@@ -832,6 +870,34 @@ export class Retro implements KeyConsumer {
 
   private openMemePicker(): void {
     this.memeFileInput.click();
+  }
+
+  private async pasteMemeFromClipboard(): Promise<void> {
+    if (!this.joinedRoomId || this.viewingHistory || this.state?.readOnly) return;
+    this.errorEl.textContent = "";
+    if (!navigator.clipboard?.read) {
+      this.errorEl.textContent = "Браузер не даёт прочитать буфер. Вставьте картинку через Ctrl+V.";
+      return;
+    }
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const type = item.types.find((t) => /image\/(png|jpeg|webp|gif)/.test(t));
+        if (!type) continue;
+        const blob = await item.getType(type);
+        const ext = type === "image/jpeg" ? "jpg" : type.slice("image/".length);
+        const file = new File([blob], `clipboard.${ext}`, { type: blob.type || type });
+        await this.uploadMemeFile(file);
+        return;
+      }
+      this.errorEl.textContent = "В буфере нет картинки.";
+    } catch (e) {
+      if (e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "SecurityError")) {
+        this.errorEl.textContent = "Нет доступа к буферу обмена. Разрешите доступ или вставьте картинку через Ctrl+V.";
+        return;
+      }
+      this.errorEl.textContent = e instanceof Error ? e.message : "Не удалось вставить картинку из буфера.";
+    }
   }
 
   private async openMemeViewer(imageUrl: string): Promise<void> {
