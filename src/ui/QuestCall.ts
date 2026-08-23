@@ -12,25 +12,14 @@ import {
   pickStatusPrompt,
   type BriefingQuestion,
 } from "../data/quests";
+import { typeWithVoice } from "./CharacterVoice";
+import { dialTone } from "./DialTone";
 
 /** В 2.5 раза медленнее исходных 22 мс. */
 const CHAR_DELAY = Math.round(22 * 2.5);
 const AFTER_PLAYER_MS = 400;
 const LINE_HOLD_MS = FRIDGE_QUEST.timings.lineHoldMs;
-
-function typeText(el: HTMLElement, text: string, onDone: () => void, delay = CHAR_DELAY): () => void {
-  let shown = 0;
-  el.textContent = "";
-  const timer = window.setInterval(() => {
-    shown++;
-    el.textContent = text.slice(0, shown);
-    if (shown >= text.length) {
-      window.clearInterval(timer);
-      onDone();
-    }
-  }, delay);
-  return () => window.clearInterval(timer);
-}
+const HANGUP_HOLD_MS = 1_000;
 
 export interface QuestCallHandlers {
   /** Игрок нажал «Хорошо, я выясню пин-код!» — квест стартует на сервере. */
@@ -167,6 +156,7 @@ export class QuestCall {
     // Последняя реплика остаётся на экране вместе с «Звонок завершён».
     this.mode = "ended";
     this.callEl.classList.add("is-ended");
+    dialTone.playHangup();
 
     if (from === "briefing") this.handlers.onBriefingComplete();
     else if (from === "completed") this.handlers.onQuestCompleted();
@@ -238,7 +228,7 @@ export class QuestCall {
     this.lineTimer = window.setTimeout(() => {
       if (token !== this.token) return;
       this.playerLine.textContent = "";
-      this.say(BRIEFING_CLOSING, () => this.enterEnded("briefing"));
+      this.say(BRIEFING_CLOSING, () => this.enterEnded("briefing"), { hangup: true });
     }, AFTER_PLAYER_MS);
   }
 
@@ -283,7 +273,7 @@ export class QuestCall {
     this.lineTimer = window.setTimeout(() => {
       if (token !== this.token) return;
       this.playerLine.textContent = "";
-      this.say(pickStatusInProgressReply(), () => this.enterEnded("status"));
+      this.say(pickStatusInProgressReply(), () => this.enterEnded("status"), { hangup: true });
     }, AFTER_PLAYER_MS);
   }
 
@@ -310,9 +300,9 @@ export class QuestCall {
       this.hidePin();
       this.awaitingPin = false;
       if (ok) {
-        this.say(STATUS_SUCCESS, () => this.enterEnded("completed"));
+        this.say(STATUS_SUCCESS, () => this.enterEnded("completed"), { hangup: true });
       } else {
-        this.say(STATUS_WRONG_PIN, () => this.enterEnded("status"));
+        this.say(STATUS_WRONG_PIN, () => this.enterEnded("status"), { hangup: true });
       }
     } finally {
       this.pinSubmit.removeAttribute("disabled");
@@ -321,13 +311,14 @@ export class QuestCall {
 
   /**
    * @param awaitReply — после печати текст остаётся, onDone сразу (ждём ответ игрока).
-   * Иначе после печати ждём LINE_HOLD_MS (3 с), затем onDone (обычно → ended).
+   * @param hangup — финальная реплика: короткая пауза и сброс, без 3 с ожидания.
+   * Иначе после печати ждём LINE_HOLD_MS, затем onDone.
    */
-  private say(text: string, onDone: () => void, opts?: { awaitReply?: boolean }): void {
+  private say(text: string, onDone: () => void, opts?: { awaitReply?: boolean; hangup?: boolean }): void {
     const token = ++this.token;
     this.cancelTyping?.();
     this.bubble.classList.remove("hidden");
-    this.cancelTyping = typeText(this.bubbleText, text, () => {
+    this.cancelTyping = typeWithVoice(this.bubbleText, text, "bulbov", () => {
       this.cancelTyping = null;
       if (token !== this.token) return;
       if (opts?.awaitReply) {
@@ -337,8 +328,8 @@ export class QuestCall {
       this.lineTimer = window.setTimeout(() => {
         if (token !== this.token) return;
         onDone();
-      }, LINE_HOLD_MS);
-    });
+      }, opts?.hangup ? HANGUP_HOLD_MS : LINE_HOLD_MS);
+    }, CHAR_DELAY);
   }
 
   private hideBubble(): void {

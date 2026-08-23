@@ -34,6 +34,10 @@ export class BootScene extends Phaser.Scene {
       // Ассеты каждой локации лежат в assets/locations/<id>/.
       const dir = publicPath(`assets/locations/${loc.id}`);
       this.load.image(loc.bg, `${dir}/background.png`);
+      if (loc.id === "day-x-hall") {
+        this.load.image("day-x-hall-bg-watching", `${dir}/background-watching.png`);
+        this.load.image("day-x-hall-overlay-watching", `${dir}/overlay-watching.png`);
+      }
       if (loc.overlay) {
         this.load.image(loc.overlay, `${dir}/overlay.png`);
       }

@@ -95,6 +95,7 @@ export class Computer {
     this.windowTitle.textContent = "Bulba Office";
     this.frame = document.createElement("iframe");
     this.frame.className = "xp-frame";
+    this.frame.setAttribute("allow", "");
     this.frame.src = nestedUrl();
     this.windowBody.replaceChildren(this.frame);
     this.windowEl.classList.remove("hidden");

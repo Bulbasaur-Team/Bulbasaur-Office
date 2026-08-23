@@ -15,18 +15,25 @@ export const BULBA_CAT = {
   adviceLabel: "Дай совет",
 } as const;
 
+function randomMeowWord(capital: boolean): string {
+  const yas = 1 + Math.floor(Math.random() * 4);
+  const us = 1 + Math.floor(Math.random() * 3);
+  const raw = `м${"я".repeat(yas)}${"у".repeat(us)}`;
+  return capital ? raw[0]!.toUpperCase() + raw.slice(1) : raw;
+}
+
 /**
- * Подменяет любой «смысловой» кусок (слова, ники, числа) на «мяу»/«Мяу».
+ * Подменяет любой «смысловой» кусок (слова, ники, числа) на мяу разной длины.
  * В результате — только мяу, пробелы и исходные знаки препинания (без цифр и ников).
  */
 export function meowify(text: string): string {
   // Всё, что не пробел и не пунктуация — токен (слово/число/ник).
   return text.replace(/[^\s.,!?;:—\-–—…«»()[\]"'`]+/gu, (token, offset) => {
-    const chunks = Math.max(1, Math.round(token.length / 3));
+    const base = Math.max(1, Math.round(token.length / 3));
+    const chunks = Math.max(1, base + Math.floor(Math.random() * 3) - 1);
     const prefix = text.slice(0, offset).replace(/\s+$/u, "");
     const sentenceStart =
       offset === 0 || prefix.length === 0 || /[.!?…]$/u.test(prefix);
-    const word = sentenceStart ? "Мяу" : "мяу";
-    return Array.from({ length: chunks }, (_, i) => (i === 0 ? word : "мяу")).join(" ");
+    return Array.from({ length: chunks }, (_, i) => randomMeowWord(i === 0 && sentenceStart)).join(" ");
   });
 }

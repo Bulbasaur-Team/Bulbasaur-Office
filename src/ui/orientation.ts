@@ -21,6 +21,8 @@ const SCREENS: ReadonlyArray<readonly [string, Orient]> = [
   ["auth", "portrait"],
   // Телефон в телефоне: вертикальный UI поверх landscape-мира.
   ["bulbaPhone", "portrait"],
+  // Ноутбук / BulbaTalk: тоже вертикально, иначе сетка звонка на телефоне схлопывается.
+  ["laptop", "portrait"],
 ];
 
 // Ориентация мира: её же наследуют экраны без своей записи (лидерборд, слайды, HUD-меню).

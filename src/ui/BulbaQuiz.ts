@@ -2,6 +2,7 @@
 
 import * as api from "../net/api";
 import type { QuizAttempt, QuizChestReward, QuizState, QuizTopic } from "../net/api";
+import { QUANTUM_QUEST } from "../data/quantumQuest";
 import { defaultAppearance, quizChestLootCards, wardrobeItem, type PlayerAppearance } from "../data/wardrobe";
 import { drawAppearance, loadWardrobeDomImages } from "../entities/PlayerAvatar";
 import { publicPath } from "../publicPath";
@@ -29,6 +30,8 @@ export class BulbaQuiz {
   onLeaderboard: (() => void) | null = null;
   onClose: (() => void) | null = null;
   onBalance: ((balance: number) => void) | null = null;
+  storyQuizAvailable: () => boolean = () => false;
+  onStoryQuizPassed: (() => void) | null = null;
 
   private root = document.getElementById("bulbaquiz")!;
   private closeBtn = document.getElementById("bqClose") as HTMLButtonElement;
@@ -76,6 +79,7 @@ export class BulbaQuiz {
   private openChestBtn = document.getElementById("bqOpenChest") as HTMLButtonElement;
   private chestOpenBtn = document.getElementById("bqChestOpen") as HTMLButtonElement;
   private playBtn = document.getElementById("bqPlay") as HTMLButtonElement;
+  private storyPlayBtn = document.getElementById("bqStoryPlay") as HTMLButtonElement;
   private rerollBtn = document.getElementById("bqReroll") as HTMLButtonElement;
   private fiftyBtn = document.getElementById("bqFifty") as HTMLButtonElement;
   private errEl = document.getElementById("bqError")!;
@@ -100,6 +104,7 @@ export class BulbaQuiz {
     this.closeBtn.onclick = () => this.close();
     document.getElementById("bqLb")!.onclick = () => this.onLeaderboard?.();
     this.playBtn.onclick = () => void this.showTopics();
+    this.storyPlayBtn.onclick = () => void this.startTopic(QUANTUM_QUEST.topicCode);
     document.getElementById("bqShopBtn")!.onclick = () => this.showShop();
     document.getElementById("bqShopBack")!.onclick = () => void this.showHub();
     document.getElementById("bqTopicsBack")!.onclick = () => void this.showHub();
@@ -328,9 +333,14 @@ export class BulbaQuiz {
     this.stopLevelAnimation();
     this.stopConfetti();
     this.setScreen("hub");
+    const storyOn = this.storyQuizAvailable();
+    this.storyPlayBtn.classList.toggle("hidden", !storyOn);
     try {
       const state = await api.fetchQuizState();
       this.applyState(state);
+      if (storyOn) {
+        this.statusEl.textContent = "Доступен сюжетный тест техлида: «Квантовая физика». Нужно 9 из 10.";
+      }
       if (state.pendingChest) this.showClosedChest(true);
     } catch (e) {
       this.setError(e instanceof Error ? e.message : "Не удалось загрузить квиз");
@@ -424,8 +434,13 @@ export class BulbaQuiz {
     this.feedbackEl.textContent = "";
     this.feedbackEl.className = "bq-feedback";
     this.questionMenuBtn.classList.add("hidden");
-    this.boostersEl.classList.remove("hidden");
-    this.qProgress.textContent = `Вопрос ${attempt.currentIndex + 1} из ${attempt.totalQuestions}`;
+    const story = !!attempt.story;
+    this.boostersEl.classList.toggle("hidden", story);
+    const score = story
+      ? ` · верно ${attempt.correctCount ?? 0}`
+      : "";
+    this.qProgress.textContent =
+      `Вопрос ${attempt.currentIndex + 1} из ${attempt.totalQuestions}${score}`;
     const q = attempt.question;
     if (!q) {
       this.setError("Нет вопроса");
@@ -452,7 +467,7 @@ export class BulbaQuiz {
       }
       this.qOptions.appendChild(btn);
     });
-    if (this.state) {
+    if (this.state && !story) {
       this.rerollBtn.disabled = this.state.boosterReroll < 1 || this.answering;
       this.fiftyBtn.disabled =
         this.state.boosterFifty < 1 || this.answering || masked.size > 0;
@@ -492,6 +507,7 @@ export class BulbaQuiz {
   private async answer(optionIndex: number): Promise<void> {
     if (!this.attempt || this.answering) return;
     const previousLevel = this.state?.level ?? 0;
+    const story = !!this.attempt.story;
     this.answering = true;
     this.stopTimer();
     this.setError(null);
@@ -503,6 +519,28 @@ export class BulbaQuiz {
       const res = await api.answerQuizAttempt(this.attempt.attemptId, optionIndex);
       this.attempt = res;
       this.applyState(res.state);
+
+      if (story) {
+        if (res.correct) selected?.classList.add("bq-correct");
+        else {
+          selected?.classList.add("bq-wrong");
+          const correctIndex = res.correctIndex;
+          if (correctIndex != null && correctIndex >= 0) {
+            const opts = this.qOptions.querySelectorAll<HTMLButtonElement>(".bq-opt");
+            opts[correctIndex]?.classList.add("bq-correct");
+          }
+        }
+        this.feedbackEl.textContent = "";
+        await this.delay(CORRECT_FEEDBACK_MS);
+        if (!this.isOpen || this.screen !== "question" || this.attempt !== res) return;
+        if (res.status === "ACTIVE" && res.question) {
+          this.showQuestion(res);
+          return;
+        }
+        this.showResult(res);
+        if (res.status === "WON") this.onStoryQuizPassed?.();
+        return;
+      }
 
       if (res.status === "LOST") {
         selected?.classList.add("bq-wrong");
@@ -564,6 +602,14 @@ export class BulbaQuiz {
   private showResult(res: QuizAttempt): void {
     this.setScreen("result");
     const won = res.status === "WON";
+    if (res.story) {
+      const score = res.correctCount ?? 0;
+      this.resultTitle.textContent = won ? "Тест сдан!" : "Пока не хватает";
+      this.resultText.textContent = won
+        ? `Верно ${score} из ${res.totalQuestions}. Техлид будет доволен.`
+        : `Верно ${score} из ${res.totalQuestions}. Нужно минимум ${QUANTUM_QUEST.passMin}. Можно пройти ещё раз.`;
+      return;
+    }
     this.resultTitle.textContent = won ? "Уровень пройден!" : "Попытка провалена";
     this.resultText.textContent = won
       ? `Уровень ${res.state.level}. ${res.state.pendingChest ? "Тебя ждёт сундук!" : "Так держать!"}`

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#06111c"/><stop offset="0.55" stop-color="#0a1b2b"/><stop offset="1" stop-color="#10263a"/>
+    </linearGradient>
+    <linearGradient id="mint" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#38f2cf"/><stop offset="1" stop-color="#7effa5"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffd76a"/><stop offset="1" stop-color="#ff8a4c"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffffff" stop-opacity=".16"/><stop offset="1" stop-color="#ffffff" stop-opacity=".035"/>
+    </linearGradient>
+    <radialGradient id="glow"><stop stop-color="#38f2cf" stop-opacity=".35"/><stop offset="1" stop-color="#38f2cf" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
+      <path d="M42 0H0V42" fill="none" stroke="#8eb5c9" stroke-opacity=".07"/>
+    </pattern>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="16" stdDeviation="17" flood-color="#000" flood-opacity=".35"/>
+    </filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="12"/></filter>
+    <filter id="photo"><feColorMatrix values="0.96 0 0 0 0  0 1.02 0 0 0  0 0 1.08 0 0  0 0 0 1 0"/></filter>
+  </defs>
+  <rect width="960" height="540" fill="url(#night)"/>
+  <rect width="960" height="540" fill="url(#grid)" opacity="1"/>
+  <circle cx="866" cy="76" r="230" fill="#ff6b6b" opacity=".08"/>
+  <text x="48" y="52" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="900" letter-spacing="2.4" fill="#ff6b6b">02  /  БОЛЬ РЫНКА</text>
+  <text x="48" y="108" font-family="Inter,Arial,sans-serif" font-size="34" font-weight="850" letter-spacing="-1.0" fill="#f8f4e9">Межгород занимает почти весь срок</text>
+  <rect x="48" y="130" width="72" height="5" rx="3" fill="#ff6b6b"/>
+  <g style="--ink:#f8f4e9;--muted:#91a9b9;--accent:#ff6b6b">
+  <g transform="translate(48 168)">
+    <rect width="864" height="250" rx="30" fill="url(#glass)" stroke="#fff" stroke-opacity=".1"/>
+    <g transform="translate(38 34)">
+      <text y="24" font-family="Inter,Arial" font-size="13" font-weight="850" letter-spacing="1.6" fill="#91a9b9">ПУТЬ ЗАКАЗА</text>
+      <line x1="20" y1="104" x2="750" y2="104" stroke="#284456" stroke-width="14" stroke-linecap="round"/>
+      <line x1="20" y1="104" x2="580" y2="104" stroke="#ff6b6b" stroke-width="14" stroke-linecap="round"/>
+      <line x1="580" y1="104" x2="750" y2="104" stroke="#38f2cf" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="20" cy="104" r="19" fill="#ff6b6b"/><circle cx="300" cy="104" r="19" fill="#ff6b6b"/><circle cx="580" cy="104" r="19" fill="#ff6b6b"/><circle cx="750" cy="104" r="19" fill="#38f2cf"/>
+      <text x="20" y="151" text-anchor="middle" font-family="Inter,Arial" font-size="15" font-weight="750" fill="#91a9b9">склад</text>
+      <text x="300" y="151" text-anchor="middle" font-family="Inter,Arial" font-size="15" font-weight="900" fill="#ff8f84">межгород</text>
+      <text x="580" y="151" text-anchor="middle" font-family="Inter,Arial" font-size="15" font-weight="750" fill="#91a9b9">город</text>
+      <text x="750" y="151" text-anchor="middle" font-family="Inter,Arial" font-size="15" font-weight="750" fill="#91a9b9">дверь</text>
+      <path d="M20 66h560" stroke="#ff6b6b" stroke-width="2" stroke-dasharray="5 7"/>
+      <text x="300" y="53" text-anchor="middle" font-family="Inter,Arial" font-size="20" font-weight="900" fill="#ff8f84">ЗДЕСЬ СЪЕДАЕТСЯ СРОК</text>
+    </g>
+  </g>
+  <g transform="translate(48 442)">
+    <text font-family="Inter,Arial" font-size="20" font-weight="750" fill="#f8f4e9">Телепорт режет перевозку между городами</text>
+    <circle cx="454" cy="-7" r="4" fill="#ff6b6b"/>
+    <text x="476" font-family="Inter,Arial" font-size="20" font-weight="750" fill="#f8f4e9">last mile остаётся</text>
+  </g></g>
+
+  <text x="48" y="512" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="800" letter-spacing="2.2" fill="#91a9b9">BULBA OFFICE  /  ДЕНЬ X</text>
+  <rect x="745" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="762" y="505" width="24" height="5" rx="3" fill="#ff6b6b" opacity="1"/><rect x="779" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="796" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="813" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="830" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="847" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="864" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="881" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="898" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/>
+</svg>

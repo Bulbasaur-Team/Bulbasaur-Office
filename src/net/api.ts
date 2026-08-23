@@ -277,10 +277,42 @@ export interface CompleteQuestResponse {
   rewarded: boolean;
 }
 
-export function completeQuest(code: string, pin: string): Promise<CompleteQuestResponse> {
+export function completeQuest(code: string, pin = ""): Promise<CompleteQuestResponse> {
   return authedJson<CompleteQuestResponse>(`/api/quests/${encodeURIComponent(code)}/complete`, {
     method: "POST",
     body: JSON.stringify({ pin }),
+  });
+}
+
+export interface PresentationClaudeState {
+  claudePaid: boolean;
+  bulbaCoinBalance: number;
+}
+
+export function fetchPresentationClaude(): Promise<PresentationClaudeState> {
+  return authedJson<PresentationClaudeState>("/api/quests/presentation/claude");
+}
+
+export function payPresentationClaude(): Promise<PresentationClaudeState> {
+  return authedJson<PresentationClaudeState>("/api/quests/presentation/claude", {
+    method: "POST",
+    body: "{}",
+  });
+}
+
+export interface PresentationDeckState {
+  slideIds: string[];
+  status: QuestStatus;
+}
+
+export function fetchPresentationDeck(): Promise<PresentationDeckState> {
+  return authedJson<PresentationDeckState>("/api/quests/presentation/deck");
+}
+
+export function acceptPresentationDeck(slideIds: string[]): Promise<PresentationDeckState> {
+  return authedJson<PresentationDeckState>("/api/quests/presentation/deck", {
+    method: "POST",
+    body: JSON.stringify({ slideIds }),
   });
 }
 
@@ -385,6 +417,8 @@ export interface QuizAttempt {
   status: "ACTIVE" | "WON" | "LOST" | string;
   currentIndex: number;
   totalQuestions: number;
+  correctCount?: number;
+  story?: boolean;
   question: QuizQuestion | null;
   deadlineAt: string;
   correct: boolean;

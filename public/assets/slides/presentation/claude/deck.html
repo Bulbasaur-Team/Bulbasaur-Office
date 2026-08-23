@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>День X — Bulba Office</title>
+<style>
+:root {
+  --bg: #07111f;
+  --panel: #0d1b2b;
+  --panel-2: #112439;
+  --ink: #f5f5ec;
+  --muted: #91a5b7;
+  --mint: #62f2c5;
+  --green: #84ee83;
+  --sun: #ffc760;
+  --orange: #ff8958;
+  --red: #ff667e;
+  --line: rgba(172, 204, 222, .16);
+  --w: 1280px;
+  --h: 720px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #02060b; }
+body {
+  color: var(--ink);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+#stage { position: fixed; inset: 0; overflow: hidden; }
+#deck {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--w);
+  height: var(--h);
+  overflow: hidden;
+  background: var(--bg);
+  transform-origin: center;
+}
+.slide {
+  position: absolute;
+  inset: 0;
+  display: none;
+  overflow: hidden;
+  padding: 58px 64px 54px;
+  background:
+    radial-gradient(720px 520px at 92% 4%, rgba(98, 242, 197, .10), transparent 68%),
+    linear-gradient(135deg, #07111f 0%, #091728 55%, #0b1d31 100%);
+}
+.slide.on { display: block; }
+.slide::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: linear-gradient(90deg, #000, transparent 68%);
+}
+.eyebrow {
+  position: relative;
+  z-index: 3;
+  color: var(--accent, var(--mint));
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 850;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+h1, h2 {
+  position: relative;
+  z-index: 3;
+  max-width: 790px;
+  font-weight: 800;
+  letter-spacing: -.045em;
+}
+h1 { margin-top: 20px; font-size: 68px; line-height: .99; }
+h2 { margin-top: 18px; font-size: 52px; line-height: 1.04; }
+.lead {
+  position: relative;
+  z-index: 3;
+  max-width: 650px;
+  margin-top: 22px;
+  color: var(--muted);
+  font-size: 21px;
+  line-height: 1.45;
+}
+.brand {
+  position: absolute;
+  z-index: 4;
+  left: 64px;
+  bottom: 27px;
+  color: #72879a;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .19em;
+  text-transform: uppercase;
+}
+.count {
+  position: absolute;
+  z-index: 4;
+  right: 64px;
+  bottom: 24px;
+  width: 90px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: .08em;
+}
+.count b { color: var(--accent, var(--mint)); font-size: 18px; }
+.accent-line {
+  position: relative;
+  z-index: 3;
+  width: 76px;
+  height: 5px;
+  margin-top: 21px;
+  border-radius: 99px;
+  background: var(--accent, var(--mint));
+}
+.glass {
+  border: 1px solid var(--line);
+  background: linear-gradient(145deg, rgba(255,255,255,.10), rgba(255,255,255,.025));
+  box-shadow: 0 24px 60px rgba(0,0,0,.28);
+  backdrop-filter: blur(18px);
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(9, 25, 39, .72);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent, var(--mint)); box-shadow: 0 0 18px var(--accent, var(--mint)); }
+.photo-cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo-card {
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 28px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.42);
+}
+
+/* 01 — history */
+.history .timeline {
+  position: absolute;
+  z-index: 3;
+  left: 64px;
+  right: 64px;
+  top: 275px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+.history .timeline::before {
+  content: "";
+  position: absolute;
+  top: 55px;
+  left: 66px;
+  right: 66px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--sun), var(--orange), var(--mint));
+}
+.milestone { position: relative; text-align: center; }
+.milestone .icon {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 110px;
+  height: 110px;
+  margin: 0 auto 22px;
+  border-radius: 28px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--c);
+  font-size: 40px;
+  font-weight: 950;
+  box-shadow: 0 20px 44px rgba(0,0,0,.28);
+}
+.milestone:last-child .icon { color: #06241d; background: linear-gradient(135deg, var(--mint), var(--green)); }
+.milestone h3 { font-size: 18px; }
+.milestone p { margin-top: 7px; color: var(--muted); font-size: 14px; }
+.paw { position: relative; width: 54px; height: 54px; }
+.paw i { position: absolute; display: block; border-radius: 50%; background: currentColor; }
+.paw i:nth-child(1) { width: 34px; height: 30px; left: 10px; bottom: 0; }
+.paw i:nth-child(2) { width: 15px; height: 18px; left: 0; top: 7px; }
+.paw i:nth-child(3) { width: 15px; height: 18px; left: 20px; top: 0; }
+.paw i:nth-child(4) { width: 15px; height: 18px; right: 0; top: 7px; }
+.arrow-icon { font-size: 46px; line-height: 1; }
+
+/* 02 — pain */
+.pain-grid {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: .92fr 1.08fr;
+  gap: 18px;
+  height: 420px;
+  margin-top: 28px;
+}
+.pain-copy { display: flex; flex-direction: column; justify-content: center; padding: 32px 36px; border-radius: 26px; }
+.pain-copy strong { color: var(--red); font-size: 84px; line-height: .92; letter-spacing: -.06em; }
+.pain-copy span { margin-top: 14px; font-size: 22px; font-weight: 750; }
+.pain-copy p { margin-top: 14px; color: var(--muted); font-size: 17px; line-height: 1.5; }
+.route-card { position: relative; overflow: hidden; border-radius: 26px; }
+.route-card img { filter: saturate(.72) brightness(.52); }
+.route-overlay { position: absolute; inset: 0; padding: 38px; background: linear-gradient(90deg, rgba(6,17,29,.87), rgba(6,17,29,.15)); }
+.route-track { position: absolute; left: 48px; right: 48px; bottom: 72px; height: 12px; border-radius: 99px; background: #23384b; }
+.route-track::before { content:""; position:absolute; inset:0 22% 0 0; border-radius:inherit; background:var(--red); box-shadow:0 0 30px rgba(255,102,126,.5); }
+.route-track::after { content:""; position:absolute; inset:0 0 0 78%; border-radius:inherit; background:var(--mint); }
+.route-labels { position: absolute; left: 48px; right: 48px; bottom: 34px; display:flex; justify-content:space-between; color:#d4dee6; font-size:13px; font-weight:800; }
+.pain-badge { position:absolute; right:42px; top:42px; padding:10px 14px; border-radius:12px; background:rgba(255,102,126,.16); color:#ff98a9; font-size:13px; font-weight:900; letter-spacing:.08em; }
+
+/* photo heroes */
+.hero-photo { padding: 0; }
+.hero-photo::after { display: none; }
+.hero-photo .shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #06111e 0%, rgba(6,17,30,.94) 35%, rgba(6,17,30,.2) 70%, rgba(6,17,30,.06) 100%);
+}
+.hero-photo .copy { position:absolute; z-index:3; left:64px; top:60px; width:610px; }
+.hero-photo h2 { font-size: 61px; max-width: 610px; }
+.hero-photo .metric { display:flex; align-items:flex-end; gap:13px; margin-top:34px; }
+.hero-photo .metric b { color:var(--accent); font-size:92px; line-height:.78; letter-spacing:-.08em; }
+.hero-photo .metric span { padding-bottom:2px; font-size:17px; font-weight:850; line-height:1.25; }
+.hero-photo .caption { max-width:420px; margin-top:36px; font-size:21px; font-weight:700; line-height:1.45; }
+.hero-photo .pill { margin-top:30px; }
+.beach.hero-photo .shade { background: linear-gradient(90deg, #f4efdf 0%, rgba(244,239,223,.97) 38%, rgba(244,239,223,.10) 73%); }
+.beach.hero-photo { color:#102438; }
+.beach.hero-photo .lead { color:#516a75; }
+.beach.hero-photo .brand, .beach.hero-photo .count { color:#476c69; }
+
+/* 06 — AI */
+.ai-map {
+  position: absolute;
+  z-index: 3;
+  left: 64px;
+  right: 64px;
+  top: 205px;
+  height: 390px;
+  border-radius: 30px;
+}
+.ai-map svg { position:absolute; inset:0; width:100%; height:100%; }
+.node {
+  position:absolute;
+  display:grid;
+  place-items:center;
+  width:110px;
+  height:110px;
+  border:1px solid rgba(98,242,197,.35);
+  border-radius:50%;
+  background:#10263a;
+  box-shadow:0 16px 38px rgba(0,0,0,.34);
+  color:#dce8ed;
+  font-size:13px;
+  font-weight:900;
+  letter-spacing:.06em;
+}
+.node.core {
+  left:50%;
+  top:50%;
+  width:154px;
+  height:154px;
+  transform:translate(-50%,-50%);
+  border:0;
+  color:#09261f;
+  background:linear-gradient(135deg,var(--mint),var(--green));
+  box-shadow:0 0 80px rgba(98,242,197,.28);
+}
+.node.core b { display:block; text-align:center; font-size:46px; line-height:1; }
+.node.core small { display:block; margin-bottom:8px; font-size:10px; letter-spacing:.18em; }
+.node.n1 { left:90px; top:44px; }.node.n2 { left:90px; bottom:44px; }
+.node.n3 { right:90px; top:44px; }.node.n4 { right:90px; bottom:44px; }
+.ai-model { position:absolute; top:50%; transform:translateY(-50%); color:var(--muted); font-size:15px; font-weight:850; }
+.ai-model.left { left:290px; }.ai-model.right { right:286px; }
+
+/* 07 — tired */
+.tired-panels {
+  position:relative;
+  z-index:3;
+  display:grid;
+  grid-template-columns: .9fr 1.1fr;
+  gap:18px;
+  height:390px;
+  margin-top:32px;
+}
+.token-panel, .burn-panel { border-radius:28px; padding:34px 38px; }
+.panel-label { color:var(--muted); font-size:11px; font-weight:900; letter-spacing:.18em; }
+.token-zero { margin-top:28px; color:var(--red); font-size:142px; line-height:.8; font-weight:900; letter-spacing:-.09em; }
+.token-bar { position:relative; height:28px; margin-top:34px; border-radius:99px; background:#21384b; }
+.token-bar::after { content:""; position:absolute; top:7px; right:-13px; width:9px; height:14px; border-radius:2px; background:#41586a; }
+.token-panel p { margin-top:24px; color:var(--ink); font-size:18px; font-weight:700; }
+.burn-panel { position:relative; overflow:hidden; }
+.burn-panel svg { width:100%; height:235px; margin-top:18px; }
+.burn-panel .status { display:flex; justify-content:space-between; align-items:center; color:var(--muted); font-size:14px; }
+.status b { color:#ff9caf; }
+
+/* 08 — limit */
+.limit-layout {
+  position:relative;
+  z-index:3;
+  display:grid;
+  grid-template-columns: .78fr 1.22fr;
+  gap:18px;
+  height:405px;
+  margin-top:30px;
+}
+.limit-copy { display:flex; flex-direction:column; justify-content:center; padding:34px; border-radius:28px; }
+.limit-copy .big { color:var(--sun); font-size:96px; font-weight:900; line-height:.85; letter-spacing:-.08em; }
+.limit-copy h3 { margin-top:18px; font-size:25px; }
+.limit-copy p { margin-top:12px; color:var(--muted); font-size:17px; line-height:1.5; }
+.limit-map { position:relative; overflow:hidden; border-radius:28px; }
+.limit-map img { filter:brightness(.62) saturate(.8); }
+.limit-map::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(7,17,31,.2),rgba(7,17,31,.05)); }
+.map-tag { position:absolute; z-index:2; display:flex; align-items:center; gap:9px; padding:10px 14px; border-radius:999px; background:rgba(7,17,31,.84); border:1px solid var(--line); font-size:13px; font-weight:850; }
+.map-tag.a { left:42%; top:18%; }.map-tag.b { right:64px; bottom:72px; }
+.map-tag i { width:9px; height:9px; border-radius:50%; background:var(--mint); box-shadow:0 0 18px var(--mint); }
+.future-tag { position:absolute; z-index:2; right:34px; top:30px; color:rgba(255,255,255,.5); font-size:12px; font-weight:800; letter-spacing:.08em; }
+
+/* 09 — market */
+.market-flow {
+  position:relative;
+  z-index:3;
+  display:grid;
+  grid-template-columns:1fr 100px 1fr;
+  align-items:center;
+  height:380px;
+  margin-top:34px;
+}
+.market-card { height:100%; padding:38px; border-radius:28px; }
+.market-card .over { color:var(--muted); font-size:11px; font-weight:900; letter-spacing:.17em; }
+.market-card .word { margin-top:38px; font-size:67px; line-height:.95; font-weight:900; letter-spacing:-.06em; }
+.market-card p { margin-top:26px; color:var(--muted); font-size:18px; line-height:1.5; }
+.market-card.after { background:linear-gradient(145deg,rgba(98,242,197,.15),rgba(255,255,255,.025)); border-color:rgba(98,242,197,.32); }
+.market-card.after .word { color:var(--mint); }
+.market-arrow { text-align:center; color:var(--mint); font-size:58px; font-weight:300; }
+.market-strip { display:flex; gap:8px; margin-top:30px; }
+.market-strip i { height:9px; flex:1; border-radius:99px; background:#31495b; }
+.market-card.before .market-strip i:nth-child(-n+3) { background:var(--orange); }
+.market-card.after .market-strip i { background:var(--mint); }
+
+/* optional slides */
+.team-grid {
+  position:relative; z-index:3; display:grid; grid-template-columns:repeat(4,1fr);
+  gap:14px; height:370px; margin-top:40px;
+}
+.team-card { position:relative; padding:28px 24px; border-radius:26px; overflow:hidden; }
+.team-avatar {
+  display:grid; place-items:center; width:74px; height:74px; border-radius:24px;
+  color:#09231d; background:linear-gradient(135deg,var(--mint),var(--green));
+  font-size:29px; font-weight:950;
+}
+.team-card:nth-child(2) .team-avatar { background:linear-gradient(135deg,var(--sun),var(--orange)); }
+.team-card:nth-child(3) .team-avatar { background:linear-gradient(135deg,#8ab4ff,#ae8cff); }
+.team-card:nth-child(4) .team-avatar { background:linear-gradient(135deg,#ff89a0,#ff667e); }
+.team-card h3 { margin-top:28px; font-size:20px; }.team-card p { margin-top:10px; color:var(--muted); font-size:15px; line-height:1.45; }
+.team-card small { position:absolute; left:24px; bottom:24px; color:#6f8597; font-size:10px; font-weight:900; letter-spacing:.12em; }
+.metrics-layout {
+  position:relative; z-index:3; display:grid; grid-template-columns:.72fr 1.28fr;
+  gap:18px; height:405px; margin-top:30px;
+}
+.metric-stack { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.metric-card { display:flex; flex-direction:column; justify-content:center; padding:24px; border-radius:24px; }
+.metric-card b { color:var(--green); font-size:45px; line-height:1; }.metric-card span { margin-top:10px; color:var(--muted); font-size:13px; }
+.chart-card { position:relative; padding:30px; border-radius:28px; overflow:hidden; }
+.chart-card svg { width:100%; height:285px; margin-top:18px; }
+.chart-card .chart-title { color:var(--muted); font-size:11px; font-weight:900; letter-spacing:.16em; }
+.roadmap-line {
+  position:relative; z-index:3; display:grid; grid-template-columns:repeat(3,1fr);
+  gap:18px; margin-top:68px;
+}
+.roadmap-line::before { content:""; position:absolute; left:80px; right:80px; top:58px; height:4px; background:linear-gradient(90deg,var(--mint),var(--sun),#8899aa); }
+.road-phase { position:relative; min-height:290px; padding:90px 28px 28px; border-radius:28px; }
+.road-phase::before {
+  content:attr(data-step); position:absolute; z-index:2; top:28px; left:28px;
+  display:grid; place-items:center; width:60px; height:60px; border-radius:20px;
+  color:#08241d; background:var(--mint); font-size:23px; font-weight:950;
+}
+.road-phase:nth-child(2)::before { background:var(--sun); }.road-phase:nth-child(3)::before { color:#e9f0f6; background:#33495c; }
+.road-phase h3 { font-size:22px; }.road-phase p { margin-top:14px; color:var(--muted); font-size:16px; line-height:1.5; }
+.moat-layout {
+  position:relative; z-index:3; display:grid; grid-template-columns:1.05fr .95fr;
+  gap:20px; height:405px; margin-top:30px;
+}
+.moat-copy { display:flex; flex-direction:column; justify-content:center; padding:38px; border-radius:30px; }
+.moat-copy strong { color:var(--mint); font-size:46px; line-height:1.02; letter-spacing:-.04em; }
+.moat-copy p { margin-top:22px; color:var(--muted); font-size:18px; line-height:1.55; }
+.moat-visual { position:relative; display:grid; place-items:center; border-radius:30px; }
+.lock-ring { display:grid; place-items:center; width:245px; height:245px; border:2px solid rgba(98,242,197,.34); border-radius:50%; box-shadow:0 0 0 32px rgba(98,242,197,.06),0 0 0 64px rgba(98,242,197,.025); }
+.lock-ring b { color:var(--mint); font-size:90px; }.lock-ring span { position:absolute; bottom:48px; color:var(--muted); font-size:11px; font-weight:900; letter-spacing:.13em; }
+.green-layout {
+  position:relative; z-index:3; display:grid; grid-template-columns:.86fr 1.14fr;
+  gap:18px; height:405px; margin-top:30px;
+}
+.green-zero { display:flex; flex-direction:column; justify-content:center; padding:36px; border-radius:30px; background:linear-gradient(145deg,rgba(132,238,131,.19),rgba(255,255,255,.025)); }
+.green-zero b { color:var(--green); font-size:124px; line-height:.8; letter-spacing:-.09em; }.green-zero span { margin-top:26px; font-size:23px; font-weight:850; }
+.green-zero p { margin-top:12px; color:var(--muted); font-size:15px; }
+.green-route { position:relative; overflow:hidden; border-radius:30px; }
+.green-route img { filter:saturate(.75) brightness(.55); }
+.green-route::after { content:""; position:absolute; inset:0; background:linear-gradient(135deg,rgba(7,17,31,.25),rgba(15,60,43,.35)); }
+.green-route .leaf-copy { position:absolute; z-index:2; left:34px; right:34px; bottom:32px; font-size:26px; font-weight:850; line-height:1.25; }
+.culture-flow {
+  position:relative; z-index:3; display:grid; grid-template-columns:1fr 72px 1fr 72px 1fr;
+  align-items:center; height:350px; margin-top:48px;
+}
+.culture-card { display:flex; flex-direction:column; justify-content:center; min-height:230px; padding:28px; border-radius:28px; text-align:center; }
+.culture-card b { color:var(--mint); font-size:28px; }.culture-card:nth-of-type(3) b { color:var(--sun); }.culture-card:nth-of-type(5) b { color:#ff8da3; }
+.culture-card span { margin-top:15px; color:var(--muted); font-size:15px; line-height:1.45; }
+.culture-arrow { color:#526c7e; text-align:center; font-size:38px; }
+
+/* 16 — ask */
+.ask { --accent:var(--sun); }
+.ask-grid {
+  position:relative;
+  z-index:3;
+  display:grid;
+  grid-template-columns:1.03fr .97fr;
+  gap:20px;
+  height:420px;
+  margin-top:30px;
+}
+.ask-number {
+  position:relative;
+  overflow:hidden;
+  padding:36px 40px;
+  border-radius:30px;
+  color:#172332;
+  background:linear-gradient(135deg,#ffd36b,#ff8d5a);
+  box-shadow:0 30px 80px rgba(255,137,88,.20);
+}
+.ask-number small { font-size:11px; font-weight:950; letter-spacing:.18em; }
+.ask-number b { display:block; margin-top:26px; font-size:70px; line-height:.88; letter-spacing:-.065em; }
+.ask-number strong { display:block; margin-top:20px; color:#fff; font-size:96px; line-height:.8; letter-spacing:-.08em; }
+.ask-number::after { content:"BC"; position:absolute; right:-8px; bottom:-52px; color:rgba(255,255,255,.11); font-size:220px; font-weight:950; letter-spacing:-.12em; }
+.funds { display:flex; flex-direction:column; gap:12px; }
+.fund {
+  flex:1;
+  display:grid;
+  grid-template-columns:58px 1fr;
+  align-items:center;
+  padding:18px 22px;
+  border-radius:22px;
+}
+.fund .fund-icon { display:grid; place-items:center; width:42px; height:42px; border-radius:14px; background:rgba(98,242,197,.13); color:var(--mint); font-size:21px; font-weight:950; }
+.fund:nth-child(2) .fund-icon { background:rgba(255,199,96,.13); color:var(--sun); }
+.fund:nth-child(3) .fund-icon { background:rgba(255,102,126,.13); color:var(--red); }
+.fund h3 { font-size:19px; }.fund p { margin-top:5px; color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<div id="stage"><main id="deck">
+
+<section class="slide history" id="history" style="--accent:var(--sun)">
+  <div class="eyebrow">01 · Контекст</div>
+  <h2>От коробки до маршрута</h2>
+  <div class="accent-line"></div>
+  <div class="timeline">
+    <div class="milestone" style="--c:var(--sun)">
+      <div class="icon"><span class="paw"><i></i><i></i><i></i><i></i></span></div>
+      <h3>На лапах</h3><p>Всё несли сами</p>
+    </div>
+    <div class="milestone" style="--c:var(--orange)">
+      <div class="icon">▦</div><h3>Коробки</h3><p>Появилась сортировка</p>
+    </div>
+    <div class="milestone" style="--c:var(--mint)">
+      <div class="icon"><span class="arrow-icon">→</span></div><h3>Стрелка «ТУДЫ»</h3><p>Первый короткий путь</p>
+    </div>
+    <div class="milestone">
+      <div class="icon">0′</div><h3>Мгновенно</h3><p>Путь исчезает</p>
+    </div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>01</b> / 16</div>
+</section>
+
+<section class="slide pain" id="pain" style="--accent:var(--red)">
+  <div class="eyebrow">02 · Боль рынка</div>
+  <h2>Межгород занимает почти весь срок</h2>
+  <div class="pain-grid">
+    <div class="pain-copy glass">
+      <strong>МЕЖ<br>ГОРОД</strong>
+      <span>съедает почти весь срок</span>
+      <p>Телепорт убирает перевозку между городами и странами. Последняя миля до двери остаётся.</p>
+    </div>
+    <div class="route-card glass">
+      <img class="photo-cover" src="media/truck-cabin.jpg" alt="">
+      <div class="route-overlay"></div>
+      <div class="pain-badge">ОСНОВНОЕ ВРЕМЯ</div>
+      <div class="route-track"></div>
+      <div class="route-labels"><span>склад</span><span>межгород</span><span>дверь</span></div>
+    </div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>02</b> / 16</div>
+</section>
+
+<section class="slide hero-photo miracle" id="miracle" style="--accent:var(--mint)">
+  <img class="photo-cover" src="media/instant-delivery-globe.jpg" alt="Мгновенный маршрут из Москвы во Вьетнам">
+  <div class="shade"></div>
+  <div class="copy">
+    <div class="eyebrow">03 · Продукт</div>
+    <h2>Мгновенная доставка существует</h2>
+    <div class="accent-line"></div>
+    <div class="metric"><b>0</b><span>МИНУТ<br>МОСКВА → ВЬЕТНАМ</span></div>
+    <div class="caption">Не мечты.<br>MVP — сегодня.</div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>03</b> / 16</div>
+</section>
+
+<section class="slide hero-photo cabin" id="cabin" style="--accent:var(--orange)">
+  <img class="photo-cover" src="media/truck-cabin.jpg" alt="Дальнобойная кабина прототипа">
+  <div class="shade"></div>
+  <div class="copy">
+    <div class="eyebrow">04 · Демо-точка</div>
+    <h2>Прототип<br>на парковке</h2>
+    <div class="accent-line"></div>
+    <div class="caption">Дальнобойная кабина — оболочка продукта. Отдельной машины нет. Эффект есть.</div>
+    <div class="pill"><i class="dot"></i> ПИЛОТ РАБОТАЕТ</div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>04</b> / 16</div>
+</section>
+
+<section class="slide hero-photo beach" id="beach" style="--accent:#168c78">
+  <img class="photo-cover" src="media/vietnam-beach-hub.jpg" alt="Первый хаб на вьетнамском пляже">
+  <div class="shade"></div>
+  <div class="copy">
+    <div class="eyebrow">05 · Первый хаб</div>
+    <h2>Пилот: точка прибытия</h2>
+    <div class="accent-line"></div>
+    <p class="lead">Вьетнамский пляж — первая живая точка. Пока одна. Дальше масштабирование.</p>
+    <div class="pill"><i class="dot"></i> ХАБ ONLINE · ТУДА И ОБРАТНО</div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>05</b> / 16</div>
+</section>
+
+<section class="slide ai" id="ai" style="--accent:var(--mint)">
+  <div class="eyebrow">06 · Технология</div>
+  <h2>Сделали нейросети</h2>
+  <p class="lead">Сложная задача. Модели с ней справились.</p>
+  <div class="ai-map glass">
+    <svg viewBox="0 0 1152 390" aria-hidden="true">
+      <g fill="none" stroke="#62f2c5" stroke-opacity=".32" stroke-width="2">
+        <path d="M145 99L576 195L1007 99M145 291L576 195L1007 291"/>
+        <path d="M355 195L145 99M355 195L145 291M797 195L1007 99M797 195L1007 291"/>
+      </g>
+    </svg>
+    <div class="node n1">ROUTE</div><div class="node n2">TIME</div>
+    <div class="node n3">CARGO</div><div class="node n4">HUB</div>
+    <div class="ai-model left">CLAUDE</div><div class="ai-model right">CURSOR</div>
+    <div class="node core"><span><small>ПРОЕКТ</small><b>T</b></span></div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>06</b> / 16</div>
+</section>
+
+<section class="slide team" id="team" style="--accent:var(--mint)">
+  <div class="eyebrow">07 · Команда</div>
+  <h2>Команда быстрого реагирования</h2>
+  <div class="team-grid">
+    <div class="team-card glass"><div class="team-avatar">БН</div><h3>Видение</h3><p>Следит, чтобы оно было единым, даже когда его нет.</p><small>ГЕНЕРАЛЬНЫЙ</small></div>
+    <div class="team-card glass"><div class="team-avatar">БГ</div><h3>Логистика</h3><p>Чтобы «доставлено» совпадало с реальностью.</p><small>КОНТУР ГРУЗА</small></div>
+    <div class="team-card glass"><div class="team-avatar">БМ</div><h3>Развитие</h3><p>Культура, слайды и нейросеть рядом.</p><small>БЕСШОВНО</small></div>
+    <div class="team-card glass"><div class="team-avatar">БС</div><h3>Технологии</h3><p>Знает, почему всё лежит. Иногда.</p><small>ДАШБОРДЫ</small></div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>07</b> / 16</div>
+</section>
+
+<section class="slide metrics" id="metrics" style="--accent:var(--green)">
+  <div class="eyebrow">08 · Операционная зрелость</div>
+  <h2>Дашборды зелёные</h2>
+  <div class="metrics-layout">
+    <div class="metric-stack">
+      <div class="metric-card glass"><b>100%</b><span>целевое состояние</span></div>
+      <div class="metric-card glass"><b>1</b><span>дашборд — одна правда</span></div>
+      <div class="metric-card glass"><b>0</b><span>красных метрик</span></div>
+      <div class="metric-card glass"><b>∞</b><span>готовность каскадировать</span></div>
+    </div>
+    <div class="chart-card glass">
+      <div class="chart-title">КОНЦЕПТУАЛЬНАЯ ДИНАМИКА УСПЕХА</div>
+      <svg viewBox="0 0 650 300" aria-hidden="true">
+        <g stroke="#8ca2b4" stroke-opacity=".15"><path d="M0 50H650M0 125H650M0 200H650M0 275H650"/></g>
+        <path d="M10 245C110 225 145 236 218 188s126-10 189-72 140-42 230-97" fill="none" stroke="#84ee83" stroke-width="9" stroke-linecap="round"/>
+        <path d="M10 245C110 225 145 236 218 188s126-10 189-72 140-42 230-97V285H10Z" fill="#84ee83" opacity=".08"/>
+        <circle cx="637" cy="19" r="12" fill="#84ee83"/>
+      </svg>
+    </div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>08</b> / 16</div>
+</section>
+
+<section class="slide tired" id="tired" style="--accent:var(--red)">
+  <div class="eyebrow">09 · Честно</div>
+  <h2>Модели устали</h2>
+  <div class="tired-panels">
+    <div class="token-panel glass">
+      <div class="panel-label">TOKEN BALANCE</div>
+      <div class="token-zero">0</div>
+      <div class="token-bar"></div>
+      <p>Бюджет съеден проектом Т.</p>
+    </div>
+    <div class="burn-panel glass">
+      <div class="panel-label">MODEL STATUS</div>
+      <svg viewBox="0 0 560 240" aria-hidden="true">
+        <defs><linearGradient id="burn" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#62f2c5"/><stop offset=".55" stop-color="#ffc760"/><stop offset="1" stop-color="#ff667e"/></linearGradient></defs>
+        <g stroke="#7890a2" stroke-opacity=".15"><path d="M0 45H560M0 100H560M0 155H560M0 210H560"/></g>
+        <path d="M12 35C96 40 100 65 174 72S248 100 314 118s101 20 134 59 65 22 101 40" fill="none" stroke="url(#burn)" stroke-width="7" stroke-linecap="round"/>
+        <circle cx="549" cy="217" r="10" fill="#ff667e"/>
+      </svg>
+      <div class="status"><span>ресурс моделей</span><b>ВЫГОРЕЛ</b></div>
+    </div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>09</b> / 16</div>
+</section>
+
+<section class="slide limit" id="limit" style="--accent:var(--sun)">
+  <div class="eyebrow">10 · Фокус пилота</div>
+  <h2>Пока один маршрут</h2>
+  <div class="limit-layout">
+    <div class="limit-copy glass">
+      <div class="big">1</div>
+      <h3>живой маршрут</h3>
+      <p>Москва ↔ Вьетнам.<br>Фокус MVP сегодня.<br>Сеть точек — завтра.</p>
+    </div>
+    <div class="limit-map glass">
+      <img class="photo-cover" src="media/instant-delivery-globe.jpg" alt="Маршрут между Москвой и Вьетнамом">
+      <div class="future-tag">СЛЕДУЮЩИЕ ТОЧКИ ···</div>
+      <div class="map-tag a"><i></i> МОСКВА</div>
+      <div class="map-tag b"><i></i> ВЬЕТНАМ</div>
+    </div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>10</b> / 16</div>
+</section>
+
+<section class="slide roadmap" id="roadmap" style="--accent:var(--mint)">
+  <div class="eyebrow">11 · Горизонт развития</div>
+  <h2>Путь к любой точке</h2>
+  <div class="roadmap-line">
+    <div class="road-phase glass" data-step="01"><h3>Закрепить хаб</h3><p>Сделать логистику на пляж стабильной, повторяемой и чуть менее случайной.</p></div>
+    <div class="road-phase glass" data-step="02"><h3>Научиться выбирать точки А и Б</h3><p>Задавать начало и конец маршрута вместо одной фиксированной точки.</p></div>
+    <div class="road-phase glass" data-step="03"><h3>Убрать расстояние</h3><p>Превратить один маршрут в глобальную сеть мгновенной доставки.</p></div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>11</b> / 16</div>
+</section>
+
+<section class="slide market" id="market" style="--accent:var(--mint)">
+  <div class="eyebrow">12 · Рынок</div>
+  <h2>Революция в ecom</h2>
+  <div class="market-flow">
+    <div class="market-card before glass">
+      <div class="over">ЛОГИСТИКА СЕГОДНЯ</div>
+      <div class="word">Продаёт<br>срок</div>
+      <p>Дни становятся часами.<br>Ожидание остаётся.</p>
+      <div class="market-strip"><i></i><i></i><i></i><i></i></div>
+    </div>
+    <div class="market-arrow">→</div>
+    <div class="market-card after glass">
+      <div class="over">ECOM ПОСЛЕ ПИЛОТА</div>
+      <div class="word">Убирает<br>срок</div>
+      <p>Селлер платит за отсутствие ожидания. Рынок становится другим.</p>
+      <div class="market-strip"><i></i><i></i><i></i><i></i></div>
+    </div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>12</b> / 16</div>
+</section>
+
+<section class="slide moat" id="moat" style="--accent:var(--mint)">
+  <div class="eyebrow">13 · Технологический ров</div>
+  <h2>Преимущество невозможно повторить</h2>
+  <div class="moat-layout">
+    <div class="moat-copy glass">
+      <strong>Мы не понимаем,<br>как это работает.</strong>
+      <p>Конкуренты не понимают ещё сильнее. Пока устройство прототипа остаётся загадкой даже для создателей, скопировать его практически невозможно.</p>
+    </div>
+    <div class="moat-visual glass"><div class="lock-ring"><b>?</b><span>PROPRIETARY UNKNOWN</span></div></div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>13</b> / 16</div>
+</section>
+
+<section class="slide green" id="green" style="--accent:var(--green)">
+  <div class="eyebrow">14 · Устойчивость</div>
+  <h2>Ноль километров — меньше след</h2>
+  <div class="green-layout">
+    <div class="green-zero glass"><b>0 км</b><span>между точками</span><p>Без трассы, пробок и лишнего пробега.</p></div>
+    <div class="green-route glass">
+      <img class="photo-cover" src="media/vietnam-beach-hub.jpg" alt="Зелёный хаб на вьетнамском пляже">
+      <div class="leaf-copy">Первый хаб уже зелёный.<br>Во всех смыслах.</div>
+    </div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>14</b> / 16</div>
+</section>
+
+<section class="slide culture" id="culture" style="--accent:var(--sun)">
+  <div class="eyebrow">15 · Как мы работаем</div>
+  <h2>Бесшовная культура</h2>
+  <div class="culture-flow">
+    <div class="culture-card glass"><b>Синхронизируем</b><span>единое видение будущего</span></div>
+    <div class="culture-arrow">→</div>
+    <div class="culture-card glass"><b>Приземляем</b><span>результат в нужный горизонт</span></div>
+    <div class="culture-arrow">→</div>
+    <div class="culture-card glass"><b>Каскадируем</b><span>успех до всех стейкхолдеров</span></div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>15</b> / 16</div>
+</section>
+
+<section class="slide ask" id="ask">
+  <div class="eyebrow">16 · Инвестиции</div>
+  <h2>Инвестиции: миллиарды BC</h2>
+  <div class="ask-grid">
+    <div class="ask-number">
+      <small>ПРОСИМ</small>
+      <b>НЕСКОЛЬКО<br>МИЛЛИАРДОВ</b>
+      <strong>BC</strong>
+    </div>
+    <div class="funds">
+      <div class="fund glass"><div class="fund-icon">●</div><div><h3>Точки назначения</h3><p>Из одного хаба — в сеть</p></div></div>
+      <div class="fund glass"><div class="fund-icon">+</div><div><h3>Токены моделям</h3><p>Вернуть разработку в online</p></div></div>
+      <div class="fund glass"><div class="fund-icon">↗</div><div><h3>Уникальный продукт</h3><p>Развивать то, чего больше нет ни у кого</p></div></div>
+    </div>
+  </div>
+  <div class="brand">Bulba Office · День X</div><div class="count"><b>16</b> / 16</div>
+</section>
+
+</main></div>
+<script>
+(() => {
+  const deck = document.getElementById("deck");
+  const slides = [...document.querySelectorAll(".slide")];
+  const ids = slides.map((slide) => slide.id);
+
+  function fit() {
+    const scale = Math.min(innerWidth / 1280, innerHeight / 720);
+    deck.style.transform = `translate(-50%, -50%) scale(${scale})`;
+  }
+
+  function render() {
+    const requested = decodeURIComponent(location.hash.slice(1));
+    const active = ids.includes(requested) ? requested : "history";
+    slides.forEach((slide) => slide.classList.toggle("on", slide.id === active));
+  }
+
+  addEventListener("resize", fit);
+  addEventListener("hashchange", render);
+  fit();
+  render();
+})();
+</script>
+</body>
+</html>

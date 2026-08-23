@@ -1,7 +1,11 @@
 import { publicPath } from "../publicPath";
+import { characterVoice } from "./CharacterVoice";
+import { dialTone } from "./DialTone";
+import { embedded } from "../embed";
 
 const MUSIC_VOLUME = 0.18;
 const ENABLED_KEY = "bulba_music_enabled";
+const SFX_KEY = "bulba_sfx_enabled";
 const TRACK_KEY = "bulba_music_track";
 
 interface MusicTrack {
@@ -20,29 +24,42 @@ const TRACKS: MusicTrack[] = [
   { id: "hiphop", label: "Хип-хоп", file: "hiphop.mp3" },
 ];
 
-export class BackgroundMusic {
+class BackgroundMusic {
   private audio = new Audio();
   private enabled = localStorage.getItem(ENABLED_KEY) === "1";
+  /** Звук эффектов (бормотание героев и т.п.). По умолчанию выключен. */
+  private sfxOn = localStorage.getItem(SFX_KEY) === "1";
   private unlocked = false;
   private trackId = this.validTrackId(localStorage.getItem(TRACK_KEY) ?? "chill");
   private toggleBtn: HTMLButtonElement | null = null;
+  private sfxBtn: HTMLButtonElement | null = null;
   private dropdownEl: HTMLElement | null = null;
   private dropdownBtn: HTMLButtonElement | null = null;
   private dropdownLabel: HTMLElement | null = null;
   private dropdownMenu: HTMLElement | null = null;
+  private sfxListeners = new Set<(on: boolean) => void>();
 
   constructor() {
     this.audio.loop = true;
-    this.audio.preload = "auto";
-    this.audio.volume = MUSIC_VOLUME;
+    this.audio.preload = embedded ? "none" : "auto";
+    this.audio.volume = embedded ? 0 : MUSIC_VOLUME;
+    this.audio.muted = embedded;
+    if (embedded) return;
     this.applyTrack();
   }
 
   install(): void {
     this.bindControls();
+    if (embedded) this.silence();
 
+    characterVoice.setEnabled(this.sfxOn);
+    dialTone.setEnabled(this.sfxOn);
     const unlock = (): void => {
       this.unlocked = true;
+      characterVoice.unlock();
+      dialTone.unlock();
+      characterVoice.setEnabled(this.sfxOn);
+      dialTone.setEnabled(this.sfxOn);
       if (this.enabled) this.play();
     };
 
@@ -51,13 +68,36 @@ export class BackgroundMusic {
     window.addEventListener("touchstart", unlock, { once: true });
   }
 
+  isSfxOn(): boolean {
+    return this.sfxOn;
+  }
+
+  setSfxEnabled(on: boolean): void {
+    this.setSfxOn(on);
+  }
+
+  /** Подписка на смену SFX; возвращает отписку. */
+  onSfxChange(listener: (on: boolean) => void): () => void {
+    this.sfxListeners.add(listener);
+    return () => this.sfxListeners.delete(listener);
+  }
+
+  private silence(): void {
+    this.audio.muted = true;
+    this.audio.volume = 0;
+    this.audio.pause();
+  }
+
   private bindControls(): void {
     this.toggleBtn = document.getElementById("musicToggle") as HTMLButtonElement | null;
+    this.sfxBtn = document.getElementById("sfxToggle") as HTMLButtonElement | null;
     this.dropdownEl = document.getElementById("musicDropdown");
     this.dropdownBtn = document.getElementById("musicDropdownBtn") as HTMLButtonElement | null;
     this.dropdownLabel = document.getElementById("musicDropdownLabel");
     this.dropdownMenu = document.getElementById("musicDropdownMenu");
-    if (!this.toggleBtn || !this.dropdownEl || !this.dropdownBtn || !this.dropdownLabel || !this.dropdownMenu) return;
+    if (!this.toggleBtn || !this.dropdownEl || !this.dropdownBtn || !this.dropdownLabel || !this.dropdownMenu) {
+      return;
+    }
 
     this.dropdownMenu.innerHTML = "";
     for (const track of TRACKS) {
@@ -78,6 +118,7 @@ export class BackgroundMusic {
       this.setDropdownOpen(!this.dropdownEl!.classList.contains("open"));
     };
     this.toggleBtn.onclick = () => this.setEnabled(!this.enabled);
+    this.sfxBtn?.addEventListener("click", () => this.setSfxOn(!this.sfxOn));
     document.addEventListener("pointerdown", (e) => {
       if (!this.dropdownEl?.contains(e.target as Node)) this.setDropdownOpen(false);
     });
@@ -91,11 +132,25 @@ export class BackgroundMusic {
     this.enabled = enabled;
     localStorage.setItem(ENABLED_KEY, enabled ? "1" : "0");
     if (enabled) this.play();
-    else this.pause();
+    else this.silence();
     this.renderControls();
   }
 
+  private setSfxOn(on: boolean): void {
+    if (this.sfxOn === on) {
+      this.renderControls();
+      return;
+    }
+    this.sfxOn = on;
+    localStorage.setItem(SFX_KEY, on ? "1" : "0");
+    characterVoice.setEnabled(on);
+    dialTone.setEnabled(on);
+    this.renderControls();
+    for (const listener of this.sfxListeners) listener(on);
+  }
+
   private setTrack(trackId: string): void {
+    if (embedded) return;
     this.trackId = this.validTrackId(trackId);
     localStorage.setItem(TRACK_KEY, this.trackId);
     const wasPlaying = this.enabled && !this.audio.paused;
@@ -111,16 +166,23 @@ export class BackgroundMusic {
   }
 
   private play(): void {
-    if (!this.unlocked) return;
+    if (embedded) {
+      this.silence();
+      return;
+    }
+    if (!this.unlocked || !this.enabled) return;
+    this.audio.muted = false;
+    this.audio.volume = MUSIC_VOLUME;
     void this.audio.play().catch(() => {});
   }
 
-  private pause(): void {
-    this.audio.pause();
-  }
-
   private renderControls(): void {
-    if (this.toggleBtn) this.toggleBtn.textContent = this.enabled ? "🔊 Музыка включена" : "🔇 Музыка выключена";
+    if (this.toggleBtn) {
+      this.toggleBtn.textContent = this.enabled ? "🎵 Музыка включена" : "🎵 Музыка выключена";
+    }
+    if (this.sfxBtn) {
+      this.sfxBtn.textContent = this.sfxOn ? "🔊 Звук включен" : "🔇 Звук выключен";
+    }
     if (this.dropdownLabel) this.dropdownLabel.textContent = this.currentTrack().label;
     this.dropdownMenu?.querySelectorAll<HTMLElement>(".hud-dropdown-option").forEach((option) => {
       const selected = option.dataset.trackId === this.trackId;
@@ -142,3 +204,5 @@ export class BackgroundMusic {
     return TRACKS.some((track) => track.id === trackId) ? trackId : TRACKS[0].id;
   }
 }
+
+export const backgroundMusic = new BackgroundMusic();

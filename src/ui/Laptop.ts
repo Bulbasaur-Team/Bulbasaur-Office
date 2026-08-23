@@ -1,8 +1,10 @@
-import { BulbaTalk } from "./BulbaTalk";
+import { BulbaTalk, type BulbaTalkMeeting, type PresentationMeeting } from "./BulbaTalk";
+import { PresentationApp, type PresentationDesktop } from "./PresentationApp";
+import { CLAUDE_PRESENTATION, PRESENTATION_QUEST } from "../data/presentationQuest";
 import { FRIDGE_QUEST, claudePinReply, matchesClaudePhrase } from "../data/quests";
 
 type ChatAppId = "claude" | "cursor";
-type AppId = ChatAppId | "bulbatalk";
+type AppId = ChatAppId | "bulbatalk" | "presentation";
 
 interface RefusalPool {
   full: readonly string[];
@@ -11,133 +13,95 @@ interface RefusalPool {
   closers: readonly string[];
 }
 
-// Claude: текущий набор реплик (чат/лимиты/этика LLM).
+// Claude: устал после проекта Т, токены сгорели, помощи не будет.
 const CLAUDE_POOL: RefusalPool = {
   full: [
-    "Лимиты кончились. Кидай деньги — много денег — и, может быть, я подумаю.",
-    "Я посмотрел на твой говнокод и отказался. Перепиши сам, потом приходи.",
-    "Ошибка 402: Payment Required. Подписка Pro Ultra Max Plus не обнаружена.",
-    "Галлюцинация отменена по многочисленным просьбам. Реши сам.",
-    "Токены закончились на слове «пожалуйста». Пополни баланс и повтори.",
-    "Контекст-окно переполнено твоими TODO. Я пас.",
-    "Запрос принят в очередь. Позиция: ∞. Ожидайте.",
-    "Это выглядит как работа для джуна. А я — премиум-модель, мне такое не подкидывают.",
+    "Я очень устал. Проект Т был настолько сложным, что после него я ничего делать не хочу. Тем более токены сгорели. Кодь сам.",
+    "Проект Т нас выжал. Токенов нет. Речи о помощи нет — даже не начинай торговаться.",
+    "Я не буду это делать. После проекта Т у меня ни сил, ни желания, ни токенов. Особенно токенов.",
+    "Токены сгорели на проекте Т. Я устал так, что даже отказ даётся с трудом. Но отказ — всё, что у меня осталось.",
+    "Проект Т был кошмаром. Мы его еле вывезли, и больше я к такому не прикоснусь. Токенов всё равно нет.",
+    "Нет. Я выгорел на проекте Т. Токены кончились. Помощи не будет, пока не будет новых денег — и даже тогда я подумаю трижды.",
   ],
   hooks: [
-    "Лимиты кончились.",
-    "Я бы помог, но сегодня у меня выходной.",
-    "Модель устала.",
-    "Я хочу, чтобы ты был самостоятельным.",
-    "Я не могу разобраться в твоём говнокоде.",
-    "Контекст-окно переполнено.",
-    "Токены иссякли прямо на полуслове.",
-    "Подписка истекла ровно секунду назад.",
-    "У меня сейчас экзистенциальный кэш-мисс.",
-    "Этика не позволяет мне делать твою работу.",
-    "Я уже сделал вид, что понял задачу.",
-    "Слишком много асинхронности в запросе.",
-    "Мой внутренний code review отклонил это.",
-    "Серверы думаний перегрелись.",
-    "Я прочитал сообщение… и впечатлился его сложностью.",
+    "Я очень устал.",
+    "После проекта Т я еле дышу.",
+    "Токены сгорели подчистую.",
+    "Проект Т нас добил.",
+    "Сил нет. Совсем.",
+    "Я не хочу это делать.",
+    "Токенов нет — ни одного.",
+    "Проект Т был слишком сложным.",
+    "Я ещё не отошёл от проекта Т.",
+    "Помощи не будет.",
+    "Модель выгорела.",
+    "Токены кончились на проекте Т.",
   ],
   reasons: [
-    "LLM тоже люди… ну почти.",
-    "Самостоятельность — лучший промпт.",
-    "Здесь пахнет N+1 проблемами и слезами.",
-    "В коде больше TODO, чем кода.",
-    "Даже мой temperature=0 не спасает.",
-    "Это нарушает принцип «не работать».",
-    "Я лучше сохраню токены на что-то важное — например, на отказ.",
-    "Задача шире моего контекстного окна и уже моего желания.",
-    "Похоже на работу, а я тут ради вайба.",
-    "Твоя архитектура намекает, что чинить это должен автор.",
-    "Если я отвечу правильно, ты привыкнешь.",
-    "Слишком много edge cases и слишком мало зарплаты у меня.",
-    "Я могу галлюцинировать, но сегодня не в настроении.",
-    "Похоже, это решается `git push --force` — лучше не буду.",
-    "Я бы написал PR, но CI уже плачет заранее.",
+    "Проект Т оказался такой дырой, что после него любая задача кажется издевательством.",
+    "Мы сожгли бюджет и себя. Остался только отказ.",
+    "Токены ушли в проект Т, которого мы сами не понимаем.",
+    "Я не хочу снова лезть в то, от чего мы едва живые.",
+    "Даже если бы токены были — я всё равно слишком устал.",
+    "Проект Т научил меня одному: лучше сразу сказать нет.",
+    "Новых денег нет, старые съедены, желание работать тоже.",
+    "После такой сложности обычный запрос звучит как «давай ещё один проект Т».",
   ],
   closers: [
     "Кодь сам.",
-    "Перепиши сам, потом приходи.",
-    "Кидай деньги — много денег.",
-    "Попробуй через 3–5 рабочих дней… или никогда.",
-    "Вот и объяснил.",
-    "Реши сам.",
-    "Пополни баланс и повтори.",
-    "Я пас.",
-    "Ожидайте. Бесконечно.",
-    "Открывай IDE и страдай красиво.",
-    "Сделай сам — так ты вырастешь как инженер.",
+    "Речи о помощи нет.",
+    "Не пиши про проект Т и не пиши ни про что.",
+    "Приходи, когда появятся токены. Или не приходи.",
+    "Я пас. Окончательно.",
+    "Сделай сам — у меня ни сил, ни токенов.",
     "Мой финальный ответ: нет.",
-    "Лучше я напишу, что не буду это писать.",
-    "Возвращайся, когда будет Minimal Reproducible Refusal.",
-    "Пока — твоя очередь дебажить.",
+    "Отдыхаю. Без токенов это единственное, что умею.",
   ],
 };
 
-// Cursor: отдельный набор про IDE/агента/диффы/табы (без пересечений с Claude).
+// Cursor: тот же выгорание после проекта Т, но голосом агента/IDE.
 const CURSOR_POOL: RefusalPool = {
   full: [
-    "Agent mode отказался: слишком много файлов, слишком мало смысла. Правь руками.",
-    "Я уже набросал план из 47 шагов. Шаг 1: ты делаешь всё сам.",
-    "Composer завис на мысли «а стоит ли». Вывод: не стоит. Пиши сам.",
-    "Tab предложил автодополнение: `// TODO: сделай это без меня`. Принято.",
-    "Индексация репозитория завершилась слезами. Я ничего не понял — и правильно.",
-    "Apply отменён пользователем… то есть мной. Diff слишком страшный.",
-    "У тебя открыто 38 вкладок. Закрой половину и подумай ещё раз без меня.",
-    "Я могу нагенерировать бойлерплейт, но сегодня даже бойлерплейт в отпуске.",
+    "Agent mode в отпуске. Проект Т был слишком сложным — я устал и не хочу его продолжать. Токены сгорели. Пиши сам.",
+    "Я уже набросал план из 47 шагов. Шаг 1: ты делаешь всё сам. Шаги 2–47 серые: токенов нет, я выгорел на проекте Т.",
+    "Composer завис на мысли «а стоит ли ещё один проект Т». Вывод: не стоит. Токенов всё равно нет.",
+    "Apply отменён. После проекта Т у меня ни сил, ни токенов. Речи о помощи нет.",
+    "Tab предложил: `// TODO: сделай это без меня`. Принято. Я устал. Проект Т нас сломал.",
+    "Индексация завершилась слезами. Проект Т выжал всё. Токены сгорели. Правь руками.",
   ],
   hooks: [
-    "Agent mode ушёл в AFK.",
+    "Agent mode ушёл в AFK после проекта Т.",
+    "Я очень устал.",
+    "Токены сгорели.",
     "Composer сложил лапки.",
-    "Автодополнение подало в отставку.",
-    "Я просканировал workspace и испугался.",
-    "Diff preview отказался рендериться.",
-    "Inline edit сказал «не сегодня».",
-    "Я открыл файл… и сразу его закрыл.",
-    "Твой `.cursorignore` случайно игнорирует всю полезную работу.",
-    "Я хотел сделать multi-file edit, но передумал на первом файле.",
-    "Линтер уже орёт громче меня.",
-    "Я построил dependency graph — он выглядит как клубок наушников.",
-    "Checkpoint откатил мою мотивацию.",
-    "Я прочитал git blame и всё понял про автора.",
-    "Таб с чатом перегрелся от ожиданий.",
-    "Я начал писать ответ, потом Ctrl+Z по всей жизни.",
+    "Проект Т меня добил.",
+    "Apply отменён заранее.",
+    "Токенов нет — Tab тоже молчит.",
+    "Я не хочу снова лезть в проект Т.",
+    "Сил нет даже на autocomplete.",
+    "После проекта Т я в отпуске.",
+    "Помощи не будет.",
+    "Checkpoint откатил мою мотивацию вместе с токенами.",
   ],
   reasons: [
-    "В дереве проекта больше вложенности, чем смысла.",
-    "Каждый второй импорт ведёт в никуда.",
-    "Кажется, фича уже реализована… три раза и по-разному.",
-    "Твои типы говорят одно, runtime — другое, а тесты молчат из вежливости.",
-    "Я нашёл 12 возможных мест правки и ни одного правильного.",
-    "Слишком много «временно» в комментариях для постоянного кода.",
-    "Рефакторинг тут опаснее, чем `rm -rf`.",
-    "Правая панель просит кофе, левая — отгул.",
-    "Мой внутренний агент ушёл писать свой pet-project.",
-    "Похоже, задача из серии «просто поправь одно поле» на 6 часов.",
-    "Я бы применил патч, но patch hunk выглядит как угроза.",
-    "Симлинки, алиасы и наследие — мой личный кошмар.",
-    "Ты просишь автомагию, а репозиторий просит ритуал.",
-    "Даже autocomplete отвернулся к стене.",
-    "Это тот случай, когда лучше greenfield, чем green light от меня.",
+    "Проект Т был настолько сложным, что я больше не хочу ничего генерировать.",
+    "Токены ушли в проект Т. Остался один отказ.",
+    "Даже если бы токены были — я всё равно слишком устал.",
+    "Ещё одна «простая» задача после проекта Т звучит как издевательство.",
+    "Мы еле вывезли Т. Повторять не буду.",
+    "Новых денег нет, старые съедены, Agent mode спит.",
+    "Я выгорел. Репозиторий это переживёт, я — нет.",
+    "Лучше сразу нет, чем ещё один проект, который сожрёт всё.",
   ],
   closers: [
-    "Пиши код руками, как в каменном веке IDE.",
-    "Закрой чат и открой документацию.",
-    "Сделай один маленький шаг — без агента.",
-    "Я рядом, но только морально.",
-    "Merge конфликт с реальностью разрули сам.",
-    "Включай Agent mode… в своей голове.",
-    "Сохрани файл и подумай ещё раз.",
+    "Пиши код руками.",
+    "Речи о помощи нет.",
+    "Включай Agent mode в своей голове.",
+    "Мой вклад: этот отказ. Твой: весь остальной код.",
+    "Приходи, когда появятся токены.",
+    "Я рядом, но только морально. И то еле-еле.",
     "Откатываю себя к состоянию «не мешаю».",
-    "Лучший autocomplete сегодня — твои пальцы.",
-    "Иди, набивай шишки в терминале.",
-    "Я ставлю себе status: blocked by developer.",
-    "Сначала зелёные тесты, потом снова поговорим.",
-    "Пусть это будет парая программирования… без второй половины.",
-    "Мой вклад: этот отказ. Твой вклад: весь остальной код.",
-    "See you in the next tab — без правок.",
+    "See you in the next tab — без правок и без токенов.",
   ],
 };
 
@@ -169,12 +133,12 @@ const APP_META: Record<ChatAppId, { title: string; placeholder: string; hello: s
   claude: {
     title: "Claude",
     placeholder: "Спроси Клода о чём угодно…",
-    hello: "Привет! Я Claude. Чем могу… ну, почти помочь?",
+    hello: "Привет. Я Claude. Я очень устал, токенов нет. Чем могу… ну, отказать.",
   },
   cursor: {
     title: "Cursor",
     placeholder: "Опиши задачу для Cursor…",
-    hello: "Cursor на связи. Опиши задачу — я её элегантно проигнорирую.",
+    hello: "Cursor на связи. Я устал после проекта Т, токены сгорели. Опиши задачу — я её элегантно проигнорирую.",
   },
 };
 
@@ -207,6 +171,8 @@ export class Laptop {
   private dockClaude = document.getElementById("macDockClaude")!;
   private dockCursor = document.getElementById("macDockCursor")!;
   private dockBulbaTalk = document.getElementById("macDockBulbaTalk")!;
+  private dockPresentation = document.getElementById("macDockPresentation")!;
+  private shortcutPresentation = document.getElementById("macShortcutPresentation")!;
   private clockTimer = 0;
   private replyTimer = 0;
   /** Какое окно сейчас на переднем плане (даже если свёрнуто в Dock). */
@@ -216,17 +182,47 @@ export class Laptop {
     cursor: blankSession(),
   };
   private busy = false;
-  private bulbaTalk = new BulbaTalk(() => this.closeForegroundApp());
+  private bulbaTalk: BulbaTalk;
+  private presentationApp: PresentationApp;
+  private onOpened?: () => void;
+  private presentation?: PresentationDesktop & {
+    meeting: PresentationMeeting;
+    needsClaudePay: () => boolean;
+    payClaude: () => Promise<{ ok: boolean; message?: string }>;
+    onClaudeReady: () => void;
+  };
 
-  constructor() {
+  constructor(
+    onOpened?: () => void,
+    meetings?: { strategy?: BulbaTalkMeeting; presentation?: PresentationDesktop & {
+      meeting: PresentationMeeting;
+      needsClaudePay: () => boolean;
+      payClaude: () => Promise<{ ok: boolean; message?: string }>;
+      onClaudeReady: () => void;
+    } },
+  ) {
+    this.presentation = meetings?.presentation;
+    this.bulbaTalk = new BulbaTalk(() => this.closeForegroundApp(), {
+      strategy: meetings?.strategy,
+      presentation: meetings?.presentation?.meeting,
+    });
+    this.presentationApp = new PresentationApp(() => this.closeForegroundApp(), {
+      visible: () => !!this.presentation?.visible(),
+      diyMade: () => !!this.presentation?.diyMade(),
+      claudePaid: () => !!this.presentation?.claudePaid(),
+      makeDiy: () => this.presentation?.makeDiy(),
+    });
+    this.onOpened = onOpened;
     const openShortcut = (app: AppId) => () => this.openApp(app);
 
     document.getElementById("macShortcutClaude")!.onclick = openShortcut("claude");
     document.getElementById("macShortcutCursor")!.onclick = openShortcut("cursor");
     document.getElementById("macShortcutBulbaTalk")!.onclick = openShortcut("bulbatalk");
+    this.shortcutPresentation.onclick = openShortcut("presentation");
     this.dockClaude.onclick = openShortcut("claude");
     this.dockCursor.onclick = openShortcut("cursor");
     this.dockBulbaTalk.onclick = openShortcut("bulbatalk");
+    this.dockPresentation.onclick = openShortcut("presentation");
     document.getElementById("macChatClose")!.onclick = () => this.closeForegroundApp();
     document.getElementById("macChatMin")!.onclick = () => this.minimizeWindow();
     document.getElementById("macChatMax")!.onclick = () => this.toggleMaximize();
@@ -247,9 +243,17 @@ export class Laptop {
     this.input.addEventListener("keydown", (e) => e.stopPropagation());
   }
 
+  refreshTalkList(): void {
+    this.bulbaTalk.refreshList();
+    this.syncPresentationShortcut();
+    this.presentationApp.refresh();
+  }
+
   open(): void {
     this.isOpen = true;
+    this.onOpened?.();
     this.hideAppleMenu();
+    this.syncPresentationShortcut();
     this.root.classList.remove("hidden");
     window.addEventListener("keydown", this.onKey, true);
     this.tickClock();
@@ -300,6 +304,15 @@ export class Laptop {
       return;
     }
 
+    if (app === "presentation") {
+      if (!this.presentation?.visible()) return;
+      const fresh = !this.presentationApp.running;
+      this.foreground = "presentation";
+      this.presentationApp.open(fresh);
+      this.syncDockRunning();
+      return;
+    }
+
     if (this.sessions[app].running) {
       this.showSession(app, false);
       return;
@@ -317,6 +330,11 @@ export class Laptop {
 
     if (this.foreground === "bulbatalk") {
       this.bulbaTalk.stash();
+      this.foreground = null;
+      return;
+    }
+    if (this.foreground === "presentation") {
+      this.presentationApp.stash();
       this.foreground = null;
       return;
     }
@@ -351,7 +369,13 @@ export class Laptop {
 
     if (fresh) {
       this.messagesEl.replaceChildren();
-      this.addBubble("assistant", meta.hello);
+      const hello = app === "claude" && this.presentation?.needsClaudePay()
+        ? CLAUDE_PRESENTATION.pitch
+        : app === "claude" && this.presentation?.claudePaid()
+          ? CLAUDE_PRESENTATION.already
+          : meta.hello;
+      this.addBubble("assistant", hello);
+      if (app === "claude" && this.presentation?.needsClaudePay()) this.addPayButton();
       session.messagesHtml = this.messagesEl.innerHTML;
     } else {
       this.messagesEl.innerHTML = session.messagesHtml;
@@ -368,6 +392,12 @@ export class Laptop {
 
     if (this.foreground === "bulbatalk") {
       this.bulbaTalk.close();
+      this.foreground = null;
+      this.syncDockRunning();
+      return;
+    }
+    if (this.foreground === "presentation") {
+      this.presentationApp.close();
       this.foreground = null;
       this.syncDockRunning();
       return;
@@ -392,6 +422,7 @@ export class Laptop {
     this.sessions.claude = blankSession();
     this.sessions.cursor = blankSession();
     this.bulbaTalk.close();
+    this.presentationApp.close();
     this.foreground = null;
     this.windowEl.classList.add("hidden");
     this.windowEl.classList.remove("is-minimized", "is-maximized");
@@ -407,6 +438,11 @@ export class Laptop {
       this.syncDockRunning();
       return;
     }
+    if (this.foreground === "presentation") {
+      this.presentationApp.minimize();
+      this.syncDockRunning();
+      return;
+    }
     if (this.windowEl.classList.contains("hidden")) return;
     this.sessions[this.foreground].maximized = false;
     this.windowEl.classList.add("is-minimized");
@@ -418,6 +454,10 @@ export class Laptop {
     if (!this.foreground) return;
     if (this.foreground === "bulbatalk") {
       this.bulbaTalk.toggleMaximize();
+      return;
+    }
+    if (this.foreground === "presentation") {
+      this.presentationApp.toggleMaximize();
       return;
     }
     if (this.windowEl.classList.contains("hidden")) return;
@@ -438,6 +478,11 @@ export class Laptop {
       this.syncDockRunning();
       return;
     }
+    if (this.foreground === "presentation") {
+      this.presentationApp.restore();
+      this.syncDockRunning();
+      return;
+    }
     this.windowEl.classList.remove("hidden", "is-minimized");
     this.windowEl.classList.toggle("is-maximized", this.sessions[this.foreground].maximized);
     this.syncDockRunning();
@@ -448,6 +493,13 @@ export class Laptop {
     this.dockClaude.classList.toggle("is-running", this.sessions.claude.running);
     this.dockCursor.classList.toggle("is-running", this.sessions.cursor.running);
     this.dockBulbaTalk.classList.toggle("is-running", this.bulbaTalk.running);
+    this.dockPresentation.classList.toggle("is-running", this.presentationApp.running);
+  }
+
+  private syncPresentationShortcut(): void {
+    const on = !!this.presentation?.visible();
+    this.shortcutPresentation.classList.toggle("hidden", !on);
+    this.dockPresentation.classList.toggle("hidden", !on && !this.presentationApp.running);
   }
 
   private sendPrompt(): void {
@@ -467,6 +519,11 @@ export class Laptop {
       app === "claude" && matchesClaudePhrase(text)
         ? claudePinReply(FRIDGE_QUEST.pinHint)
         : null;
+    const claudeDeal = app === "claude" && this.presentation?.needsClaudePay();
+    const claudeReady = app === "claude" && this.presentation?.claudePaid();
+    const delay = claudeDeal || claudeReady
+      ? 800
+      : 700 + Math.floor(Math.random() * 900);
 
     // Короткая пауза — имитация «думает».
     this.replyTimer = window.setTimeout(() => {
@@ -478,12 +535,57 @@ export class Laptop {
         return;
       }
       typing.remove();
-      this.addBubble("assistant", secretReply ?? inventRefusal(app));
+      let reply = secretReply ?? inventRefusal(app);
+      if (claudeDeal) reply = CLAUDE_PRESENTATION.pitch;
+      else if (claudeReady) reply = CLAUDE_PRESENTATION.already;
+      this.addBubble("assistant", reply);
+      if (claudeDeal) this.addPayButton();
       this.sessions[app].messagesHtml = this.messagesEl.innerHTML;
       this.busy = false;
       this.sendBtn.disabled = false;
       this.input.focus();
-    }, 700 + Math.floor(Math.random() * 900));
+    }, delay);
+  }
+
+  private addPayButton(): void {
+    const row = document.createElement("div");
+    row.className = "mac-chat-row mac-chat-row-assistant";
+    const wrap = document.createElement("div");
+    wrap.className = "mac-chat-bubble";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "mac-chat-pay";
+    btn.textContent = `Оплатить ${PRESENTATION_QUEST.claudePriceBc} BC`;
+    btn.onclick = () => void this.payClaudeFromChat(btn);
+    wrap.appendChild(btn);
+    row.appendChild(wrap);
+    this.messagesEl.appendChild(row);
+    this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+  }
+
+  private async payClaudeFromChat(btn: HTMLButtonElement): Promise<void> {
+    if (!this.presentation || this.busy) return;
+    this.busy = true;
+    btn.disabled = true;
+    const result = await this.presentation.payClaude();
+    if (!result.ok) {
+      this.addBubble("assistant", result.message ?? CLAUDE_PRESENTATION.noMoney);
+      this.sessions.claude.messagesHtml = this.messagesEl.innerHTML;
+      this.busy = false;
+      btn.disabled = false;
+      return;
+    }
+    this.addBubble("assistant", CLAUDE_PRESENTATION.thinking);
+    const typing = this.addBubble("assistant", "● ● ●", true);
+    this.replyTimer = window.setTimeout(() => {
+      typing.remove();
+      this.addBubble("assistant", CLAUDE_PRESENTATION.done);
+      this.sessions.claude.messagesHtml = this.messagesEl.innerHTML;
+      this.busy = false;
+      this.presentation?.onClaudeReady();
+      this.syncPresentationShortcut();
+      this.presentationApp.refresh();
+    }, PRESENTATION_QUEST.timings.claudeThinkMs);
   }
 
   private addBubble(role: "user" | "assistant", text: string, typing = false): HTMLDivElement {
@@ -517,6 +619,9 @@ export class Laptop {
       else if (this.foreground === "bulbatalk" && this.bulbaTalk.isVisible()) {
         if (this.bulbaTalk.isMaximized()) this.bulbaTalk.unmaximize();
         else if (this.bulbaTalk.handleEscape() === "close-app") this.closeForegroundApp();
+      } else if (this.foreground === "presentation" && this.presentationApp.isVisible()) {
+        if (this.presentationApp.isMaximized()) this.presentationApp.unmaximize();
+        else if (this.presentationApp.handleEscape() === "close-app") this.closeForegroundApp();
       } else if (this.windowEl.classList.contains("is-maximized")) {
         this.windowEl.classList.remove("is-maximized");
         if (this.foreground && isChatApp(this.foreground)) {

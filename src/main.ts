@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { BootScene } from "./scenes/BootScene";
 import { WorldScene } from "./scenes/WorldScene";
-import { BackgroundMusic } from "./ui/BackgroundMusic";
+import { backgroundMusic } from "./ui/BackgroundMusic";
 import { isTouch } from "./ui/TouchControls";
 import { initOrientation, onStageChange, screenToStage, stage } from "./ui/orientation";
 
@@ -10,7 +10,7 @@ const GH = 768;
 const touch = isTouch();
 
 initOrientation();
-new BackgroundMusic().install();
+backgroundMusic.install();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#06111c"/><stop offset="0.55" stop-color="#0a1b2b"/><stop offset="1" stop-color="#10263a"/>
+    </linearGradient>
+    <linearGradient id="mint" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#38f2cf"/><stop offset="1" stop-color="#7effa5"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffd76a"/><stop offset="1" stop-color="#ff8a4c"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffffff" stop-opacity=".16"/><stop offset="1" stop-color="#ffffff" stop-opacity=".035"/>
+    </linearGradient>
+    <radialGradient id="glow"><stop stop-color="#38f2cf" stop-opacity=".35"/><stop offset="1" stop-color="#38f2cf" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
+      <path d="M42 0H0V42" fill="none" stroke="#8eb5c9" stroke-opacity=".07"/>
+    </pattern>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="16" stdDeviation="17" flood-color="#000" flood-opacity=".35"/>
+    </filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="12"/></filter>
+    <filter id="photo"><feColorMatrix values="0.96 0 0 0 0  0 1.02 0 0 0  0 0 1.08 0 0  0 0 0 1 0"/></filter>
+  </defs>
+  <rect width="960" height="540" fill="url(#night)"/>
+  <rect width="960" height="540" fill="url(#grid)" opacity="1"/>
+  <circle cx="866" cy="76" r="230" fill="#38f2cf" opacity=".08"/>
+  <text x="48" y="52" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="900" letter-spacing="2.4" fill="#38f2cf">06  /  ТЕХНОЛОГИЯ</text>
+  <text x="48" y="108" font-family="Inter,Arial,sans-serif" font-size="42" font-weight="850" letter-spacing="-1.2" fill="#f8f4e9">Сделали нейросети</text>
+  <rect x="48" y="130" width="72" height="5" rx="3" fill="#38f2cf"/>
+  <g style="--ink:#f8f4e9;--muted:#91a9b9;--accent:#38f2cf">
+  <g transform="translate(48 163)">
+    <rect width="864" height="277" rx="32" fill="url(#glass)" stroke="#fff" stroke-opacity=".1"/>
+    <g stroke="#38f2cf" stroke-opacity=".35" stroke-width="2">
+      <path d="M104 78L312 138L474 62L640 142L784 76M104 202L312 138L474 220L640 142L784 202M312 138L474 62M474 220L640 142"/>
+    </g>
+    <g fill="#112c3d" stroke="#38f2cf">
+      <circle cx="104" cy="78" r="28"/><circle cx="104" cy="202" r="28"/><circle cx="312" cy="138" r="36"/>
+      <circle cx="640" cy="142" r="36"/><circle cx="784" cy="76" r="28"/><circle cx="784" cy="202" r="28"/>
+    </g>
+    <circle cx="474" cy="141" r="82" fill="url(#glow)"/>
+    <circle cx="474" cy="141" r="62" fill="url(#mint)" filter="url(#shadow)"/>
+    <text x="474" y="132" text-anchor="middle" font-family="Inter,Arial" font-size="12" font-weight="900" letter-spacing="2" fill="#08202b">ПРОЕКТ</text>
+    <text x="474" y="170" text-anchor="middle" font-family="Inter,Arial" font-size="38" font-weight="950" fill="#08202b">T</text>
+    <text x="312" y="145" text-anchor="middle" font-family="Inter,Arial" font-size="15" font-weight="900" fill="#f8f4e9">CLAUDE</text>
+    <text x="640" y="149" text-anchor="middle" font-family="Inter,Arial" font-size="15" font-weight="900" fill="#f8f4e9">CURSOR</text>
+    <g fill="#91a9b9" font-family="Inter,Arial" font-size="11" font-weight="850" text-anchor="middle">
+      <text x="104" y="82">ROUTE</text><text x="104" y="206">TIME</text><text x="784" y="80">CARGO</text><text x="784" y="206">HUB</text>
+    </g>
+  </g>
+  <text x="48" y="470" font-family="Inter,Arial" font-size="22" font-weight="750" fill="#f8f4e9">Сложная задача. Модели с ней справились.</text></g>
+
+  <text x="48" y="512" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="800" letter-spacing="2.2" fill="#91a9b9">BULBA OFFICE  /  ДЕНЬ X</text>
+  <rect x="745" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="762" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="779" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="796" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="813" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="830" y="505" width="24" height="5" rx="3" fill="#38f2cf" opacity="1"/><rect x="847" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="864" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="881" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="898" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/>
+</svg>
