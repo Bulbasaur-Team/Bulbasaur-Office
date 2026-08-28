@@ -124,7 +124,7 @@ const THOUGHT_INTERVAL_JITTER_MS = 5000; // случайная добавка к
 const THOUGHT_PROBABILITY = 0.1;         // вероятность появления мысли при очередной проверке
 
 const DEPTH = {
-  // Подсказки «Пробел / Enter» — поверх всего мира (фон, персонажи, overlay, облачка).
+  // Подсказки у объектов — поверх всего мира (фон, персонажи, overlay, облачка).
   prompt: 10_000_000,
   player: 1_000_001,
   doorOverlay: 2_000_000,
@@ -244,6 +244,7 @@ export class WorldScene extends Phaser.Scene {
   private chatInput = document.getElementById("chatInput") as HTMLInputElement;
   private emoteBar = document.getElementById("emoteBar") as HTMLDivElement;
   private emoteBarBuilt = false;
+  private emoteListEl: HTMLDivElement | null = null;
   private currentExit: ExitDef | null = null;
   private wotdBoardSnap = new Map<string, api.Leaderboard>();
 
@@ -784,6 +785,7 @@ export class WorldScene extends Phaser.Scene {
     hudPanel.classList.remove("hidden");
     // На ПК меню сразу развёрнуто; на тач-устройствах — свёрнуто, чтобы не занимать экран.
     if (!isTouch()) hudPanel.open = true;
+    this.syncHudPanel();
     if (!this.multiplayer) void this.storyIntro.showIfNeeded();
   }
 
@@ -890,22 +892,71 @@ export class WorldScene extends Phaser.Scene {
     void this.quest.start();
   }
 
-  // Панель реакций (мультиплеер): строим один раз из EMOTES, потом показываем.
+  // Панель реакций (мультиплеер): одна кнопка, список раскрывается вверх.
   private showEmoteBar(): void {
     if (!this.emoteBarBuilt) {
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "emote-toggle";
+      toggle.textContent = "😊";
+      toggle.setAttribute("aria-label", "реакции");
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.onclick = (e) => {
+        e.stopPropagation();
+        const willOpen = list.classList.contains("hidden");
+        list.classList.toggle("hidden", !willOpen);
+        toggle.setAttribute("aria-expanded", willOpen ? "true" : "false");
+      };
+
+      const list = document.createElement("div");
+      list.className = "emote-list hidden";
       for (const e of EMOTES) {
         const btn = document.createElement("button");
+        btn.type = "button";
         btn.textContent = e.emoji;
         btn.title = e.title;
         btn.onclick = () => {
           this.sendEmote(e.code);
-          btn.blur(); // чтобы Space/Enter не «нажимали» кнопку повторно и уходили в мир
+          btn.blur();
+          list.classList.add("hidden");
+          toggle.setAttribute("aria-expanded", "false");
         };
-        this.emoteBar.appendChild(btn);
+        list.appendChild(btn);
       }
+      this.emoteBar.append(toggle, list);
+      this.emoteListEl = list;
       this.emoteBarBuilt = true;
+      document.addEventListener("pointerdown", (ev) => {
+        if (!this.emoteBar.contains(ev.target as Node)) this.closeEmoteList();
+      });
     }
-    this.emoteBar.classList.remove("hidden");
+    this.syncEmoteBar();
+  }
+
+  private closeEmoteList(): void {
+    this.emoteListEl?.classList.add("hidden");
+    this.emoteBar.querySelector(".emote-toggle")?.setAttribute("aria-expanded", "false");
+  }
+
+  private syncEmoteBar(): void {
+    if (!this.multiplayer) {
+      this.emoteBar.classList.add("hidden");
+      this.closeEmoteList();
+      return;
+    }
+    const hide = LOCATIONS[this.locIndex]?.id === "day-x-hall";
+    this.emoteBar.classList.toggle("hidden", hide);
+    if (hide) this.closeEmoteList();
+  }
+
+  /** В зале Дня X overlay перекрывает шапку HUD — прячем меню целиком. */
+  private syncHudPanel(): void {
+    if (!this.started || embedded) return;
+    const hud = document.getElementById("hudPanel") as HTMLDetailsElement | null;
+    if (!hud) return;
+    const hide = LOCATIONS[this.locIndex]?.id === "day-x-hall";
+    hud.classList.toggle("hidden", hide);
+    if (hide) hud.open = false;
   }
 
   private sendEmote(code: string): void {
@@ -1019,6 +1070,10 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private refreshStoryHint(): void {
+    if (LOCATIONS[this.locIndex]?.id === "day-x-hall") {
+      this.storyHint.hide();
+      return;
+    }
     void this.storyHint.refresh(this.quest.storyHintProgress());
   }
 
@@ -1234,6 +1289,9 @@ export class WorldScene extends Phaser.Scene {
       if (p) this.player.setPosition(p.x, p.y);
     }
     this.syncBeachQuestNpc(cfg.id);
+    this.syncEmoteBar();
+    this.syncHudPanel();
+    this.refreshStoryHint();
   }
 
   // Открыта ли модалка, перехватывающая ввод (диалог, меню игры или окно игры).

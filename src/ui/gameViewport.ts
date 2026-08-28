@@ -28,6 +28,12 @@ export function gamePointToViewport(x: number, y: number, canvas: HTMLCanvasElem
   };
 }
 
+/** Игровые координаты → left/top внутри #stage (position:fixed от сцены на таче). */
+export function gamePointToStage(x: number, y: number, canvas: HTMLCanvasElement): { left: number; top: number } {
+  const p = gamePointToViewport(x, y, canvas);
+  return viewportToStage(p.left, p.top);
+}
+
 export function gameRectToViewport(
   r: { x: number; y: number; w: number; h: number },
   canvas: HTMLCanvasElement,
@@ -39,4 +45,14 @@ export function gameRectToViewport(
     width: r.w * vp.scaleX,
     height: r.h * vp.scaleY,
   };
+}
+
+/** Viewport → координаты внутри #stage (там position:fixed считается от сцены). */
+export function viewportToStage(left: number, top: number): { left: number; top: number } {
+  const stageEl = document.getElementById("stage");
+  if (!stageEl) return { left, top };
+  const cs = getComputedStyle(stageEl);
+  if (cs.display === "contents" || cs.transform === "none") return { left, top };
+  const r = stageEl.getBoundingClientRect();
+  return { left: left - r.left, top: top - r.top };
 }

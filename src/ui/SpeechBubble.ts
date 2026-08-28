@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { meowify } from "../data/bulbaCat";
 import { VOICES, type VoiceId } from "../data/voices";
 import { characterVoice, pauseAfterChar } from "./CharacterVoice";
-import { gamePointToViewport } from "./gameViewport";
+import { gamePointToStage, viewportToStage } from "./gameViewport";
 
 const CHAR_DELAY = 25;
 const TAIL_H = 12;
@@ -173,8 +173,9 @@ export class SpeechBubble {
 
   private positionTranslateBtn(): void {
     const box = this.root.getBoundingClientRect();
-    this.translateBtn.style.left = `${box.left + box.width / 2}px`;
-    this.translateBtn.style.top = `${box.top}px`;
+    const local = viewportToStage(box.left + box.width / 2, box.top);
+    this.translateBtn.style.left = `${local.left}px`;
+    this.translateBtn.style.top = `${local.top}px`;
   }
 
   private hideTranslateBtn(): void {
@@ -184,7 +185,7 @@ export class SpeechBubble {
   private place(x: number, y: number): void {
     const canvas = this.scene.game.canvas;
     if (!canvas) return;
-    const p = gamePointToViewport(x, y, canvas);
+    const p = gamePointToStage(x, y, canvas);
     this.root.style.left = `${p.left}px`;
     this.root.style.top = `${p.top}px`;
     this.root.style.transform = `translate(-50%, calc(-100% - ${TAIL_H}px))`;

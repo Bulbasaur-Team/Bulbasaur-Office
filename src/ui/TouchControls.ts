@@ -1,5 +1,3 @@
-import { screenToStage } from "./orientation";
-
 // Тач-управление для мобильных браузеров: виртуальный джойстик + кнопка действия
 // для мира и панель удержания кнопок для аркад. Показывается только на тач-устройствах.
 
@@ -18,7 +16,7 @@ export class Joystick {
   private knob = div("touch-joy-knob");
   private action = document.createElement("button");
   private pid: number | null = null;
-  private readonly radius = 52;
+  private readonly radius = 28;
   private readonly dead = 0.18; // мёртвая зона, чтобы лёгкое касание не двигало
 
   constructor() {
@@ -27,11 +25,9 @@ export class Joystick {
     this.action.className = "touch-action hidden";
     this.action.setAttribute("aria-label", "действие");
     this.action.textContent = "✦";
-    // Внутрь сцены, а не в body: джойстик должен поворачиваться вместе с миром,
-    // тогда «вправо» на экране = «вправо» в кадре без компенсации осей.
-    const stage = document.getElementById("stage")!;
-    stage.appendChild(this.wrap);
-    stage.appendChild(this.action);
+    // В body: сцена больше не крутится, контролы стоят в полях слева/справа от фона.
+    document.body.appendChild(this.wrap);
+    document.body.appendChild(this.action);
 
     this.base.addEventListener("pointerdown", this.onDown);
     this.base.addEventListener("pointermove", this.onMove);
@@ -75,7 +71,7 @@ export class Joystick {
     const cy = r.top + r.height / 2;
     // clientX/clientY экранные, а джойстик повёрнут вместе со сценой: переводим смещение
     // в координаты сцены — тогда и ручка едет за пальцем, и оси совпадают с осями мира.
-    const local = screenToStage(e.clientX - cx, e.clientY - cy);
+    const local = { x: e.clientX - cx, y: e.clientY - cy };
     let dx = local.x;
     let dy = local.y;
     const dist = Math.hypot(dx, dy);

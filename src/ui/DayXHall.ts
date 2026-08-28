@@ -18,9 +18,9 @@ import { dayXWardrobeComment } from "../data/dayXWardrobe";
 import { SLIDE_IDS, slideAsset, type SlideId } from "../data/presentationSlides";
 import { defaultAppearance, type PlayerAppearance } from "../data/wardrobe";
 import { isPunctuationOnly, typeText, typeWithVoice } from "./CharacterVoice";
-import { GAME_H, GAME_W, gamePointToViewport, gameRectToViewport, gameViewport } from "./gameViewport";
+import { GAME_H, GAME_W, gamePointToViewport, gameRectToViewport, gameViewport, viewportToStage } from "./gameViewport";
 import { publicPath } from "../publicPath";
-import { stage } from "./orientation";
+import { onStageChange } from "./orientation";
 import type { VoiceId } from "../data/voices";
 import type { KeyConsumer } from "./KeyboardRouter";
 import type { Rect } from "../scenes/LocationLoader";
@@ -154,6 +154,7 @@ export class DayXHall implements KeyConsumer {
     document.getElementById("dayXDesktopFolderBtn")!.onclick = () => this.openExplorer();
     document.getElementById("dayXDesktopRightInFolder")!.onclick = () => this.openDeck("right");
     document.getElementById("dayXExplorerClose")!.onclick = () => this.closeExplorer();
+    onStageChange(() => this.relayout());
   }
 
   isActive(): boolean {
@@ -506,8 +507,9 @@ export class DayXHall implements KeyConsumer {
     if (!canvas) return;
     const projector = this.opts?.projectorRect() ?? PROJECTOR_FALLBACK;
     const vp = gameRectToViewport(projector, canvas);
-    this.projectorEl.style.left = `${vp.left}px`;
-    this.projectorEl.style.top = `${vp.top}px`;
+    const local = viewportToStage(vp.left, vp.top);
+    this.projectorEl.style.left = `${local.left}px`;
+    this.projectorEl.style.top = `${local.top}px`;
     this.projectorEl.style.width = `${vp.width}px`;
     this.projectorEl.style.height = `${vp.height}px`;
     this.layoutBubbles(canvas);
@@ -517,8 +519,9 @@ export class DayXHall implements KeyConsumer {
     const canvas = document.getElementById("game")?.querySelector("canvas");
     if (!canvas) return;
     const vp = gameViewport(canvas);
-    this.overlayEl.style.left = `${vp.left}px`;
-    this.overlayEl.style.top = `${vp.top}px`;
+    const local = viewportToStage(vp.left, vp.top);
+    this.overlayEl.style.left = `${local.left}px`;
+    this.overlayEl.style.top = `${local.top}px`;
     this.overlayEl.style.width = `${vp.scaleX * GAME_W}px`;
     this.overlayEl.style.height = `${vp.scaleY * GAME_H}px`;
   }
@@ -527,8 +530,9 @@ export class DayXHall implements KeyConsumer {
     const canvas = document.getElementById("game")?.querySelector("canvas");
     if (!canvas || this.dialogueEl.classList.contains("hidden")) return;
     const vp = gameViewport(canvas);
-    this.dialogueEl.style.left = `${vp.left}px`;
-    this.dialogueEl.style.top = `${vp.top}px`;
+    const local = viewportToStage(vp.left, vp.top);
+    this.dialogueEl.style.left = `${local.left}px`;
+    this.dialogueEl.style.top = `${local.top}px`;
     this.dialogueEl.style.width = `${vp.scaleX * GAME_W}px`;
     this.dialogueEl.style.height = `${vp.scaleY * GAME_H}px`;
   }
@@ -537,8 +541,9 @@ export class DayXHall implements KeyConsumer {
     const canvas = document.getElementById("game")?.querySelector("canvas");
     if (!canvas || this.meterEl.classList.contains("hidden")) return;
     const vp = gameViewport(canvas);
-    this.meterEl.style.left = `${vp.left}px`;
-    this.meterEl.style.top = `${vp.top + 10}px`;
+    const local = viewportToStage(vp.left, vp.top);
+    this.meterEl.style.left = `${local.left}px`;
+    this.meterEl.style.top = `${local.top + 10}px`;
     this.meterEl.style.width = `${vp.scaleX * GAME_W}px`;
   }
 
@@ -585,8 +590,9 @@ export class DayXHall implements KeyConsumer {
       const pt = this.layout.bubbles[id];
       if (!pt) continue;
       const pos = gamePointToViewport(pt.x, pt.y, canvas);
-      el.style.left = `${pos.left}px`;
-      el.style.top = `${pos.top}px`;
+      const local = viewportToStage(pos.left, pos.top);
+      el.style.left = `${local.left}px`;
+      el.style.top = `${local.top}px`;
     }
   }
 
@@ -738,8 +744,9 @@ export class DayXHall implements KeyConsumer {
     const canvas = document.getElementById("game")?.querySelector("canvas");
     if (!canvas) return;
     const pos = gamePointToViewport(anchor.x, anchor.y, canvas);
-    bubble.style.left = `${pos.left}px`;
-    bubble.style.top = `${pos.top}px`;
+    const local = viewportToStage(pos.left, pos.top);
+    bubble.style.left = `${local.left}px`;
+    bubble.style.top = `${local.top}px`;
   }
 
   private hideChoices(): void {
@@ -783,8 +790,8 @@ export class DayXHall implements KeyConsumer {
   }
 
   private launchConfetti(): void {
-    const w = (this.confetti.width = stage.width);
-    const h = (this.confetti.height = stage.height);
+    const w = (this.confetti.width = window.innerWidth);
+    const h = (this.confetti.height = window.innerHeight);
     this.confettiParticles = [];
     const cx = w / 2;
     const cy = h * 0.38;
