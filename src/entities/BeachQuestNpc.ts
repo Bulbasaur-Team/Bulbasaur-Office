@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { PACKAGE_QUEST } from "../data/packageQuest";
 import { ITEM_TYPES } from "../data/items";
 import { spriteScale } from "./sprites";
-import { ITEM_TOP_DEPTH } from "./PhysicsItem";
+import { CARRY_DEPTH } from "./PhysicsItem";
 
 /**
  * Квестовый NPC на Вьетнамском пляже (только MP, lost_package).
@@ -44,7 +44,7 @@ export class BeachQuestNpc {
       this.held = scene.add
         .image(x, y + BeachQuestNpc.HELD_OFFSET_Y, def.texture)
         .setScale((def.radius * 2) / texW)
-        .setDepth(ITEM_TOP_DEPTH);
+        .setDepth(CARRY_DEPTH);
     }
   }
 

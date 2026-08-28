@@ -1,5 +1,6 @@
 import { BEACH_QUEST, DRIVER_QUEST, matchesPackageSecretCode } from "../data/packageQuest";
 import type { KeyConsumer } from "./KeyboardRouter";
+import { typeWithVoice } from "./CharacterVoice";
 
 const BUBBLE_CHAR_MS = Math.round(22 * 2.5);
 
@@ -16,17 +17,9 @@ export class DriverBubble {
   show(text: string): void {
     this.cancel?.();
     this.root.classList.remove("hidden");
-    let shown = 0;
-    this.textEl.textContent = "";
-    const timer = window.setInterval(() => {
-      shown++;
-      this.textEl.textContent = text.slice(0, shown);
-      if (shown >= text.length) {
-        window.clearInterval(timer);
-        this.cancel = null;
-      }
+    this.cancel = typeWithVoice(this.textEl, text, "driver", () => {
+      this.cancel = null;
     }, BUBBLE_CHAR_MS);
-    this.cancel = () => window.clearInterval(timer);
   }
 
   hide(): void {
@@ -99,10 +92,25 @@ export class DriverDialogue implements KeyConsumer {
   }
 
   private talkAboutPackage(): void {
-    const first = !this.handlers.driverBriefed();
-    const text = first ? DRIVER_QUEST.firstTalk : DRIVER_QUEST.alreadyTalked;
-    if (first) this.handlers.onBriefed();
-    this.handlers.onSay(text);
+    if (this.handlers.driverBriefed()) {
+      this.handlers.onSay(DRIVER_QUEST.alreadyTalked);
+      this.lines = [{ label: "Понятно", action: () => this.renderMenu() }];
+      this.index = 0;
+      this.renderOptions();
+      return;
+    }
+    this.handlers.onSay(DRIVER_QUEST.firstTalk);
+    this.lines = [
+      { label: DRIVER_QUEST.whereGoneLabel, action: () => this.afterFirstTalk() },
+      { label: DRIVER_QUEST.gotItLabel, action: () => this.afterFirstTalk() },
+    ];
+    this.index = 0;
+    this.renderOptions();
+  }
+
+  private afterFirstTalk(): void {
+    this.handlers.onBriefed();
+    this.handlers.onSay(DRIVER_QUEST.firstTalkFollowup);
     this.lines = [{ label: "Понятно", action: () => this.renderMenu() }];
     this.index = 0;
     this.renderOptions();
@@ -181,6 +189,9 @@ export class DriverDialogue implements KeyConsumer {
 
 interface BeachNpcDialogueHandlers {
   onSay: (text: string) => void;
+  /** Пароль уже принят (повтор после провала). */
+  codeAccepted: () => boolean;
+  onCodeAccepted: () => void;
   onCodeOk: () => void;
   onClose: () => void;
 }
@@ -203,7 +214,7 @@ export class BeachNpcDialogue implements KeyConsumer {
   private done = false;
 
   constructor(private handlers: BeachNpcDialogueHandlers) {
-    this.inputSubmit.onclick = () => this.submitCode();
+    this.inputSubmit.addEventListener("click", () => this.submitCode());
     this.input.addEventListener("keydown", (e) => {
       e.stopPropagation();
       if (e.key === "Enter") {
@@ -223,14 +234,34 @@ export class BeachNpcDialogue implements KeyConsumer {
     this.phase = "menu";
     this.hideInput();
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    this.handlers.onSay(BEACH_QUEST.greet);
+    if (this.handlers.codeAccepted()) {
+      this.showTakeReady();
+    } else {
+      this.handlers.onSay(BEACH_QUEST.greet);
+      this.lines = [
+        { label: BEACH_QUEST.askCodeLabel, action: () => this.openInput() },
+        { label: BEACH_QUEST.byeLabel, action: () => this.close() },
+      ];
+      this.index = 0;
+      this.renderOptions();
+    }
+    this.root.classList.remove("hidden");
+  }
+
+  private showTakeReady(): void {
+    this.done = true;
+    this.handlers.onSay(BEACH_QUEST.correct);
     this.lines = [
-      { label: BEACH_QUEST.askCodeLabel, action: () => this.openInput() },
-      { label: BEACH_QUEST.byeLabel, action: () => this.close() },
+      {
+        label: "Забрать посылку",
+        action: () => {
+          this.handlers.onCodeOk();
+          this.close();
+        },
+      },
     ];
     this.index = 0;
     this.renderOptions();
-    this.root.classList.remove("hidden");
   }
 
   close(): void {
@@ -265,19 +296,8 @@ export class BeachNpcDialogue implements KeyConsumer {
       this.renderOptions();
       return;
     }
-    this.done = true;
-    this.handlers.onSay(BEACH_QUEST.correct);
-    this.lines = [
-      {
-        label: "Забрать посылку",
-        action: () => {
-          this.handlers.onCodeOk();
-          this.close();
-        },
-      },
-    ];
-    this.index = 0;
-    this.renderOptions();
+    this.handlers.onCodeAccepted();
+    this.showTakeReady();
   }
 
   private hideInput(): void {

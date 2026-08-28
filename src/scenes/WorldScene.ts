@@ -39,6 +39,7 @@ import { BulbaCat } from "../entities/BulbaCat";
 import { BeachQuestNpc } from "../entities/BeachQuestNpc";
 import { BULBA_CAT } from "../data/bulbaCat";
 import { PACKAGE_QUEST, DRIVER_QUEST } from "../data/packageQuest";
+import { voiceForNpc, dayXPlayerVoice } from "../data/voices";
 import { LocationLoader, type Spawn, type Rect, type PlacedNpc } from "./LocationLoader";
 import { AuthGate } from "../ui/AuthGate";
 import { hideBootLoader } from "../ui/BootLoader";
@@ -51,7 +52,11 @@ import { BulbaCoins, BC_COIN_SRC } from "../ui/BulbaCoins";
 import { Wardrobe } from "../ui/Wardrobe";
 import { Ancestors } from "../ui/Ancestors";
 import { QuestController } from "../ui/QuestController";
+import { StoryHint } from "../ui/StoryHint";
+import { StoryIntro } from "../ui/StoryIntro";
 import { DriverDialogue, BeachNpcDialogue, DriverBubble } from "../ui/PackageNpcDialogues";
+import { PackagePeekModal } from "../ui/PackagePeekModal";
+import { DayXHall, dayXLayoutFromMap } from "../ui/DayXHall";
 import { Logs } from "../ui/Logs";
 import { Monitoring } from "../ui/Monitoring";
 import { Computer } from "../ui/Computer";
@@ -166,6 +171,7 @@ export class WorldScene extends Phaser.Scene {
   private leaderboard!: Leaderboard;
   private achievements!: Achievements;
   private achievementPopup!: AchievementPopup;
+  private storyHint!: StoryHint;
   private community!: Community;
   private passwordChange!: PasswordChange;
   private bulbaCoins!: BulbaCoins;
@@ -199,6 +205,9 @@ export class WorldScene extends Phaser.Scene {
   private chosen!: Character;
   private locIndex = 0;
   private atParking = false;
+  private immersiveLoc = false;
+  private dayXHall!: DayXHall;
+  private dayXHallEntered = false;
   private doors: Map<string, Spawn> = new Map(); // двери текущей локации (ключ — id соседней локации)
   private tv: Spawn | null = null;               // точка телевизора в текущей локации, если есть
   private ancestorsRect: Rect | null = null;     // прямоугольник стены с портретами предков (объект "ancestors")
@@ -225,6 +234,8 @@ export class WorldScene extends Phaser.Scene {
   private nearBeachNpc = false;
   private driverDialogue!: DriverDialogue;
   private beachNpcDialogue!: BeachNpcDialogue;
+  private peekModal!: PackagePeekModal;
+  private storyIntro!: StoryIntro;
   private driverBubble!: DriverBubble;
   private driverTalkBtn = document.getElementById("driverTalkBtn") as HTMLButtonElement;
   private menu!: LocationMenu;
@@ -250,7 +261,7 @@ export class WorldScene extends Phaser.Scene {
     this.loader = new LocationLoader(this, this.walls, TARGET_H, DEPTH.doorOverlay);
     this.items = new ItemsManager(this);
 
-    this.bubble = new SpeechBubble(this, DEPTH.bubble);
+    this.bubble = new SpeechBubble(this);
     this.projector = new Projector(this, (slides, index) => {
       this.dialogue.paused = true;
       this.slides.open(slides, index);
@@ -268,7 +279,17 @@ export class WorldScene extends Phaser.Scene {
     this.slidePicker = new SlidePicker((owner) => this.turnProjectorOn(owner.id));
     this.dialogue = new Dialogue({
       onSay: (text) => {
-        if (this.talking) this.bubble.show(text, this.talking.x, this.talking.y - TARGET_H / 2);
+        if (this.talking) {
+          this.bubble.show(
+            text,
+            this.talking.x,
+            this.talking.y - TARGET_H / 2,
+            undefined,
+            undefined,
+            14,
+            voiceForNpc(this.talking.char.id),
+          );
+        }
       },
       onShowSlides: (npc) => {
         this.projectorFromDialogue = true;
@@ -298,12 +319,26 @@ export class WorldScene extends Phaser.Scene {
         this.realtime.catTalk(false);
       },
       questActive: () => this.multiplayer && this.quest.fridgeQuestStatus === "IN_PROGRESS",
+      packageQuestActive: () => this.multiplayer && this.quest.packageInProgress,
     });
+    this.peekModal = new PackagePeekModal();
+    this.storyIntro = new StoryIntro();
+    this.dayXHall = new DayXHall();
     this.quest = new QuestController({
       onBalance: (balance) => this.setBcBalance(balance),
       canRing: () => this.started && !this.modalOpenExceptQuest(),
-      onPackageProgress: () => this.onPackageQuestProgress(),
+      onPackageProgress: () => {
+        this.onPackageQuestProgress();
+        this.refreshStoryHint();
+      },
+      onQuestsChanged: () => {
+        this.refreshStoryHint();
+        this.laptop?.refreshTalkList();
+        this.syncDayXAccess();
+      },
+      onPackagePeekFailed: () => this.onPackagePeekFailed(),
     });
+    this.storyHint = new StoryHint();
     this.driverBubble = new DriverBubble();
     this.driverDialogue = new DriverDialogue({
       questActive: () => this.multiplayer && this.quest.packageInProgress,
@@ -332,14 +367,20 @@ export class WorldScene extends Phaser.Scene {
       onSay: (text) => {
         if (!this.beachNpc || this.beachNpc.isGone) return;
         const a = this.beachNpc.bubbleAnchor();
-        this.bubble.show(text, a.x, a.y, undefined, () => this.beachNpc!.bubbleAnchor());
+        this.bubble.show(text, a.x, a.y, undefined, () => this.beachNpc!.bubbleAnchor(), 14, "beach");
       },
+      codeAccepted: () => this.quest.packageCodeAccepted,
+      onCodeAccepted: () => this.quest.markPackageCodeAccepted(),
       onCodeOk: () => {
         this.quest.markPackageReceived();
         this.beachNpc?.clearHeld();
         this.items.giveQuestPackage(this.player.x, this.player.y);
         this.beachNpc?.leave();
         this.bubble.hide();
+        this.peekModal.showChoice({
+          onLook: () => this.quest.startPeekFailCall(),
+          onKeep: () => {},
+        });
       },
       onClose: () => this.bubble.hide(),
     });
@@ -374,6 +415,8 @@ export class WorldScene extends Phaser.Scene {
     for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaTanks, this.bulbaGuess, this.bulbaWordle, this.bulbaColors, this.bulbaSurki, this.airHockey]) {
       g.onClose = () => this.setPhaserAsleep(false);
     }
+    this.bulbaQuiz.storyQuizAvailable = () => this.quest.quantumQuizAvailable;
+    this.bulbaQuiz.onStoryQuizPassed = () => void this.quest.completeQuantumQuiz();
     this.bulbaQuiz.onClose = () => this.setPhaserAsleep(false);
     this.bulbaQuiz.onBalance = (balance) => this.setBcBalance(balance);
     this.airHockey.onLeave = () => this.realtime.airhockeyLeave();
@@ -405,7 +448,16 @@ export class WorldScene extends Phaser.Scene {
       showWaybill: () => this.multiplayer && this.quest.packageInProgress,
       onWaybillUnlocked: () => this.quest.markWaybillRead(),
     });
-    this.laptop = new Laptop();
+    this.laptop = new Laptop(
+      () => this.quest.markLaptopOpened(),
+      {
+        strategy: {
+          active: () => this.quest.strategyInProgress,
+          onComplete: () => void this.quest.completeStrategyMeeting(),
+        },
+        presentation: this.quest.presentationLaptop(),
+      },
+    );
     document.getElementById("passBtn")!.onclick = () => {
       (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
       this.passwordChange.open();
@@ -418,6 +470,11 @@ export class WorldScene extends Phaser.Scene {
       (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
       void this.wardrobe.open();
     };
+    const openPhone = () => {
+      (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
+      this.quest.openDirectory();
+    };
+    document.getElementById("phoneBtn")!.onclick = openPhone;
     document.getElementById("logoutBtn")!.onclick = () => {
       api.logout();
       window.location.reload();
@@ -528,10 +585,13 @@ export class WorldScene extends Phaser.Scene {
     // (диалог, выбор игры, парковка). Выход в дверь и взаимодействие с NPC/TV
     // разбираются в update() — там Space и Enter равноценны.
     this.router.register(this.slides);
+    this.router.register(this.storyIntro);
     this.router.register(this.poker);
     this.router.register(this.retro);
     this.router.register(this.airHockey);
     this.router.register(this.quest);
+    this.router.register(this.dayXHall);
+    this.router.register(this.peekModal);
     this.router.register(this.slidePicker);
     this.router.register(this.dialogue);
     this.router.register(this.driverDialogue);
@@ -724,6 +784,7 @@ export class WorldScene extends Phaser.Scene {
     hudPanel.classList.remove("hidden");
     // На ПК меню сразу развёрнуто; на тач-устройствах — свёрнуто, чтобы не занимать экран.
     if (!isTouch()) hudPanel.open = true;
+    if (!this.multiplayer) void this.storyIntro.showIfNeeded();
   }
 
   // Удалить аккаунт: подтверждение, запрос на сервер, затем выход и перезагрузка.
@@ -766,7 +827,6 @@ export class WorldScene extends Phaser.Scene {
     this.items.onDrop = (itemId, itemType, x, y) => this.realtime.itemDrop(itemId, itemType, x, y);
     this.items.onPlace = (itemId, itemType, table, x, y) => this.realtime.itemPlace(itemId, itemType, table, x, y);
     this.items.onGone = (itemId) => this.realtime.itemGone(itemId);
-    void this.quest.start();
     this.realtime.connect({
       onOpen: () => {
         this.sendJoin();
@@ -805,7 +865,7 @@ export class WorldScene extends Phaser.Scene {
       onAchievement: (_code, title, description, image) => {
         this.achievementPopup.show(title, description, image);
         void api.fetchProfile().then((p) => this.setBcBalance(p.bulbaCoinBalance)).catch(() => {});
-        // 5-я ачивка могла только что открыть квест — перепроверим статус.
+        // 3-я ачивка открывает адаптацию, 5-я — холодильник.
         void this.quest.refreshFromServer();
       },
       onAirHockeyLobby: (lobby) => this.applyAirHockeyLobby(lobby),
@@ -822,6 +882,12 @@ export class WorldScene extends Phaser.Scene {
       onAirHockeyError: (message) => console.warn("Аэрохоккей:", message),
       onPing: (rttMs) => this.airHockey.setPing(rttMs),
     });
+    void this.bootQuestsAfterIntro();
+  }
+
+  private async bootQuestsAfterIntro(): Promise<void> {
+    await this.storyIntro.showIfNeeded();
+    void this.quest.start();
   }
 
   // Панель реакций (мультиплеер): строим один раз из EMOTES, потом показываем.
@@ -870,7 +936,7 @@ export class WorldScene extends Phaser.Scene {
     this.remotePlayers.get(player.id)?.destroy();
     const remote = new RemotePlayer(
       this, player.appearance ?? defaultAppearance(), player.login,
-      player.x, player.y, player.facing, TARGET_H, DEPTH.bubble,
+      player.x, player.y, player.facing, TARGET_H,
     );
     this.remotePlayers.set(player.id, remote);
     // Пришёл с предметом в лапах — рисуем его и убираем этот предмет из мира.
@@ -936,6 +1002,24 @@ export class WorldScene extends Phaser.Scene {
         PACKAGE_QUEST.beachNpc.spawnY,
       );
     }
+  }
+
+  /** Провал заглядывания: модалка → сброс коробки → снова пляж, код уже принят. */
+  private onPackagePeekFailed(): void {
+    this.peekModal.showFail(() => {
+      this.quest.rollbackPackagePeek();
+      this.items.clearQuestPackage();
+      if (this.beachNpc) {
+        if (!this.beachNpc.isGone) this.beachNpc.destroy();
+        this.beachNpc = null;
+      }
+      this.goTo(LOC.vietnamBeach);
+      this.player.setPosition(PACKAGE_QUEST.beachNpc.spawnX, PACKAGE_QUEST.beachNpc.spawnY + 70);
+    });
+  }
+
+  private refreshStoryHint(): void {
+    void this.storyHint.refresh(this.quest.storyHintProgress());
   }
 
   private onPackageQuestProgress(): void {
@@ -1063,6 +1147,8 @@ export class WorldScene extends Phaser.Scene {
     const cfg = LOCATIONS[index];
     this.locIndex = index;
     this.atParking = !!cfg.isParking;
+    this.immersiveLoc = !!cfg.isParking || !!cfg.isFirstPerson;
+    this.dayXHallEntered = cfg.id !== "day-x-hall" ? false : this.dayXHallEntered;
 
     const { npcs, doors, spawns, interactions, rects, items, physicsWalls, tableRects, routes } = this.loader.load(cfg, index, this.chosen.id, this.multiplayer);
     this.npcs = npcs;
@@ -1117,16 +1203,24 @@ export class WorldScene extends Phaser.Scene {
 
     // Прячем и физический спрайт, и layered-аватар с ником: sync видимости аватара/
     // бейджа живёт в update(), а на парковке update рано выходит.
-    const showPlayer = !this.atParking;
+    const showPlayer = !this.immersiveLoc;
     this.player.setVisible(showPlayer);
     this.avatar?.setVisible(showPlayer);
     this.playerLabel?.setVisible(showPlayer);
     if (this.atParking) {
       // На парковке ходить нельзя — прячем игрока и показываем меню локаций.
       this.player.setVelocity(0);
-      this.menu.show(cfg);
+      this.menu.show(cfg, this.parkingExits(cfg));
       this.syncDriverTalkBtn();
       this.items.setCarriedVisible(false);
+    } else if (cfg.isFirstPerson) {
+      this.player.setVelocity(0);
+      this.menu.hide();
+      this.driverTalkBtn.classList.add("hidden");
+      this.driverBubble.hide();
+      if (this.driverDialogue.isOpen) this.driverDialogue.close();
+      this.items.setCarriedVisible(false);
+      this.maybeStartDayXHall(interactions);
     } else {
       this.menu.hide();
       this.driverTalkBtn.classList.add("hidden");
@@ -1150,7 +1244,10 @@ export class WorldScene extends Phaser.Scene {
   /** Для входящего звонка: не звонить поверх других окон (телефон сам не считается). */
   private modalOpenExceptQuest(): boolean {
     return (
+      this.storyIntro.isOpen ||
       this.dialogue.isOpen ||
+      this.dayXHall.isOpen ||
+      this.peekModal.isOpen ||
       this.driverDialogue.isOpen ||
       this.beachNpcDialogue.isOpen ||
       this.catDialogue.isOpen ||
@@ -1209,7 +1306,42 @@ export class WorldScene extends Phaser.Scene {
     else this.game.loop.wake(true);
   }
 
+  private setDayXHallWatching(watching: boolean): void {
+    const bg = this.loader.background();
+    if (bg) bg.setTexture(watching ? "day-x-hall-bg-watching" : "day-x-hall-bg");
+    const overlay = this.loader.overlay();
+    if (overlay) {
+      const key = watching ? "day-x-hall-overlay-watching" : "day-x-hall-overlay";
+      if (this.textures.exists(key)) overlay.setTexture(key);
+    }
+  }
+
+  private maybeStartDayXHall(interactions: Map<string, Spawn>): void {
+    if (this.dayXHallEntered || !this.quest.dayXInProgress) return;
+    this.dayXHallEntered = true;
+    const points = new Map<string, { x: number; y: number }>();
+    for (const [name, pt] of interactions) points.set(name, pt);
+    const layout = dayXLayoutFromMap(points);
+    void this.dayXHall.begin(layout, {
+      login: () => api.getLogin() ?? "Игрок",
+      appearance: () => this.appearance,
+      playerVoice: () => dayXPlayerVoice(this.chosen.id),
+      projectorRect: () => this.projectorRect,
+      onWatching: (watching) => this.setDayXHallWatching(watching),
+      onFinished: async () => {
+        await this.quest.refreshFromServer();
+        this.goTo(LOC.mainOffice);
+      },
+    });
+  }
+
   private goTo(to: number): void {
+    if (LOCATIONS[this.locIndex]?.id === "day-x-hall") {
+      this.dayXHall.stop();
+      this.dayXHallEntered = false;
+      this.setDayXHallWatching(false);
+    }
+    if (to === LOC.dayXHall && !this.quest.dayXInProgress) return;
     if (this.airHockey.isOpen) this.airHockey.close();
     else if (this.airHockeyWaiting) {
       this.realtime.airhockeyLeave();
@@ -1226,6 +1358,27 @@ export class WorldScene extends Phaser.Scene {
         Math.round(this.player.y),
         this.player.flipX,
       );
+    }
+  }
+
+  /** Пункты меню парковки: зал Дня X только при активном квесте. */
+  private parkingExits(cfg: (typeof LOCATIONS)[number] = LOCATIONS[LOC.parking]): ExitDef[] {
+    return cfg.exits.filter((exit) => {
+      if (exit.to === LOC.dayXHall) return this.quest.dayXInProgress;
+      return true;
+    });
+  }
+
+  /** Обновить меню парковки / выгнать из зала, если day_x уже не IN_PROGRESS. */
+  private syncDayXAccess(): void {
+    if (!this.started) return;
+    const here = LOCATIONS[this.locIndex];
+    if (here.id === "day-x-hall" && !this.quest.dayXInProgress) {
+      this.goTo(LOC.parking);
+      return;
+    }
+    if (this.atParking) {
+      this.menu.show(here, this.parkingExits(here));
     }
   }
 
@@ -1271,12 +1424,16 @@ export class WorldScene extends Phaser.Scene {
     this.beachNpc?.update(delta);
     if (this.beachNpc?.isGone) this.beachNpc = null;
 
-    if (this.atParking) {
-      // Канвас может ресайзиться (FIT) — держим кнопку/облачко над ним.
-      this.layoutDriverOverlays();
+    if (this.immersiveLoc) {
+      this.player.setVelocity(0);
+      if (this.atParking) this.layoutDriverOverlays();
+      this.prompt.setVisible(false);
+      this.showExit(null);
+      this.joystick?.setVisible(false);
+      return;
     }
 
-    if (this.atParking || this.modalOpen()) {
+    if (this.modalOpen()) {
       this.player.setVelocity(0);
       this.prompt.setVisible(false);
       this.showExit(null);

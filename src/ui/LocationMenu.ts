@@ -1,4 +1,4 @@
-import { LOCATIONS, type LocationDef } from "../data/locations";
+import { LOCATIONS, type ExitDef, type LocationDef } from "../data/locations";
 import type { KeyConsumer } from "./KeyboardRouter";
 
 // Меню выбора локации на парковке: ходить нельзя, вместо этого жмём кнопку нужной локации.
@@ -6,18 +6,18 @@ import type { KeyConsumer } from "./KeyboardRouter";
 export class LocationMenu implements KeyConsumer {
   private root = document.getElementById("parking") as HTMLDivElement;
   private list = document.getElementById("parkingBtns") as HTMLDivElement;
-  private loc: LocationDef | null = null;
+  private exits: ExitDef[] = [];
   private index = 0;
   private visible = false;
 
   constructor(private onPick: (to: number) => void) {}
 
-  show(loc: LocationDef): void {
-    this.loc = loc;
-    this.index = 0;
+  show(loc: LocationDef, exits?: ExitDef[]): void {
+    this.exits = exits ?? loc.exits;
+    this.index = Math.min(this.index, Math.max(0, this.exits.length - 1));
     this.visible = true;
     this.list.innerHTML = "";
-    loc.exits.forEach((exit, i) => {
+    this.exits.forEach((exit, i) => {
       const btn = document.createElement("button");
       btn.className = "loc-btn" + (i === this.index ? " sel" : "");
       btn.textContent = LOCATIONS[exit.to].enterLabel;
@@ -41,12 +41,13 @@ export class LocationMenu implements KeyConsumer {
   }
 
   private pick(i: number): void {
-    if (!this.loc) return;
-    this.onPick(this.loc.exits[i].to);
+    const exit = this.exits[i];
+    if (!exit) return;
+    this.onPick(exit.to);
   }
 
   isActive(): boolean {
-    return this.visible && this.loc !== null;
+    return this.visible && this.exits.length > 0;
   }
 
   handleKey(e: KeyboardEvent): boolean {

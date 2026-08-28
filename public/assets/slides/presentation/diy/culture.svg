@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#ff7a00"/><stop offset="1" stop-color="#ff006e"/></linearGradient></defs>
+  <rect width="960" height="540" fill="url(#g)"/>
+  <rect x="16" y="16" width="928" height="508" fill="none" stroke="#fff" stroke-width="8" stroke-dasharray="18 10"/>
+  <text x="480" y="110" text-anchor="middle" font-family="Comic Sans MS, cursive" font-size="48" font-weight="700" fill="#fff" stroke="#111" stroke-width="2">&#1053;&#1040;&#1064;&#1040; &#1050;&#1059;&#1051;&#1068;&#1058;&#1059;&#1056;&#1040; &#128188;</text>
+  <text x="140" y="235" font-family="Comic Sans MS, cursive" font-size="42" font-weight="700" fill="#ffef00" transform="rotate(-5 140 235)">&#1041;&#1045;&#1057;&#1064;&#1054;&#1042;&#1053;&#1054;</text>
+  <text x="510" y="315" font-family="Comic Sans MS, cursive" font-size="42" font-weight="700" fill="#fff" transform="rotate(4 510 315)">&#1055;&#1056;&#1048;&#1047;&#1045;&#1052;&#1051;&#1071;&#1045;&#1052;</text>
+  <text x="210" y="420" font-family="Comic Sans MS, cursive" font-size="50" font-weight="700" fill="#00f5ff" transform="rotate(-2 210 420)">&#1050;&#1040;&#1057;&#1050;&#1040;&#1044;&#1048;&#1056;&#1059;&#1045;&#1052;!!!</text>
+  <text x="40" y="520" font-family="Comic Sans MS, cursive" font-size="16">&#1044;&#1040;-&#1044;&#1040; &#183; &#1047;&#1040;&#1060;&#1048;&#1050;&#1057;&#1048;&#1056;&#1054;&#1042;&#1040;&#1051;&#1048; &#183; &#1044;&#1042;&#1048;&#1043;&#1040;&#1045;&#1052;&#1057;&#1071;</text>
+</svg>

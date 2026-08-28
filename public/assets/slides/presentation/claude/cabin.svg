@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#06111c"/><stop offset="0.55" stop-color="#0a1b2b"/><stop offset="1" stop-color="#10263a"/>
+    </linearGradient>
+    <linearGradient id="mint" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#38f2cf"/><stop offset="1" stop-color="#7effa5"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffd76a"/><stop offset="1" stop-color="#ff8a4c"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffffff" stop-opacity=".16"/><stop offset="1" stop-color="#ffffff" stop-opacity=".035"/>
+    </linearGradient>
+    <radialGradient id="glow"><stop stop-color="#38f2cf" stop-opacity=".35"/><stop offset="1" stop-color="#38f2cf" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
+      <path d="M42 0H0V42" fill="none" stroke="#8eb5c9" stroke-opacity=".07"/>
+    </pattern>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="16" stdDeviation="17" flood-color="#000" flood-opacity=".35"/>
+    </filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="12"/></filter>
+    <filter id="photo"><feColorMatrix values="0.96 0 0 0 0  0 1.02 0 0 0  0 0 1.08 0 0  0 0 0 1 0"/></filter>
+  </defs>
+  <image href="media/truck-cabin.jpg" width="960" height="640" y="-50" preserveAspectRatio="xMidYMid slice" filter="url(#photo)"/>
+  <linearGradient id="shade" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#06111c"/><stop offset=".46" stop-color="#06111c" stop-opacity=".9"/><stop offset=".78" stop-color="#06111c" stop-opacity=".08"/></linearGradient>
+  <rect width="960" height="540" fill="url(#shade)"/>
+  <text x="48" y="52" font-family="Inter,Arial" font-size="11" font-weight="900" letter-spacing="2.4" fill="#ff9d59">04  /  ДЕМО-ТОЧКА</text>
+  <text x="48" y="114" font-family="Inter,Arial" font-size="44" font-weight="850" letter-spacing="-1.3" fill="#f8f4e9">Прототип</text>
+  <text x="48" y="164" font-family="Inter,Arial" font-size="44" font-weight="850" letter-spacing="-1.3" fill="#f8f4e9">на парковке</text>
+  <rect x="48" y="188" width="72" height="5" rx="3" fill="#ff9d59"/>
+  <text x="48" y="253" font-family="Inter,Arial" font-size="23" font-weight="750" fill="#f8f4e9">Дальнобойная кабина —</text>
+  <text x="48" y="287" font-family="Inter,Arial" font-size="23" font-weight="750" fill="#f8f4e9">оболочка продукта.</text>
+  <g transform="translate(48 341)">
+    <rect width="236" height="66" rx="20" fill="#091b29" stroke="#38f2cf" stroke-opacity=".45"/>
+    <circle cx="34" cy="33" r="11" fill="#38f2cf"/><path d="M34 18v30M19 33h30" stroke="#06111c" stroke-width="4"/>
+    <text x="59" y="29" font-family="Inter,Arial" font-size="12" font-weight="850" letter-spacing="1.2" fill="#91a9b9">СТАТУС ПИЛОТА</text>
+    <text x="59" y="49" font-family="Inter,Arial" font-size="18" font-weight="900" fill="#f8f4e9">РАБОТАЕТ</text>
+  </g>
+
+  <text x="48" y="512" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="800" letter-spacing="2.2" fill="#91a9b9">BULBA OFFICE  /  ДЕНЬ X</text>
+  <rect x="745" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="762" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="779" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="796" y="505" width="24" height="5" rx="3" fill="#ff9d59" opacity="1"/><rect x="813" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="830" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="847" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="864" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="881" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="898" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/>
+</svg>

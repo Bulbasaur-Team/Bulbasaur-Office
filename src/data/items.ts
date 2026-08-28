@@ -83,7 +83,6 @@ export const ITEM_TYPES: Record<string, ItemTypeDef> = {
     hopFactor: 0,
     kickable: false,
     grabbable: false,
-    alwaysOnTop: true,
   },
 };
 

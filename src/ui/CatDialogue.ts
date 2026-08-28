@@ -1,4 +1,5 @@
 import { BULBA_CAT } from "../data/bulbaCat";
+import { CAT_PACKAGE_QUEST } from "../data/packageQuest";
 import { CAT_QUEST, matchesCatAnswer } from "../data/quests";
 import type { KeyConsumer } from "./KeyboardRouter";
 
@@ -11,9 +12,11 @@ interface CatDialogueHandlers {
   onClose: () => void;
   /** Квест fridge_pin в статусе IN_PROGRESS. */
   questActive?: () => boolean;
+  /** Квест lost_package в статусе IN_PROGRESS. */
+  packageQuestActive?: () => boolean;
 }
 
-type Action = "ask" | "advice" | "quest" | "bye";
+type Action = "ask" | "advice" | "quest" | "package" | "bye";
 
 interface Option {
   label: string;
@@ -37,7 +40,7 @@ export class CatDialogue implements KeyConsumer {
   private phase: Phase = "menu";
 
   constructor(private handlers: CatDialogueHandlers) {
-    this.inputSubmit.onclick = () => this.submitQuestAnswer();
+    this.inputSubmit.addEventListener("click", () => this.submitQuestAnswer());
     this.input.addEventListener("keydown", (e) => {
       e.stopPropagation();
       if (e.key === "Enter") {
@@ -79,6 +82,9 @@ export class CatDialogue implements KeyConsumer {
     if (this.handlers.questActive?.()) {
       this.options.push({ label: CAT_QUEST.optionLabel, action: "quest" });
     }
+    if (this.handlers.packageQuestActive?.()) {
+      this.options.push({ label: CAT_PACKAGE_QUEST.optionLabel, action: "package" });
+    }
     this.options.push({ label: "Бывай", action: "bye" });
     this.index = 0;
     this.renderOptions();
@@ -118,6 +124,9 @@ export class CatDialogue implements KeyConsumer {
         break;
       case "quest":
         this.openQuestDescribe();
+        break;
+      case "package":
+        this.handlers.onSay(CAT_PACKAGE_QUEST.answer);
         break;
       case "bye":
         this.close();

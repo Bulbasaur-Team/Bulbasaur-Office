@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#06111c"/><stop offset="0.55" stop-color="#0a1b2b"/><stop offset="1" stop-color="#10263a"/>
+    </linearGradient>
+    <linearGradient id="mint" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#38f2cf"/><stop offset="1" stop-color="#7effa5"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffd76a"/><stop offset="1" stop-color="#ff8a4c"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffffff" stop-opacity=".16"/><stop offset="1" stop-color="#ffffff" stop-opacity=".035"/>
+    </linearGradient>
+    <radialGradient id="glow"><stop stop-color="#38f2cf" stop-opacity=".35"/><stop offset="1" stop-color="#38f2cf" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
+      <path d="M42 0H0V42" fill="none" stroke="#8eb5c9" stroke-opacity=".07"/>
+    </pattern>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="16" stdDeviation="17" flood-color="#000" flood-opacity=".35"/>
+    </filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="12"/></filter>
+    <filter id="photo"><feColorMatrix values="0.96 0 0 0 0  0 1.02 0 0 0  0 0 1.08 0 0  0 0 0 1 0"/></filter>
+  </defs>
+  <rect width="960" height="540" fill="url(#night)"/>
+  <rect width="960" height="540" fill="url(#grid)" opacity="1"/>
+  <circle cx="866" cy="76" r="230" fill="#ffd76a" opacity=".08"/>
+  <text x="48" y="52" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="900" letter-spacing="2.4" fill="#ffd76a">08  /  ФОКУС ПИЛОТА</text>
+  <text x="48" y="108" font-family="Inter,Arial,sans-serif" font-size="42" font-weight="850" letter-spacing="-1.2" fill="#f8f4e9">Пока один маршрут</text>
+  <rect x="48" y="130" width="72" height="5" rx="3" fill="#ffd76a"/>
+  <g style="--ink:#f8f4e9;--muted:#91a9b9;--accent:#ffd76a">
+  <g transform="translate(48 164)">
+    <rect width="864" height="274" rx="32" fill="url(#glass)" stroke="#fff" stroke-opacity=".1"/>
+    <circle cx="217" cy="136" r="78" fill="#152f40" stroke="#38f2cf" stroke-width="2"/>
+    <circle cx="647" cy="136" r="78" fill="#152f40" stroke="#ffd76a" stroke-width="2"/>
+    <circle cx="217" cy="136" r="12" fill="#38f2cf"/><circle cx="647" cy="136" r="12" fill="#ffd76a"/>
+    <path d="M295 136C386 36 482 36 569 136" fill="none" stroke="url(#mint)" stroke-width="7" stroke-linecap="round"/>
+    <path d="M569 153C482 243 386 243 295 153" fill="none" stroke="#ffd76a" stroke-width="3" stroke-dasharray="8 9"/>
+    <text x="217" y="106" text-anchor="middle" font-family="Inter,Arial" font-size="12" font-weight="900" letter-spacing="1.7" fill="#91a9b9">ТОЧКА A</text>
+    <text x="217" y="177" text-anchor="middle" font-family="Inter,Arial" font-size="22" font-weight="900" fill="#f8f4e9">МОСКВА</text>
+    <text x="647" y="106" text-anchor="middle" font-family="Inter,Arial" font-size="12" font-weight="900" letter-spacing="1.7" fill="#91a9b9">ТОЧКА B</text>
+    <text x="647" y="177" text-anchor="middle" font-family="Inter,Arial" font-size="22" font-weight="900" fill="#f8f4e9">ВЬЕТНАМ</text>
+    <g fill="none" stroke="#91a9b9" stroke-opacity=".24" stroke-dasharray="4 7">
+      <path d="M395 63l-38-40"/><path d="M468 55V7"/><path d="M539 67l40-44"/>
+    </g>
+    <g fill="#91a9b9" opacity=".35"><circle cx="357" cy="23" r="9"/><circle cx="468" cy="7" r="9"/><circle cx="579" cy="23" r="9"/></g>
+    <rect x="345" y="207" width="174" height="40" rx="20" fill="#38f2cf" fill-opacity=".14"/>
+    <text x="432" y="233" text-anchor="middle" font-family="Inter,Arial" font-size="15" font-weight="900" fill="#38f2cf">1 ЖИВОЙ МАРШРУТ</text>
+  </g>
+  <text x="48" y="469" font-family="Inter,Arial" font-size="21" font-weight="750" fill="#f8f4e9">Фокус пилота сегодня. Сеть точек — завтра.</text></g>
+
+  <text x="48" y="512" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="800" letter-spacing="2.2" fill="#91a9b9">BULBA OFFICE  /  ДЕНЬ X</text>
+  <rect x="745" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="762" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="779" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="796" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="813" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="830" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="847" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="864" y="505" width="24" height="5" rx="3" fill="#ffd76a" opacity="1"/><rect x="881" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/><rect x="898" y="505" width="8" height="5" rx="3" fill="#fff" opacity="0.25"/>
+</svg>

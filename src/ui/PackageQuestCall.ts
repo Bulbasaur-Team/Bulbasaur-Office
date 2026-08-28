@@ -5,28 +5,18 @@ import {
   PACKAGE_BRIEFING_INTRO,
   PACKAGE_BRIEFING_QUESTIONS,
   PACKAGE_FINALE,
+  PACKAGE_PEEK_FAIL,
   PACKAGE_QUEST,
   packageGreeting,
   type PackageBriefingQuestion,
 } from "../data/packageQuest";
+import { typeWithVoice } from "./CharacterVoice";
+import { dialTone } from "./DialTone";
 
 const CHAR_DELAY = Math.round(22 * 2.5);
 const AFTER_PLAYER_MS = 400;
 const LINE_HOLD_MS = PACKAGE_QUEST.timings.lineHoldMs;
-
-function typeText(el: HTMLElement, text: string, onDone: () => void, delay = CHAR_DELAY): () => void {
-  let shown = 0;
-  el.textContent = "";
-  const timer = window.setInterval(() => {
-    shown++;
-    el.textContent = text.slice(0, shown);
-    if (shown >= text.length) {
-      window.clearInterval(timer);
-      onDone();
-    }
-  }, delay);
-  return () => window.clearInterval(timer);
-}
+const HANGUP_HOLD_MS = 1_000;
 
 export interface PackageQuestCallHandlers {
   onBriefingAccepted: () => void;
@@ -34,6 +24,7 @@ export interface PackageQuestCallHandlers {
   onBriefingAbort: () => void;
   onFinaleComplete: () => void;
   onFinaleAbort: () => void;
+  onPeekFailComplete: () => void;
   onDismissEnded: () => void;
 }
 
@@ -46,7 +37,7 @@ export class PackageQuestCall {
   private repliesEl = document.getElementById("bpReplies")!;
   private pinWrap = document.getElementById("bpPinWrap")!;
 
-  private mode: "idle" | "briefing" | "finale" | "ended" = "idle";
+  private mode: "idle" | "briefing" | "finale" | "peekFail" | "ended" = "idle";
   private asked = new Set<PackageBriefingQuestion["id"]>();
   private cancelTyping: (() => void) | null = null;
   private lineTimer = 0;
@@ -74,7 +65,13 @@ export class PackageQuestCall {
   startFinale(): void {
     this.resetUi();
     this.mode = "finale";
-    this.say(PACKAGE_FINALE, () => this.enterEnded("finale"));
+    this.say(PACKAGE_FINALE, () => this.enterEnded("finale"), { hangup: true });
+  }
+
+  startPeekFail(): void {
+    this.resetUi();
+    this.mode = "peekFail";
+    this.say(PACKAGE_PEEK_FAIL, () => this.enterEnded("peekFail"), { hangup: true });
   }
 
   hangupByPlayer(): void {
@@ -92,6 +89,11 @@ export class PackageQuestCall {
     if (this.mode === "finale") {
       this.stop();
       this.handlers.onFinaleAbort();
+      return;
+    }
+    if (this.mode === "peekFail") {
+      this.stop();
+      this.handlers.onPeekFailComplete();
     }
   }
 
@@ -119,7 +121,7 @@ export class PackageQuestCall {
     this.pinWrap.classList.add("hidden");
   }
 
-  private enterEnded(from: "briefing" | "finale"): void {
+  private enterEnded(from: "briefing" | "finale" | "peekFail"): void {
     this.token++;
     window.clearTimeout(this.lineTimer);
     this.cancelTyping?.();
@@ -128,7 +130,9 @@ export class PackageQuestCall {
     this.playerLine.textContent = "";
     this.mode = "ended";
     this.callEl.classList.add("is-ended");
+    dialTone.playHangup();
     if (from === "briefing") this.handlers.onBriefingComplete();
+    else if (from === "peekFail") this.handlers.onPeekFailComplete();
     else this.handlers.onFinaleComplete();
   }
 
@@ -197,7 +201,7 @@ export class PackageQuestCall {
     this.lineTimer = window.setTimeout(() => {
       if (token !== this.token) return;
       this.playerLine.textContent = "";
-      this.say(PACKAGE_BRIEFING_CLOSING, () => this.enterEnded("briefing"));
+      this.say(PACKAGE_BRIEFING_CLOSING, () => this.enterEnded("briefing"), { hangup: true });
     }, AFTER_PLAYER_MS);
   }
 
@@ -214,11 +218,11 @@ export class PackageQuestCall {
     }, AFTER_PLAYER_MS);
   }
 
-  private say(text: string, onDone: () => void, opts?: { awaitReply?: boolean }): void {
+  private say(text: string, onDone: () => void, opts?: { awaitReply?: boolean; hangup?: boolean }): void {
     const token = ++this.token;
     this.cancelTyping?.();
     this.bubble.classList.remove("hidden");
-    this.cancelTyping = typeText(this.bubbleText, text, () => {
+    this.cancelTyping = typeWithVoice(this.bubbleText, text, "bulbikov", () => {
       this.cancelTyping = null;
       if (token !== this.token) return;
       if (opts?.awaitReply) {
@@ -228,8 +232,8 @@ export class PackageQuestCall {
       this.lineTimer = window.setTimeout(() => {
         if (token !== this.token) return;
         onDone();
-      }, LINE_HOLD_MS);
-    });
+      }, opts?.hangup ? HANGUP_HOLD_MS : LINE_HOLD_MS);
+    }, CHAR_DELAY);
   }
 
   private hideBubble(): void {

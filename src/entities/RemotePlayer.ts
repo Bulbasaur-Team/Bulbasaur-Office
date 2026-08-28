@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { SpeechBubble } from "../ui/SpeechBubble";
 import { ITEM_TYPES } from "../data/items";
-import { ITEM_TOP_DEPTH } from "./PhysicsItem";
+import { CARRY_DEPTH, ITEM_TOP_DEPTH } from "./PhysicsItem";
 import { PlayerAvatar } from "./PlayerAvatar";
 import type { PlayerAppearance } from "../data/wardrobe";
 
@@ -27,7 +27,6 @@ export class RemotePlayer {
     y: number,
     facing: boolean,
     private targetH: number,
-    bubbleDepth: number,
   ) {
     this.targetX = x;
     this.targetY = y;
@@ -44,7 +43,7 @@ export class RemotePlayer {
       })
       .setOrigin(0.5)
       .setDepth(y);
-    this.bubble = new SpeechBubble(scene, bubbleDepth);
+    this.bubble = new SpeechBubble(scene);
   }
 
   get x(): number {
@@ -99,7 +98,7 @@ export class RemotePlayer {
     this.held = this.scene.add
       .image(this.avatar.x, this.avatar.y, def.texture)
       .setScale((def.radius * 2) / texW)
-      .setDepth(def.alwaysOnTop ? ITEM_TOP_DEPTH : 1_000_000);
+      .setDepth(def.alwaysOnTop ? ITEM_TOP_DEPTH : CARRY_DEPTH);
   }
 
   update(): void {

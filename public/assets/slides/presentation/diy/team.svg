@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#ffde59"/><stop offset="1" stop-color="#ff66c4"/></linearGradient></defs>
+  <rect width="960" height="540" fill="url(#g)"/>
+  <rect x="16" y="16" width="928" height="508" fill="none" stroke="#fff" stroke-width="8" stroke-dasharray="18 10"/>
+  <text x="480" y="130" text-anchor="middle" font-family="Comic Sans MS, cursive" font-size="42" font-weight="700" fill="#fff" stroke="#000" stroke-width="2">&#1053;&#1040;&#1064;&#1040; DREAM TEAM!!! &#127793;</text>
+  <text x="70" y="220" font-family="Comic Sans MS, cursive" font-size="28" font-weight="700">&#9733; &#1042;&#1089;&#1077; &#1086;&#1095;&#1077;&#1085;&#1100; &#1086;&#1087;&#1099;&#1090;&#1085;&#1099;&#1077;</text>
+  <text x="82" y="300" font-family="Comic Sans MS, cursive" font-size="28" font-weight="700">&#9733; &#1050;&#1072;&#1078;&#1076;&#1099;&#1081; &#1076;&#1077;&#1088;&#1078;&#1080;&#1090; &#1057;&#1042;&#1054;&#1049; &#1050;&#1054;&#1053;&#1058;&#1059;&#1056;</text>
+  <text x="70" y="380" font-family="Comic Sans MS, cursive" font-size="28" font-weight="700">&#9733; &#1053;&#1086;&#1074;&#1080;&#1095;&#1086;&#1082; &#1087;&#1086;&#1095;&#1077;&#1084;&#1091;-&#1090;&#1086; &#1074;&#1099;&#1089;&#1090;&#1091;&#1087;&#1072;&#1077;&#1090;</text>
+  <text x="40" y="520" font-family="Comic Sans MS, cursive" font-size="16">&#1057;&#1051;&#1040;&#1049;&#1044; &#1057;&#1044;&#1045;&#1051;&#1040;&#1053; &#1057;&#1040;&#1052;&#1054;&#1057;&#1058;&#1054;&#1071;&#1058;&#1045;&#1051;&#1068;&#1053;&#1054; &#183; &#1053;&#1045; &#1057;&#1052;&#1045;&#1071;&#1058;&#1068;&#1057;&#1071;</text>
+</svg>

@@ -16,6 +16,7 @@ export interface LocationDef {
   overlay?: string;    // ключ текстуры overlay (верх двери); может не существовать
   map?: string;        // ключ карты Tiled с коллизиями; может не существовать
   isParking?: boolean; // на парковке нельзя ходить — показывается меню выбора локации
+  isFirstPerson?: boolean; // игрок не виден, управление заблокировано (зал Дня X)
   exits: ExitDef[];    // двери/переходы наружу (для парковки — пункты меню)
 }
 
@@ -25,6 +26,7 @@ export const LOC = {
   vietnamBeach: 2,
   dataCenter: 3,
   parking: 4,
+  dayXHall: 5,
 } as const;
 
 export const LOCATIONS: LocationDef[] = [
@@ -73,11 +75,24 @@ export const LOCATIONS: LocationDef[] = [
     bg: "parking-bg",
     isParking: true,
     // У парковки нет карты — выходы это пункты меню (фаст-тревел), без геометрии.
+    // «В зал Дня X» показывается только пока day_x = IN_PROGRESS (см. LocationMenu / WorldScene).
     exits: [
       { to: LOC.mainOffice },
       { to: LOC.chillZone },
       { to: LOC.vietnamBeach },
       { to: LOC.dataCenter },
+      { to: LOC.dayXHall },
     ],
+  },
+  {
+    id: "day-x-hall",
+    name: "Зал Дня X",
+    enterLabel: "В зал Дня X",
+    bg: "day-x-hall-bg",
+    overlay: "day-x-hall-overlay",
+    map: "day-x-hall-map",
+    isFirstPerson: true,
+    // Только с парковки и только обратно на парковку.
+    exits: [{ to: LOC.parking }],
   },
 ];

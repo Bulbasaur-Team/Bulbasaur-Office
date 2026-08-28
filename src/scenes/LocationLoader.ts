@@ -30,6 +30,8 @@ export interface LoadedLocation {
 // созданных объектов, чтобы снести их при переходе в следующую локацию.
 export class LocationLoader {
   private scenery: Phaser.GameObjects.GameObject[] = [];
+  private backgroundImage: Phaser.GameObjects.Image | null = null;
+  private overlayImage: Phaser.GameObjects.Image | null = null;
 
   constructor(
     private scene: Phaser.Scene,
@@ -42,13 +44,18 @@ export class LocationLoader {
     this.scenery.forEach((o) => o.destroy());
     this.scenery = [];
     this.walls.clear(true, true);
+    this.overlayImage = null;
 
-    this.scenery.push(this.scene.add.image(0, 0, cfg.bg).setOrigin(0).setDepth(0));
+    const bgImage = this.scene.add.image(0, 0, cfg.bg).setOrigin(0).setDepth(0);
+    this.scenery.push(bgImage);
+    this.backgroundImage = bgImage;
 
     if (cfg.overlay && this.scene.textures.exists(cfg.overlay)) {
-      this.scenery.push(
-        this.scene.add.image(0, 0, cfg.overlay).setOrigin(0).setDepth(this.doorOverlayDepth),
-      );
+      this.overlayImage = this.scene.add
+        .image(0, 0, cfg.overlay)
+        .setOrigin(0)
+        .setDepth(this.doorOverlayDepth);
+      this.scenery.push(this.overlayImage);
     }
 
     const empty = () => new Map<string, Spawn>();
@@ -60,13 +67,21 @@ export class LocationLoader {
           routes: new Map<string, Spawn[]>(),
         };
 
-    const npcs: PlacedNpc[] = cfg.isParking || hideNpcs
+    const npcs: PlacedNpc[] = cfg.isParking || cfg.isFirstPerson || hideNpcs
       ? []
       : CHARACTERS.filter((c) => (c.locationIndex ?? 0) === locIndex && c.id !== chosenId)
           .map((char) => ({ char, ...(spawns.get(char.id) ?? { x: 0, y: 0 }) }));
     for (const npc of npcs) this.addNpc(npc);
 
     return { npcs, doors, spawns, interactions, rects, items, physicsWalls, tableRects, routes };
+  }
+
+  background(): Phaser.GameObjects.Image | null {
+    return this.backgroundImage;
+  }
+
+  overlay(): Phaser.GameObjects.Image | null {
+    return this.overlayImage;
   }
 
   // Из карты Tiled: collision -> стены игрока, collisions_physics -> стены предметов,
@@ -107,6 +122,9 @@ export class LocationLoader {
 
     const readPoints = (layer: string, into: Map<string, Spawn>) =>
       map.getObjectLayer(layer)?.objects.forEach((o) => {
+        const w = o.width ?? 0;
+        const h = o.height ?? 0;
+        if (w > 0 && h > 0) return;
         into.set(o.name, { x: o.x ?? 0, y: o.y ?? 0 });
       });
 

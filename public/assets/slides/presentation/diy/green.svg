@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <defs><linearGradient id="g" y2="1"><stop stop-color="#4ddf9a"/><stop offset="1" stop-color="#b7ed54"/></linearGradient></defs>
+  <rect width="960" height="540" fill="url(#g)"/>
+  <rect x="16" y="16" width="928" height="508" fill="none" stroke="#fff" stroke-width="8" stroke-dasharray="18 10"/>
+  <text x="480" y="120" text-anchor="middle" font-family="Comic Sans MS, cursive" font-size="46" font-weight="700" fill="#fff" stroke="#17552e" stroke-width="2">&#1069;&#1050;&#1054;-&#1058;&#1045;&#1051;&#1045;&#1055;&#1054;&#1056;&#1058; &#127807;&#127757;</text>
+  <text x="480" y="285" text-anchor="middle" font-family="Comic Sans MS, cursive" font-size="100" font-weight="700" fill="#17552e">0 &#1050;&#1052;</text>
+  <text x="480" y="370" text-anchor="middle" font-family="Comic Sans MS, cursive" font-size="32" font-weight="700">= 0 &#1041;&#1045;&#1053;&#1047;&#1048;&#1053;&#1040;???</text>
+  <text x="480" y="430" text-anchor="middle" font-family="Comic Sans MS, cursive" font-size="26">&#1055;&#1088;&#1080;&#1088;&#1086;&#1076;&#1072; &#1088;&#1072;&#1076;&#1072;. &#1056;&#1072;&#1089;&#1095;&#1105;&#1090;&#1099; &#1087;&#1086;&#1090;&#1086;&#1084;.</text>
+  <text x="40" y="520" font-family="Comic Sans MS, cursive" font-size="16">ESG &#183; &#1054;&#1063;&#1045;&#1053;&#1068; &#1047;&#1045;&#1051;&#1025;&#1053;&#1067;&#1049; &#1057;&#1051;&#1040;&#1049;&#1044;</text>
+</svg>

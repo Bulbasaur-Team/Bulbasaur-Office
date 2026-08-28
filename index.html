@@ -39,6 +39,16 @@
     #game canvas { border: 3px solid #3a414c; border-radius: 8px; image-rendering: pixelated; display: block; }
     #hint { margin: 8px 0 14px; font-size: 13px; opacity: .85; display: flex; gap: 16px; }
     #hint b { color: var(--accent); }
+    #bottomDock {
+      position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+      transform: translateX(-50%); z-index: 30;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      max-width: min(720px, 96vw); pointer-events: none;
+    }
+    #storyHint {
+      font-size: 13px; opacity: .9; line-height: 1.45; text-align: center;
+      padding: 6px 12px; border-radius: 10px; background: rgba(27, 31, 36, .78);
+    }
     .hidden { display: none !important; }
 
     /* Кнопка выхода в другую локацию */
@@ -89,6 +99,9 @@
         max-width: min(320px, 82%);
         white-space: normal;
       }
+      #stage:has(#storyHint:not(.hidden)) #driverTalkBtn {
+        bottom: calc(16px + 52px + 10px + 72px + env(safe-area-inset-bottom, 0px));
+      }
       #driverTalkBtn:hover, #driverTalkBtn.sel { transform: translateX(-50%); }
     }
 
@@ -107,6 +120,27 @@
       border: 8px solid transparent; border-top-color: #3a414c;
     }
     #driverBubbleText { white-space: pre-wrap; }
+
+    /* Облачко реплик NPC/кота — DOM, чтобы могло вылезать за край карты */
+    .npc-speech {
+      position: fixed; left: 0; top: 0; z-index: 24;
+      transform: translate(-50%, calc(-100% - 12px));
+      max-width: min(240px, 42vw);
+      background: #f4f1e8; color: #1b1f24;
+      border: 2px solid #7ac07a; border-radius: 8px;
+      padding: 10px;
+      font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+      font-size: 14px; line-height: 1.3;
+      box-shadow: 0 8px 22px rgba(0,0,0,.35);
+      pointer-events: none;
+    }
+    .npc-speech.hidden { display: none; }
+    .npc-speech::after {
+      content: ""; position: absolute; left: 50%; bottom: -12px;
+      transform: translateX(-50%);
+      border: 8px solid transparent; border-top-color: #7ac07a;
+    }
+    .npc-speech-text { white-space: pre-wrap; word-wrap: break-word; }
 
     /* Выбор персонажа */
     #select, #modeSelect, #roleSelect {
@@ -144,9 +178,9 @@
 
     /* Панель реакций (мультиплеер) */
     .emote-bar {
-      position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 30;
-      display: flex; gap: 8px; padding: 6px 8px; border-radius: 26px;
+      position: static; display: flex; gap: 8px; padding: 6px 8px; border-radius: 26px;
       background: rgba(15,18,23,.92); border: 2px solid var(--accent);
+      pointer-events: auto;
     }
     .emote-bar button {
       width: 40px; height: 40px; border: none; border-radius: 50%; background: transparent;
@@ -234,12 +268,107 @@
       pointer-events: auto;
     }
     .bp-close:hover { background: rgba(255, 255, 255, .28); }
-    .bp-incoming, .bp-call {
+    .bp-sfx-hint {
+      position: absolute; left: 12px; right: 52px; top: 12px; z-index: 15;
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 10px; border-radius: 12px;
+      background: rgba(18, 22, 30, .72);
+      border: 1px solid rgba(154, 163, 178, .28);
+      color: #c5cedb; font-size: 12px; line-height: 1.25;
+      backdrop-filter: blur(4px);
+      cursor: pointer; font-family: inherit; text-align: left;
+    }
+    .bp-sfx-hint.hidden { display: none; }
+    .bp-sfx-hint:hover {
+      background: rgba(28, 34, 44, .86);
+      border-color: rgba(154, 163, 178, .45);
+    }
+    .bp-sfx-hint-icon { flex: 0 0 auto; opacity: .85; font-size: 13px; }
+    .bp-sfx-hint-text { flex: 1; min-width: 0; }
+    .bp-sfx-hint-action {
+      flex: 0 0 auto; color: #9ec5ff; font-weight: 700; font-size: 12px;
+      white-space: nowrap;
+    }
+    .bp-incoming, .bp-call, .bp-home {
       flex: 1; min-height: 0; display: flex; flex-direction: column;
       align-items: center; padding: 48px 18px 22px;
       position: relative; z-index: 1;
     }
-    .bp-incoming.hidden, .bp-call.hidden { display: none; }
+    .bp-incoming.hidden, .bp-call.hidden, .bp-home.hidden { display: none; }
+    .bp-home {
+      align-items: stretch;
+      padding: 44px 0 16px;
+    }
+    .bp-home-title {
+      text-align: center; font-size: 20px; font-weight: 800; letter-spacing: .02em;
+      padding: 0 16px; flex: 0 0 auto;
+    }
+    .bp-home-sub {
+      text-align: center; font-size: 13px; color: #9aa3b2; margin: 6px 0 10px;
+      flex: 0 0 auto;
+    }
+    .bp-contacts {
+      flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto;
+      -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+      display: flex; flex-direction: column;
+      scrollbar-width: thin; scrollbar-color: #4a5568 transparent;
+    }
+    .bp-contacts::-webkit-scrollbar { width: 5px; }
+    .bp-contacts::-webkit-scrollbar-thumb {
+      background: #4a5568; border-radius: 999px;
+    }
+    .bp-contact {
+      display: flex; align-items: center; gap: 14px;
+      width: 100%; border: 0; background: transparent; color: inherit;
+      text-align: left; padding: 14px 16px; cursor: pointer; font-family: inherit;
+      flex: 0 0 auto;
+    }
+    .bp-contact:hover { background: rgba(255,255,255,.06); }
+    .bp-contact-avatar, .bp-contact-letter {
+      width: 58px; height: 58px; border-radius: 50%; flex: 0 0 auto;
+      object-fit: cover; background: #1e2430; border: 1px solid #3a4456;
+      image-rendering: pixelated;
+    }
+    .bp-contact-letter {
+      display: grid; place-items: center; font-weight: 800; color: #14210f;
+      background: var(--accent); border-color: var(--accent); font-size: 24px;
+    }
+    .bp-contact-meta { min-width: 0; flex: 1; }
+    .bp-contact-name {
+      font-size: 17px; font-weight: 700; line-height: 1.25;
+      white-space: normal; overflow-wrap: anywhere;
+    }
+    .bp-contact-role {
+      font-size: 14px; color: #9aa3b2; margin-top: 3px; line-height: 1.3;
+      white-space: normal; overflow-wrap: anywhere;
+    }
+    /* Попап входящего звонка — не блокирует мир (как ачивка) */
+    #callPopup {
+      position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 91;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      background: var(--panel); border: 3px solid var(--accent); border-radius: 14px;
+      padding: 12px 18px 14px; box-shadow: 0 12px 44px rgba(0,0,0,.55);
+      min-width: 220px; max-width: min(340px, calc(var(--sw) * .9));
+      pointer-events: auto;
+    }
+    #callPopup.call-popup-in { animation: achPopupIn .35s ease-out; }
+    .call-popup-caption { font-size: 12px; opacity: .8; letter-spacing: .04em; text-transform: uppercase; }
+    .call-popup-row { display: flex; align-items: center; gap: 10px; width: 100%; }
+    .call-popup-avatar {
+      width: 48px; height: 48px; border-radius: 50%; object-fit: contain; flex: 0 0 auto;
+      background: #1e2430; border: 2px solid rgba(122,192,122,.55);
+      image-rendering: pixelated;
+    }
+    .call-popup-name { font-weight: 800; font-size: 16px; line-height: 1.2; }
+    .call-popup-actions { display: flex; gap: 28px; margin-top: 4px; }
+    .call-popup-btn {
+      width: 44px; height: 44px; border-radius: 50%; border: 0; color: #fff;
+      font-size: 18px; cursor: pointer; display: grid; place-items: center;
+      box-shadow: 0 6px 16px rgba(0,0,0,.35);
+    }
+    .call-popup-btn:hover { filter: brightness(1.08); }
+    #callPopupDecline { background: #e5484d; }
+    #callPopupAccept { background: #2f9e57; }
     .bp-label {
       font-size: 13px; letter-spacing: .04em; text-transform: uppercase;
       color: #9aa3b2; margin-bottom: 18px;
@@ -280,11 +409,34 @@
     }
     .bp-participant-img {
       width: 100%; height: 100%; object-fit: contain; background: #1e2430;
+      image-rendering: pixelated;
     }
     .bp-participant-name {
       position: absolute; left: 8px; bottom: 8px;
       padding: 3px 8px; border-radius: 8px;
       background: rgba(0, 0, 0, .55); font-size: 11px; font-weight: 600;
+    }
+    .bp-dialing {
+      position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%);
+      z-index: 2; display: flex; align-items: center; gap: 8px;
+      padding: 5px 10px; border-radius: 999px;
+      background: rgba(0, 0, 0, .58); color: #dfe7f3;
+      font-size: 12px; font-weight: 700;
+    }
+    .bp-dialing.hidden { display: none; }
+    .bp-dialing-dots {
+      display: inline-flex; gap: 3px; align-items: center;
+    }
+    .bp-dialing-dots i {
+      width: 4px; height: 4px; border-radius: 50%;
+      background: currentColor; opacity: .35;
+      animation: bpDialDot 1s infinite ease-in-out;
+    }
+    .bp-dialing-dots i:nth-child(2) { animation-delay: .18s; }
+    .bp-dialing-dots i:nth-child(3) { animation-delay: .36s; }
+    @keyframes bpDialDot {
+      0%, 80%, 100% { opacity: .35; transform: translateY(0); }
+      40% { opacity: 1; transform: translateY(-3px); }
     }
     .bp-bubble {
       position: absolute; left: 8px; right: 8px; top: 8px; z-index: 2;
@@ -341,14 +493,90 @@
     .bp-call.is-ended .bp-hangup-row,
     .bp-call.is-ended .bp-replies,
     .bp-call.is-ended .bp-pin-wrap,
+    .bp-call.is-ended .bp-alert-wrap,
     .bp-call.is-ended .bp-player-line { display: none !important; }
+    .bp-alert-wrap { display: flex; flex-direction: column; gap: 8px; width: 100%; flex: 0 0 auto; }
+    .bp-alert-wrap.hidden { display: none; }
+    .bp-alert-open {
+      display: block; width: 100%; margin: 0; padding: 0; overflow: hidden;
+      border: 1px solid #2c3340; border-radius: 12px;
+      background: #141820; color: inherit; font-family: inherit;
+      cursor: zoom-in; text-align: left;
+    }
+    .bp-alert-open:hover { border-color: #3d8bfd; }
+    #bpAlertThumb { display: block; width: 100%; height: 88px; pointer-events: none; }
+    .bp-alert-open-cap {
+      display: block; padding: 6px 8px;
+      font-size: 12px; font-weight: 700; color: #9ec5ff; background: #1a1f28;
+    }
+    #alertShotModal {
+      position: fixed; inset: 0; z-index: 90;
+      background: rgba(8, 10, 14, .86);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    #alertShotModal.hidden { display: none !important; }
+    .alert-shot-box {
+      position: relative;
+      width: min(720px, calc(var(--sw) * .94));
+      background: var(--panel);
+      border: 3px solid var(--accent);
+      border-radius: 16px;
+      padding: 18px 18px 16px;
+      box-shadow: 0 12px 44px rgba(0,0,0,.55);
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .alert-shot-toolbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding-right: 40px;
+    }
+    .alert-shot-fill {
+      width: 42px; height: 42px; border-radius: 10px; padding: 0;
+      border: 2px solid var(--accent); background: var(--panel); color: var(--text);
+      cursor: pointer; display: grid; place-items: center; flex: 0 0 auto;
+    }
+    .alert-shot-fill:hover { filter: brightness(1.08); }
+    .alert-shot-fill.sel { background: var(--accent); color: #14210f; }
+    .alert-shot-fill svg { width: 22px; height: 22px; }
+    .alert-shot-colors { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+    .alert-shot-colors.hidden { display: none; }
+    .alert-shot-swatch {
+      width: 26px; height: 26px; border-radius: 50%; border: 2px solid #1b1f24;
+      box-shadow: 0 0 0 1px #5a6473; cursor: pointer; padding: 0;
+    }
+    .alert-shot-swatch.sel { box-shadow: 0 0 0 2px #fff; }
+    #alertShotCanvas {
+      display: block; width: 100%; height: min(420px, calc(var(--sh) * .52));
+      border-radius: 12px; background: #141820; border: 1px solid #2c3340;
+      touch-action: none; cursor: default;
+    }
+    #alertShotCanvas.is-fill {
+      cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24'><path fill='%23eef2f8' stroke='%231b1f24' stroke-width='1.3' d='M4.2 13.4 12.2 5.4l6.4 6.4-8 8a3.6 3.6 0 01-5.1 0l-1.3-1.3a3.6 3.6 0 010-5.1z'/><path fill='%23e5484d' d='M17.6 12.6c1.2 1.4 2.6 1.6 3.5.6.5 1.6-.6 3.3-2.4 4.2-1.7.8-3.3.2-3.9-1.1.7-.3 1.7-1.4 2.8-3.7z'/></svg>") 4 22, crosshair;
+    }
+    .alert-shot-send {
+      align-self: flex-end; border: 0; border-radius: 12px;
+      padding: 10px 16px; background: #3d8bfd; color: #fff;
+      font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+    }
+    .alert-shot-send.hidden { display: none; }
+    .alert-shot-send:hover { filter: brightness(1.06); }
+    #alertShotModal .slides-icon { top: 8px; right: 8px; }
     .bp-ended {
-      display: none; flex-direction: column; align-items: center; gap: 6px;
+      display: none; flex-direction: column; align-items: center; gap: 10px;
       padding: 10px 8px 4px; text-align: center;
     }
     .bp-call.is-ended .bp-ended { display: flex; }
     .bp-ended-title { font-size: 15px; font-weight: 700; color: #eef2f8; }
     .bp-ended-sub { font-size: 12px; color: #9aa3b2; }
+    .bp-back-contacts {
+      margin-top: 4px; border: 0; border-radius: 12px;
+      padding: 11px 16px; min-width: 180px;
+      background: #3d8bfd; color: #fff;
+      font-family: inherit; font-size: 14px; font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, .3);
+    }
+    .bp-back-contacts:hover { filter: brightness(1.06); }
 
     /* Кнопка перевода реплики Бульба Кота — над облачком, поверх диалога */
     .cat-translate {
@@ -532,6 +760,14 @@
     .bq-play:active:not(:disabled) { transform: scale(.98); }
     .bq-play:disabled { opacity: .4; cursor: default; }
     .bq-play svg { width: 52px; height: 52px; fill: currentColor; margin-left: 7px; }
+    .bq-story-play {
+      display: block; width: 100%; margin: 8px 0 4px;
+      padding: 10px 12px; border: 0; border-radius: 10px;
+      background: #2f6fed; color: #fff; font: inherit; font-weight: 700;
+      cursor: pointer;
+    }
+    .bq-story-play:hover { filter: brightness(1.06); }
+    .bq-story-play.hidden { display: none; }
     .bq-topics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; width: 100%; }
     .bq-topic, .bq-opt, .bq-shop-btn {
       width: 100%; text-align: left; background: rgba(255,255,255,.04); color: var(--text);
@@ -1273,16 +1509,20 @@
     .xp-startmenu-item:hover { background: #316ac5; color: #fff; }
 
     /* Ноутбук в главном офисе: MacBook-рамка и рабочий стол в духе macOS */
-    #laptop { position: fixed; inset: 0; z-index: 80; background: rgba(8,10,14,.9); display: flex; align-items: center; justify-content: center; padding: 16px; }
+    #laptop { position: fixed; inset: 0; z-index: 80; background: rgba(8,10,14,.9); display: flex; align-items: stretch; justify-content: stretch; padding: 8px; }
     .mac-chassis {
       position: relative;
-      width: min(960px, calc(var(--sw) * .96));
+      display: flex; flex-direction: column;
+      flex: 1; min-width: 0; min-height: 0;
+      width: auto; height: auto;
       background: linear-gradient(180deg, #d8dce3 0%, #b8bec8 55%, #9aa3b0 100%);
       border-radius: 18px 18px 10px 10px;
       padding: 14px 14px 10px;
       box-shadow: 0 22px 64px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.55);
     }
     .mac-bezel {
+      flex: 1; min-height: 0;
+      display: flex; flex-direction: column;
       background: #1a1a1a;
       border-radius: 12px;
       padding: 10px 10px 14px;
@@ -1295,15 +1535,17 @@
     }
     .mac-screen {
       position: relative; overflow: hidden; border-radius: 4px;
-      height: min(560px, calc(var(--sh) * .7));
+      flex: 1; min-height: 0; height: auto;
       background: #000;
     }
     .mac-hinge {
+      flex-shrink: 0;
       height: 10px; margin-top: 8px; border-radius: 0 0 6px 6px;
       background: linear-gradient(180deg, #8e96a3, #6f7785);
       box-shadow: inset 0 1px 0 rgba(255,255,255,.25);
     }
     .mac-base {
+      flex-shrink: 0;
       height: 18px; margin: 0 28px; border-radius: 0 0 10px 10px;
       background: linear-gradient(180deg, #c5cad3, #a8b0bc);
       box-shadow: 0 4px 10px rgba(0,0,0,.25);
@@ -1383,6 +1625,10 @@
       background: linear-gradient(160deg, #3d8bfd, #1a5fd0);
       color: #fff; font-size: 20px; font-weight: 700;
     }
+    .mac-shortcut-icon-pres {
+      background: linear-gradient(160deg, #f3c14e, #d4891a);
+      color: #5a3208; font-size: 20px; font-weight: 700;
+    }
     .mac-shortcut-label {
       font-size: 11px; text-align: center;
       text-shadow: 0 1px 3px rgba(0,0,0,.75);
@@ -1405,6 +1651,7 @@
     .mac-dock-item-claude { background: linear-gradient(160deg, #d4a27f, #c47a4a); color: #5a2e14; }
     .mac-dock-item-cursor { background: linear-gradient(160deg, #2a2a2a, #111); color: #fff; }
     .mac-dock-item-bulbatalk { background: linear-gradient(160deg, #3d8bfd, #1a5fd0); color: #fff; }
+    .mac-dock-item-pres { background: linear-gradient(160deg, #f3c14e, #d4891a); color: #5a3208; }
     .mac-dock-item.is-running::after {
       content: ""; position: absolute; left: 50%; bottom: -5px; transform: translateX(-50%);
       width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,.85);
@@ -1519,6 +1766,7 @@
     }
     .mac-bt-call-info { min-width: 0; }
     .mac-bt-call-title { font-size: 15px; font-weight: 650; color: #f2f5fa; }
+    .mac-bt-empty { padding: 22px 8px; text-align: center; color: #8b93a1; font-size: 14px; }
     .mac-bt-call-status {
       margin-top: 4px; font-size: 12px; color: #7ddea0;
       display: flex; align-items: center; gap: 6px;
@@ -1624,10 +1872,176 @@
     .mac-bt-hangup:hover { filter: brightness(1.08); }
     .mac-bt-hangup-icon { display: block; transform: rotate(135deg); }
 
+    .mac-chat-pay {
+      margin-top: 8px; border: 0; border-radius: 12px;
+      padding: 8px 12px; background: #c47a4a; color: #fff;
+      font-family: inherit; font-size: 13px; font-weight: 650; cursor: pointer;
+    }
+    .mac-chat-pay:hover { filter: brightness(1.06); }
+    .mac-chat-pay:disabled { opacity: .55; cursor: default; }
+
+    .mac-pres-body {
+      flex: 1; min-height: 0; overflow: auto;
+      background: #f7f4ee; padding: 16px;
+    }
+    .mac-pres-home {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; min-height: 100%; text-align: center;
+    }
+    .mac-pres-heading { font-size: 20px; font-weight: 700; color: #1b3a5f; }
+    .mac-pres-hint { margin: 0; max-width: 360px; color: #5a5348; font-size: 13px; line-height: 1.4; }
+    .mac-pres-primary, .mac-pres-secondary, .mac-pres-back {
+      border: 0; border-radius: 10px; padding: 10px 16px;
+      font-family: inherit; font-size: 14px; font-weight: 650; cursor: pointer;
+    }
+    .mac-pres-primary { background: #1b3a5f; color: #fff; }
+    .mac-pres-secondary { background: #c47a4a; color: #fff; }
+    .mac-pres-back { background: #e8e2d6; color: #2a241c; }
+    .mac-pres-wait { min-height: 100%; display: grid; place-items: center; color: #5a5348; font-size: 15px; }
+    .mac-pres-viewer { display: flex; flex-direction: column; gap: 10px; height: 100%; }
+    .mac-pres-slide {
+      flex: 1; min-height: 0; width: 100%; object-fit: contain;
+      background: #fff; border-radius: 8px; border: 1px solid #d8d0c2;
+      pointer-events: none;
+    }
+    .mac-pres-nav { display: flex; align-items: center; justify-content: center; gap: 12px; }
+    .mac-pres-nav button {
+      width: 36px; height: 32px; border: 0; border-radius: 8px;
+      background: #1b3a5f; color: #fff; cursor: pointer;
+    }
+    .mac-pres-nav button:disabled { opacity: .4; cursor: default; }
+    .mac-pres-nav-label { font-size: 12px; color: #5a5348; min-width: 140px; text-align: center; }
+
+    .mac-bt-call.is-pres .mac-bt-grid { display: none; }
+    .mac-bt-pres {
+      flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px;
+      padding: 6px 10px 0;
+    }
+    .mac-bt-pres-top {
+      flex: 0 0 26%; min-height: 0; display: grid;
+      grid-template-columns: 1fr 1.4fr; gap: 6px;
+    }
+    .mac-bt-pres-boss {
+      position: relative; overflow: hidden; border-radius: 10px;
+      background: #1e2430; border: 1px solid #2c3340;
+    }
+    .mac-bt-pres-boss .mac-bt-avatar { width: 100%; height: 100%; object-fit: contain; }
+    .mac-bt-pres-preview {
+      position: relative; overflow: hidden; border-radius: 10px;
+      background: #11141a; border: 1px solid #2c3340;
+      display: grid; place-items: center;
+    }
+    .mac-bt-pres-slide {
+      width: 100%; height: 100%; border: 0; background: #05080c;
+      pointer-events: none;
+    }
+    img.mac-bt-pres-slide { object-fit: contain; }
+    .mac-bt-pres-empty { color: #8b93a1; font-size: 12px; text-align: center; padding: 8px; }
+    .mac-bt-pres-tools {
+      flex: 1; min-height: 0; overflow: hidden;
+      background: #1a1f28; border: 1px solid #2c3340; border-radius: 10px;
+      padding: 6px;
+    }
+    .mac-bt-deck { display: flex; flex-direction: column; gap: 6px; font-size: 11px; height: 100%; min-height: 0; }
+    .mac-bt-deck-hint { color: #9aa3b2; font-size: 10px; line-height: 1.3; flex: 0 0 auto; }
+    .mac-bt-deck-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-rows: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      touch-action: none;
+    }
+    .mac-bt-deck-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      height: 100%;
+      border: 1px solid #3a4456;
+      border-radius: 7px;
+      background: #262b35;
+      padding: 4px;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .mac-bt-deck-card.is-off { opacity: .48; }
+    .mac-bt-deck-card.is-on { border-color: #3d8bfd; box-shadow: inset 0 0 0 1px rgba(61,139,253,.35); }
+    .mac-bt-deck-card.is-dragging { opacity: .85; cursor: grabbing; outline: 2px solid #3d8bfd; z-index: 2; }
+    .mac-bt-deck-card-num {
+      position: absolute; top: 5px; left: 5px; z-index: 2;
+      min-width: 16px; height: 16px; padding: 0 4px;
+      border-radius: 4px; background: rgba(8,12,18,.82);
+      color: #fff; font-size: 10px; font-weight: 700;
+      display: grid; place-items: center;
+    }
+    .mac-bt-deck-card-thumb {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #0d1118;
+      border: 1px solid #2c3340;
+    }
+    .mac-bt-deck-card-frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      pointer-events: none;
+      background: #05080c;
+    }
+    .mac-bt-deck-card-fallback {
+      width: 100%; height: 100%;
+      display: grid; place-items: center;
+      padding: 4px; text-align: center;
+      color: #d7deea; font-size: 10px; line-height: 1.2; font-weight: 600;
+    }
+    .mac-bt-deck-card-toggle {
+      position: absolute; top: 5px; right: 5px; z-index: 2;
+      width: 18px; height: 18px;
+      display: grid; place-items: center;
+      border-radius: 4px; background: rgba(8,12,18,.82);
+      pointer-events: none;
+    }
+    .mac-bt-deck-card-toggle input {
+      width: 12px; height: 12px; margin: 0; accent-color: #3d8bfd; pointer-events: none;
+    }
+    .mac-bt-deck-send {
+      width: 100%; padding: 6px 10px;
+      border: 1px solid #2f9e57; border-radius: 7px;
+      background: #2f9e57; color: #eef2f8;
+      font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+      flex: 0 0 auto;
+    }
+    .mac-bt-deck-send:disabled { opacity: .45; cursor: default; }
+
+    @media (max-width: 900px) {
+      .mac-bt-pres-top { flex-basis: 22%; }
+      .mac-bt-deck-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-rows: repeat(4, minmax(0, 1fr));
+      }
+    }
+
     /* Мобильный адаптив ноутбука / BulbaTalk (pointer: coarse = тач, как isTouch()) */
     @media (pointer: coarse) {
+      #laptop { padding: 4px; }
+      .mac-chassis { padding: 6px 6px 4px; border-radius: 12px 12px 8px 8px; }
+      .mac-bezel { padding: 4px 4px 8px; border-radius: 8px; }
+      .mac-camera { width: 6px; height: 6px; margin: 0 auto 4px; }
+      .mac-hinge { height: 6px; margin-top: 4px; }
+      .mac-base { height: 10px; margin: 0 14px; }
+      .mac-power { width: 22px; height: 22px; right: 10px; bottom: 2px; font-size: 11px; }
+      .mac-menubar { height: 24px; font-size: 11px; padding: 0 8px; }
+
       .mac-shortcuts {
-        top: 36px; left: 10px;
+        top: 30px; left: 8px;
         display: grid; grid-template-columns: repeat(2, 70px); gap: 8px 8px;
         max-height: calc(100% - 64px);
       }
@@ -1639,32 +2053,49 @@
       .mac-bt-window { z-index: 4; }
       .mac-dock { z-index: 5; }
 
-      .mac-bt-window { inset: 30px 12px 56px 12px; }
-      .mac-bt-window.is-maximized { inset: 28px 4px 52px 4px; }
-      .mac-bt-call { align-items: center; }
+      .mac-bt-window { inset: 26px 4px 50px 4px; }
+      .mac-bt-window.is-maximized { inset: 24px 0 46px 0; border-radius: 0; }
+      .mac-bt-call { align-items: stretch; }
       .mac-bt-call-heading {
-        align-self: stretch; padding: 4px 8px 0; font-size: 11px;
+        align-self: stretch; padding: 6px 8px 2px; font-size: 13px;
       }
       .mac-bt-controls {
         align-self: stretch; gap: 14px; padding: 6px 8px 8px;
       }
-      .mac-bt-ctrl { width: 38px; height: 38px; font-size: 16px; }
+      .mac-bt-ctrl { width: 42px; height: 42px; font-size: 16px; }
       .mac-bt-grid {
-        flex: 1 1 0;
+        flex: 1 1 auto;
         min-height: 0;
         min-width: 0;
-        width: auto;
-        height: 100%;
-        max-width: 100%;
-        aspect-ratio: 1 / 1;
-        margin: 0 auto;
-        padding: 4px 6px;
-        gap: 4px;
+        width: 100%;
+        height: auto;
+        max-width: none;
+        aspect-ratio: unset;
+        margin: 0;
+        padding: 4px 8px;
+        gap: 6px;
       }
       .mac-bt-avatar { object-fit: cover; object-position: center 28%; }
-      .mac-bt-bubble-text { font-size: 11px; }
-      .mac-bt-replies { min-width: 180px; max-width: min(260px, 80%); }
-      .mac-bt-reply { font-size: 11px; padding: 7px 10px; white-space: normal; }
+      .mac-bt-participant-name {
+        font-size: 12px; left: 6px; right: 6px; bottom: 6px;
+        max-width: calc(100% - 12px);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .mac-bt-bubble {
+        left: 4px; right: 4px; top: 4px; padding: 8px 9px;
+        max-height: calc(100% - 28px); overflow-y: auto;
+      }
+      .mac-bt-bubble-text { font-size: 14px; line-height: 1.3; }
+      .mac-bt-player-bubble {
+        min-width: 140px; max-width: min(260px, 86%);
+      }
+      .mac-bt-player-bubble-text { font-size: 13px; }
+      .mac-bt-replies {
+        min-width: min(280px, 92vw);
+        max-width: min(320px, 92%);
+      }
+      .mac-bt-reply { font-size: 13px; padding: 9px 12px; white-space: normal; }
+      .mac-bt-pres-top { flex-basis: 30%; grid-template-columns: 1fr 1.2fr; }
     }
 
     /* Смена пароля */
@@ -1707,6 +2138,169 @@
     #monitoring .lb-close:hover { background: #ff780a; color: #111217; border-color: #ff780a; }
     #monitoring .lb-nav { border-color: #2c3235; background: #181b1f; color: #d8d9da; border-radius: 2px; }
     #monitoring .lb-nav:hover { background: #ff780a; color: #111217; border-color: #ff780a; }
+
+    #packagePeek { position: fixed; inset: 0; z-index: 80; background: rgba(8,10,14,.78); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .pkg-peek-box { background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 20px 22px; max-width: min(460px, calc(var(--sw) * .94)); box-shadow: 0 12px 44px rgba(0,0,0,.55); }
+    .pkg-peek-text { margin: 0 0 16px; font-size: 16px; line-height: 1.45; text-align: center; }
+    .pkg-peek-img { display: block; width: min(360px, 100%); height: auto; margin: 0 auto 16px; border-radius: 10px; image-rendering: pixelated; }
+    #storyIntro { position: fixed; inset: 0; z-index: 82; background: rgba(8,10,14,.78); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .story-intro-box { max-width: min(520px, calc(var(--sw) * .94)); }
+    .story-intro-title { margin: 0 0 14px; font-size: 20px; text-align: center; color: var(--accent); }
+    .story-intro-text { margin: 0 0 12px; font-size: 16px; line-height: 1.5; text-align: left; }
+    .story-intro-box .dlg-options { justify-content: center; margin-top: 6px; }
+
+    #dayXHall { position: fixed; inset: 0; z-index: 72; pointer-events: none; }
+    #dayXHall:not(.hidden) { pointer-events: auto; }
+    #dayXProjector { position: fixed; z-index: 73; overflow: hidden; background: #f5f5f5; border: 2px solid #222; box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); pointer-events: none; }
+    #dayXProjector.hidden { display: none; }
+    #dayXProjectorMedia { position: absolute; inset: 0; overflow: hidden; }
+    .dayx-slide-media { display: block; width: 100%; height: 100%; border: 0; background: #fff; }
+    .dayx-slide-img { object-fit: contain; }
+    .dayx-slide-iframe { object-fit: unset; }
+    /* Overlay поверх слайда: Бульбазавры за столом закрывают проектор (Phaser-overlay под DOM не виден). */
+    #dayXOverlay {
+      position: fixed; z-index: 74; pointer-events: none;
+      image-rendering: pixelated; object-fit: fill;
+    }
+    #dayXOverlay.hidden { display: none; }
+    #dayXBubbles { position: fixed; inset: 0; z-index: 75; pointer-events: none; }
+    .dayx-bubble { position: fixed; transform: translate(-50%, -100%); max-width: min(280px, 32vw); background: #fffef8; color: #1b1f24; border: 3px solid #3a414c; border-radius: 16px; padding: 10px 14px; font-size: clamp(12px, calc(var(--sw) * .013), 15px); line-height: 1.35; box-shadow: 0 10px 28px rgba(0,0,0,.45); }
+    .dayx-bubble::after { content: ""; position: absolute; left: 50%; bottom: -12px; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #3a414c; }
+    .dayx-bubble-text { white-space: pre-wrap; }
+    .dayx-bubble-speaker { border-color: #5a8fd4; }
+    .dayx-bubble-speaker::after { border-top-color: #5a8fd4; }
+    #dayXDialogue { position: fixed; z-index: 76; display: flex; align-items: flex-end; justify-content: center; padding: 0 10px 10px; pointer-events: none; box-sizing: border-box; }
+    #dayXDialogue.hidden { display: none; }
+    #dayXDialogue .dlg-frame { pointer-events: auto; max-width: 100%; padding: 12px 18px; }
+    #dayXDesktop {
+      position: fixed; inset: 0; z-index: 77;
+      background: rgba(8,10,14,.55);
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px; pointer-events: auto;
+    }
+    #dayXDesktop.hidden { display: none; }
+    /* ~50% площади экрана: корпус монитора как в дата-центре, внутри — Win10 */
+    .dayx-pc-case {
+      position: relative;
+      background: linear-gradient(#e8e2cf, #cfc8b2);
+      border-radius: 18px;
+      padding: 18px 18px 40px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.6);
+      width: min(980px, calc(var(--sw) * 0.78));
+    }
+    .dayx-pc-case .pc-screen {
+      background: #000;
+      border: 6px solid #3a3a38;
+      border-radius: 8px;
+      overflow: hidden;
+      width: 100%;
+      height: min(520px, calc(var(--sh) * 0.52));
+    }
+    .dayx-pc-case .pc-brand {
+      position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+      color: #6b6552; font-size: 13px; font-style: italic; letter-spacing: 1px;
+    }
+    .win10-desktop {
+      position: relative; width: 100%; height: 100%; overflow: hidden;
+      background: url("assets/ui/win10-wallpaper.jpg") center / cover no-repeat;
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+    .win10-icons {
+      position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 4px; z-index: 1;
+    }
+    .win10-shortcut {
+      width: 72px; display: flex; flex-direction: column; align-items: center; gap: 3px;
+      background: transparent; border: 1px solid transparent; border-radius: 2px;
+      padding: 6px 4px 4px; cursor: pointer; color: #fff;
+    }
+    .win10-shortcut:hover, .win10-shortcut:focus { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.35); }
+    .win10-shortcut.hidden { display: none; }
+    .win10-shortcut-icon {
+      width: 36px; height: 36px; display: grid; place-items: center; font-size: 18px;
+      border-radius: 2px; box-shadow: 0 1px 3px rgba(0,0,0,.35);
+    }
+    .win10-shortcut-icon.ppsx { background: linear-gradient(180deg, #ff9a56, #e85d04); }
+    .win10-shortcut-icon.folder { background: linear-gradient(180deg, #ffd966, #f4b400); }
+    .win10-shortcut-label { font-size: 10px; line-height: 1.2; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,.9); }
+    .win10-explorer {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -52%);
+      width: min(88%, 440px); height: min(72%, 260px);
+      display: flex; flex-direction: column; background: #fff; border: 1px solid #ababab;
+      box-shadow: 0 12px 38px rgba(0,0,0,.45); z-index: 2;
+    }
+    .win10-explorer.hidden { display: none; }
+    .win10-explorer-titlebar {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 0 0 0 10px; height: 32px; background: #fff; border-bottom: 1px solid #e5e5e5;
+    }
+    .win10-explorer-title { font-size: 12px; color: #1a1a1a; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .win10-winbtns { display: flex; height: 100%; }
+    .win10-winbtn {
+      width: 46px; border: 0; background: transparent; color: #1a1a1a; font-size: 14px; cursor: pointer;
+    }
+    .win10-winbtn:hover { background: #e5e5e5; }
+    .win10-winbtn.close:hover { background: #e81123; color: #fff; }
+    .win10-explorer-ribbon {
+      display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+      background: #f3f3f3; border-bottom: 1px solid #e0e0e0; font-size: 12px; color: #444;
+    }
+    .win10-explorer-body {
+      flex: 1; overflow: auto; padding: 16px; background: #fff;
+      display: flex; flex-wrap: wrap; gap: 12px; align-content: flex-start;
+    }
+    .win10-explorer-body .win10-shortcut { color: #1a1a1a; }
+    .win10-explorer-body .win10-shortcut-label { color: #1a1a1a; text-shadow: none; }
+    .win10-explorer-body .win10-shortcut:hover { background: rgba(0,120,215,.12); border-color: rgba(0,120,215,.35); }
+    .win10-taskbar {
+      position: absolute; left: 0; right: 0; bottom: 0; height: 32px; z-index: 3;
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(20,20,20,.92); backdrop-filter: blur(8px);
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    .win10-start {
+      height: 100%; padding: 0 18px; border: 0; background: transparent; color: #fff;
+      font-size: 18px; cursor: default;
+    }
+    .win10-taskbar-tray { display: flex; align-items: center; gap: 12px; padding-right: 14px; color: #fff; font-size: 12px; }
+    #dayXCongrats { position: fixed; inset: 0; z-index: 78; background: rgba(8,10,14,.82); display: flex; align-items: center; justify-content: center; padding: 20px; pointer-events: auto; }
+    #dayXCongrats.hidden { display: none; }
+    #dayXConfetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+    #dayXFail { position: fixed; inset: 0; z-index: 78; background: rgba(8,10,14,.82); display: flex; align-items: center; justify-content: center; padding: 20px; pointer-events: auto; }
+    #dayXFail.hidden { display: none; }
+    #dayXInvestorMeter {
+      position: fixed; z-index: 76; pointer-events: none;
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 8px 14px 10px; box-sizing: border-box;
+    }
+    #dayXInvestorMeter.hidden { display: none; }
+    .dayx-meter-hint { font-size: clamp(11px, calc(var(--sw) * .012), 13px); color: #f0f4f8; text-shadow: 0 1px 4px rgba(0,0,0,.85); font-weight: bold; letter-spacing: .02em; }
+    .dayx-meter-wrap { position: relative; width: min(420px, 88%); }
+    .dayx-meter-track {
+      position: relative; height: 14px; border-radius: 999px;
+      background: rgba(20,24,32,.75); border: 2px solid rgba(255,255,255,.25);
+      overflow: visible;
+    }
+    .dayx-meter-fill {
+      height: 100%; width: 50%; border-radius: 999px;
+      background: linear-gradient(90deg, #c9a227, #7ac07a);
+      transition: width .45s ease, background .35s ease;
+    }
+    .dayx-meter-fill.dayx-meter-bad { background: linear-gradient(90deg, #a04040, #c06060); }
+    .dayx-meter-fill.dayx-meter-good { background: linear-gradient(90deg, #5a9a5a, #9ad49a); }
+    .dayx-meter-mark {
+      position: absolute; top: -22px; transform: translateX(-50%);
+      font-size: 10px; color: #9ad49a; font-weight: bold; white-space: nowrap;
+      text-shadow: 0 1px 3px rgba(0,0,0,.9);
+    }
+    .dayx-meter-mark::after {
+      content: ""; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%);
+      width: 2px; height: 6px; background: #9ad49a; border-radius: 1px;
+    }
+    .dayx-meter-value { font-size: clamp(12px, calc(var(--sw) * .013), 14px); color: #fff; font-weight: bold; text-shadow: 0 1px 4px rgba(0,0,0,.85); }
+    .dayx-congrats-box { position: relative; z-index: 2; background: var(--panel); border: 3px solid var(--accent); border-radius: 18px; padding: 24px 26px; max-width: min(520px, calc(var(--sw) * .92)); text-align: center; box-shadow: 0 16px 44px rgba(0,0,0,.55); }
+    .dayx-congrats-box h2 { margin: 0 0 10px; font-size: clamp(22px, calc(var(--sw) * .028), 30px); }
+    .dayx-congrats-box p { margin: 0 0 18px; line-height: 1.45; opacity: .9; }
+    .dayx-congrats-emoji { font-size: clamp(28px, calc(var(--sw) * .038), 40px); letter-spacing: 8px; margin: 0 0 8px; line-height: 1; }
 
     /* Попап получения ачивки */
     #achPopup { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 90; display: flex; align-items: center; gap: 12px; background: var(--panel); border: 3px solid var(--accent); border-radius: 14px; padding: 12px 18px; box-shadow: 0 12px 44px rgba(0,0,0,.55); max-width: min(360px, calc(var(--sw) * .9)); }
@@ -1983,6 +2577,7 @@
       #hint { display: none; }
       h1 { display: none; }
       html, body { overflow: hidden; }
+      #storyHint { font-size: 12px; }
     }
 
     /* Тач-управление миром: джойстик слева, кнопка действия справа. */
@@ -2019,7 +2614,10 @@
     <input id="chatInput" class="chat-input hidden" type="text" maxlength="200" autocomplete="off"
            placeholder="Сообщение… (Enter — отправить)" />
 
-    <div id="emoteBar" class="emote-bar hidden"></div>
+    <div id="bottomDock">
+      <div id="storyHint" class="hidden"></div>
+      <div id="emoteBar" class="emote-bar hidden"></div>
+    </div>
 
     <div id="select" class="hidden">
       <h2>Выбери Бульбазавра</h2>
@@ -2059,7 +2657,17 @@
         <div class="bp-notch" aria-hidden="true"></div>
         <button type="button" class="bp-close" id="bulbaPhoneClose" aria-label="сбросить">×</button>
         <div class="bp-screen">
-          <div class="bp-incoming" id="bpIncoming">
+          <button type="button" class="bp-sfx-hint hidden" id="bpSfxHint" aria-label="включить звук">
+            <span class="bp-sfx-hint-icon" aria-hidden="true">🔇</span>
+            <span class="bp-sfx-hint-text">Звук выключен</span>
+            <span class="bp-sfx-hint-action">Включить</span>
+          </button>
+          <div class="bp-home hidden" id="bpHome">
+            <div class="bp-home-title">BulbaPhone</div>
+            <div class="bp-home-sub">Корпоративный справочник</div>
+            <div class="bp-contacts" id="bpContacts"></div>
+          </div>
+          <div class="bp-incoming hidden" id="bpIncoming">
             <div class="bp-label">Входящий вызов</div>
             <div class="bp-avatar-wrap">
               <img class="bp-avatar" id="bpIncomingAvatar" alt="" draggable="false" />
@@ -2084,6 +2692,16 @@
                 </div>
                 <img class="bp-participant-img" id="bpCallAvatar" alt="" draggable="false" />
                 <div class="bp-participant-name" id="bpCallName">Бульбов Н.Н.</div>
+                <div class="bp-dialing hidden" id="bpDialing">
+                  <span>Дозваниваемся</span>
+                  <span class="bp-dialing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                </div>
+              </div>
+              <div class="bp-alert-wrap hidden" id="bpAlertWrap">
+                <button type="button" class="bp-alert-open" id="bpAlertOpen" aria-label="Открыть картинку">
+                  <canvas id="bpAlertThumb"></canvas>
+                  <span class="bp-alert-open-cap">Открыть картинку</span>
+                </button>
               </div>
               <div class="bp-player-line" id="bpPlayerLine"></div>
               <div class="bp-replies hidden" id="bpReplies"></div>
@@ -2094,6 +2712,7 @@
               <div class="bp-ended" id="bpEnded" aria-live="polite">
                 <div class="bp-ended-title">Звонок завершён</div>
                 <div class="bp-ended-sub" id="bpEndedSub">Бульбов Н.Н. сбросил трубку</div>
+                <button type="button" class="bp-back-contacts" id="bpBackToContacts">К контактам</button>
               </div>
               <div class="bp-hangup-row">
                 <button type="button" class="bp-hangup" id="bpHangup" aria-label="завершить звонок" title="Завершить">
@@ -2103,6 +2722,26 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div id="alertShotModal" class="hidden" role="dialog" aria-modal="true" aria-label="Скрин алерта">
+      <div class="alert-shot-box" id="alertShotBox">
+        <button type="button" class="slides-icon" id="alertShotClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <div class="alert-shot-toolbar">
+          <button type="button" class="alert-shot-fill" id="alertShotFill" aria-label="Заливка" title="Заливка">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M19.2 11.2 12 4 3.6 12.4a5 5 0 007 7.1l8.6-8.3z"/>
+              <path d="m16 8 4 4"/>
+              <path d="M5 16c.9 2 2.3 3.4 4 4"/>
+            </svg>
+          </button>
+          <div class="alert-shot-colors hidden" id="alertShotColors"></div>
+        </div>
+        <canvas id="alertShotCanvas"></canvas>
+        <button type="button" class="alert-shot-send hidden" id="alertShotSend">Показать начальнику</button>
       </div>
     </div>
 
@@ -2298,6 +2937,7 @@
             <div class="bq-track" id="bqTrack"></div>
           </div>
           <div class="ttt-status" id="bqStatus">Загрузка…</div>
+          <button class="bq-story-play hidden" id="bqStoryPlay" type="button">Тест: Квантовая физика</button>
           <div class="bq-actions">
             <button class="bq-play" id="bqPlay" type="button" aria-label="Играть" title="Играть">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>
@@ -2543,10 +3183,12 @@
           <button id="achBtn" class="hud-btn" aria-label="мои ачивки">🎖 Мои ачивки</button>
           <button id="communityBtn" class="hud-btn" aria-label="сообщество">👥 Сообщество</button>
           <button id="wardrobeBtn" class="hud-btn" aria-label="гардероб">👔 Гардероб</button>
+          <button id="phoneBtn" class="hud-btn hidden" aria-label="BulbaPhone">📱 BulbaPhone</button>
           <button id="modeBtn" class="hud-btn" aria-label="сменить режим">🔄 Сменить режим</button>
         </div>
         <div class="hud-group">
-          <div class="hud-label">Музыка</div>
+          <div class="hud-label">Звук</div>
+          <button id="sfxToggle" class="hud-btn" aria-label="включить или выключить звук">🔇 Звук выключен</button>
           <button id="musicToggle" class="hud-btn" aria-label="включить или выключить музыку">🔇 Музыка выключена</button>
           <div id="musicDropdown" class="hud-dropdown">
             <button id="musicDropdownBtn" class="hud-dropdown-btn" type="button" aria-haspopup="listbox" aria-expanded="false">
@@ -2693,6 +3335,133 @@
     </div>
 
     <div id="achPopup" class="hidden"></div>
+
+    <div id="dayXHall" class="hidden" aria-live="polite">
+      <div id="dayXProjector" class="hidden"><div id="dayXProjectorMedia"></div></div>
+      <img id="dayXOverlay" class="hidden" alt="" draggable="false" />
+      <div id="dayXInvestorMeter" class="hidden" aria-hidden="true">
+        <div class="dayx-meter-hint">Удовлетворённость инвесторов</div>
+        <div class="dayx-meter-wrap">
+          <div class="dayx-meter-track">
+            <div class="dayx-meter-mark" style="left: 90%">Успех</div>
+            <div class="dayx-meter-fill" id="dayXMeterFill"></div>
+          </div>
+        </div>
+        <div class="dayx-meter-value" id="dayXMeterValue">50%</div>
+      </div>
+      <div id="dayXBubbles"></div>
+      <div id="dayXDialogue" class="hidden">
+        <div class="dlg-frame">
+          <div class="dlg-options" id="dayXDlgOptions"></div>
+        </div>
+      </div>
+      <div id="dayXDesktop" class="hidden">
+        <div class="pc-case dayx-pc-case">
+          <div class="pc-screen">
+            <div class="win10-desktop">
+              <div class="win10-icons" id="dayXDesktopInner">
+                <button type="button" class="win10-shortcut" id="dayXDesktopWrong">
+                  <span class="win10-shortcut-icon ppsx">📊</span>
+                  <span class="win10-shortcut-label">DayX.ppsx</span>
+                </button>
+                <button type="button" class="win10-shortcut" id="dayXDesktopFolderBtn">
+                  <span class="win10-shortcut-icon folder">📁</span>
+                  <span class="win10-shortcut-label">Новая папка (1)</span>
+                </button>
+              </div>
+              <div class="win10-explorer hidden" id="dayXExplorer">
+                <div class="win10-explorer-titlebar">
+                  <span class="win10-explorer-title">Новая папка (1)</span>
+                  <div class="win10-winbtns">
+                    <button type="button" class="win10-winbtn" aria-hidden="true">—</button>
+                    <button type="button" class="win10-winbtn" aria-hidden="true">□</button>
+                    <button type="button" class="win10-winbtn close" id="dayXExplorerClose" aria-label="Закрыть">✕</button>
+                  </div>
+                </div>
+                <div class="win10-explorer-ribbon">📁 Этот компьютер › Рабочий стол › Новая папка (1)</div>
+                <div class="win10-explorer-body" id="dayXDesktopFolder">
+                  <button type="button" class="win10-shortcut" id="dayXDesktopRightInFolder">
+                    <span class="win10-shortcut-icon ppsx">📊</span>
+                    <span class="win10-shortcut-label">DayX2.ppsx</span>
+                  </button>
+                </div>
+              </div>
+              <div class="win10-taskbar">
+                <button type="button" class="win10-start" aria-hidden="true">⊞</button>
+                <div class="win10-taskbar-tray">
+                  <span id="dayXWinClock">12:00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <span class="pc-brand">Bulbovo</span>
+        </div>
+      </div>
+      <div id="dayXCongrats" class="hidden">
+        <canvas id="dayXConfetti"></canvas>
+        <div class="dayx-congrats-box">
+          <div class="dayx-congrats-emoji" aria-hidden="true">👏 👏 👏</div>
+          <h2>Сюжет игры пройден!</h2>
+          <p>Ты успешно провёл презентацию перед инвесторами и закрыл сюжет Bulba Office. Спасибо за старание и терпение — это был долгий путь. Получена ачивка «День X».</p>
+          <button type="button" class="opt" id="dayXCongratsOk">В офис</button>
+        </div>
+      </div>
+      <div id="dayXFail" class="hidden">
+        <div class="dayx-congrats-box">
+          <h2>Квест не пройден</h2>
+          <p>Инвесторы не готовы вкладываться: им показалось, что проект слишком рискованный. Держи уровень удовлетворённости не ниже 90% — выбирай убедительные ответы и не перегибай с честностью в минус.</p>
+          <button type="button" class="opt" id="dayXFailRetry">Пройти заново</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="packagePeek" class="hidden">
+      <div class="pkg-peek-box">
+        <div id="packagePeekChoice">
+          <p class="pkg-peek-text">Посылка у тебя в лапах. Заглянуть внутрь?</p>
+          <div class="dlg-options">
+            <button type="button" class="opt" id="packagePeekLook">Посмотреть что в коробке</button>
+            <button type="button" class="opt" id="packagePeekKeep">Сохранить корпоративную тайну</button>
+          </div>
+        </div>
+        <div id="packagePeekPhoto" class="hidden">
+          <img id="packagePeekImg" class="pkg-peek-img" alt="Открытая коробка" />
+          <div class="dlg-options">
+            <button type="button" class="opt" id="packagePeekContinue">Закрыть</button>
+          </div>
+        </div>
+        <div id="packagePeekFail" class="hidden">
+          <p class="pkg-peek-text">Квест «Посылка не туда» провален. Откатываем к последнему чекпоинту.</p>
+          <div class="dlg-options">
+            <button type="button" class="opt" id="packagePeekFailOk">Понятно</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="storyIntro" class="hidden" role="dialog" aria-modal="true" aria-label="О сюжете">
+      <div class="pkg-peek-box story-intro-box">
+        <h2 class="story-intro-title">Добро пожаловать в Бульба Офис!</h2>
+        <p class="story-intro-text">Привет!</p>
+        <p class="story-intro-text">В игре есть короткая сюжетка примерно на час — проходить её не обязательно. По сюжету тебе часто звонят персонажи. Если нет настроения — можно не отвечать: они перезвонят позже.</p>
+        <p class="story-intro-text">В любом случае можно просто ходить и исследовать Бульба Офис, не проходя сюжет. Хорошей тебе игры!</p>
+        <div class="dlg-options">
+          <button type="button" class="opt" id="storyIntroOk">Понятно</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="callPopup" class="hidden" aria-live="polite">
+      <div class="call-popup-caption">Входящий звонок</div>
+      <div class="call-popup-row">
+        <img class="call-popup-avatar" id="callPopupAvatar" alt="" draggable="false" />
+        <div class="call-popup-name" id="callPopupName">Бульбов Н.Н.</div>
+      </div>
+      <div class="call-popup-actions">
+        <button type="button" class="call-popup-btn" id="callPopupDecline" aria-label="отклонить">✕</button>
+        <button type="button" class="call-popup-btn" id="callPopupAccept" aria-label="ответить">☎</button>
+      </div>
+    </div>
 
     <div id="community" class="hidden">
       <div class="comm-box">
@@ -2905,6 +3674,10 @@
                   <span class="mac-shortcut-icon mac-shortcut-icon-bulbatalk" aria-hidden="true">☎</span>
                   <span class="mac-shortcut-label">BulbaTalk</span>
                 </button>
+                <button class="mac-shortcut hidden" id="macShortcutPresentation">
+                  <span class="mac-shortcut-icon mac-shortcut-icon-pres" aria-hidden="true">▣</span>
+                  <span class="mac-shortcut-label">Презентация</span>
+                </button>
               </div>
 
               <div class="mac-chat-window hidden" id="macChatWindow">
@@ -2936,8 +3709,19 @@
                 <div class="mac-bt-body">
                   <div class="mac-bt-list" id="macBtList"></div>
                   <div class="mac-bt-call hidden" id="macBtCall">
-                    <div class="mac-bt-call-heading" id="macBtCallTitle">Стратегия развития</div>
+                    <div class="mac-bt-call-heading" id="macBtCallTitle">Стратегическое планирование</div>
                     <div class="mac-bt-grid" id="macBtGrid"></div>
+                    <div class="mac-bt-pres hidden" id="macBtPres">
+                      <div class="mac-bt-pres-top">
+                        <div class="mac-bt-pres-boss" id="macBtPresBoss"></div>
+                        <div class="mac-bt-pres-preview">
+                          <img class="mac-bt-pres-slide hidden" id="macBtPresSlideImage" alt="">
+                          <iframe class="mac-bt-pres-slide hidden" id="macBtPresSlideFrame" title="Предпросмотр слайда" tabindex="-1"></iframe>
+                          <div class="mac-bt-pres-empty" id="macBtPresEmpty">Набор пуст</div>
+                        </div>
+                      </div>
+                      <div class="mac-bt-pres-tools" id="macBtPresTools"></div>
+                    </div>
                     <div class="mac-bt-controls">
                       <div class="mac-bt-mic-wrap">
                         <div class="mac-bt-player-bubble hidden" id="macBtPlayerBubble">
@@ -2952,10 +3736,23 @@
                 </div>
               </div>
 
+              <div class="mac-chat-window hidden" id="macPresWindow">
+                <div class="mac-chat-titlebar">
+                  <div class="mac-traffic">
+                    <span class="mac-dot-close" id="macPresClose" role="button" tabindex="0" aria-label="закрыть"></span>
+                    <span class="mac-dot-min" id="macPresMin" role="button" tabindex="0" aria-label="свернуть"></span>
+                    <span class="mac-dot-max" id="macPresMax" role="button" tabindex="0" aria-label="развернуть"></span>
+                  </div>
+                  <div class="mac-chat-title">Презентация</div>
+                </div>
+                <div class="mac-pres-body" id="macPresBody"></div>
+              </div>
+
               <div class="mac-dock">
                 <button class="mac-dock-item mac-dock-item-claude" id="macDockClaude" type="button" aria-label="Claude">✶</button>
                 <button class="mac-dock-item mac-dock-item-cursor" id="macDockCursor" type="button" aria-label="Cursor">▸</button>
                 <button class="mac-dock-item mac-dock-item-bulbatalk" id="macDockBulbaTalk" type="button" aria-label="BulbaTalk">☎</button>
+                <button class="mac-dock-item mac-dock-item-pres hidden" id="macDockPresentation" type="button" aria-label="Презентация">▣</button>
               </div>
             </div>
           </div>
