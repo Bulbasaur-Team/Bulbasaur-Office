@@ -3,6 +3,7 @@ import { BootScene } from "./scenes/BootScene";
 import { WorldScene } from "./scenes/WorldScene";
 import { backgroundMusic } from "./ui/BackgroundMusic";
 import { isTouch } from "./ui/TouchControls";
+import { viewportToStage } from "./ui/gameViewport";
 import { initOrientation, onStageChange, stage } from "./ui/orientation";
 
 const GW = 1408;
@@ -54,8 +55,8 @@ if (touch) {
 }
 
 // Штатный transformPointer Phaser переводит экранные координаты в игровые как
-// (pageX - canvasBounds.left) * displayScale. Канвас масштабируется CSS-transform,
-// поэтому считаем от центра кадра и текущего scale сцены.
+// (pageX - canvasBounds.left) * displayScale. На таче канвас в #stage (иногда с
+// rotate 90°) — сначала в координаты сцены, потом делим на CSS-scale.
 function patchPointerTransform(): void {
   game.input.transformPointer = (
     pointer: Phaser.Input.Pointer,
@@ -68,12 +69,10 @@ function patchPointerTransform(): void {
     prev.x = pos.x;
     prev.y = pos.y;
 
-    const rect = game.canvas.getBoundingClientRect();
+    const local = viewportToStage(pageX - window.scrollX, pageY - window.scrollY);
     const scale = Math.min(stage.width / GW, stage.height / GH);
-    const localX = pageX - window.scrollX - (rect.left + rect.width / 2);
-    const localY = pageY - window.scrollY - (rect.top + rect.height / 2);
-    const x = localX / scale + GW / 2;
-    const y = localY / scale + GH / 2;
+    const x = local.left / scale;
+    const y = local.top / scale;
 
     const smooth = pointer.smoothFactor;
     if (!wasMove || smooth === 0) {

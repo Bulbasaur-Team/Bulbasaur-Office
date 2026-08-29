@@ -15,20 +15,21 @@
       user-select: none;
     }
 
-    /* Сцена: на десктопе прозрачна (display: contents) — вёрстка как была.
-       На тач-устройствах это letterbox нужной ориентации (--sw × --sh) в окне.
-       Поворот телефона только меняет поля: кадр не крутится (нет rotate).
-       Без transform, чтобы position:fixed оверлеи (День X) считались от viewport
-       так же, как канвас Phaser. */
+    /* Сцена: на десктопе прозрачна (display: contents).
+       На таче — letterbox нужной ориентации. Если телефон повёрнут «не так»,
+       кадр крутится на 90°, чтобы вертикальные экраны оставались вертикальными. */
     #stage { display: contents; }
     @media (pointer: coarse) {
       #stage {
         display: block; position: fixed;
         left: var(--sx, 0px); top: var(--sy, 0px);
         width: var(--sw); height: var(--sh);
-        /* translate(0,0) — containing block для position:fixed внутри сцены,
-           без поворота: оверлеи (телефон, ноут, аркады) заполняют letterbox. */
         transform: translate(0, 0);
+        transform-origin: center center;
+      }
+      html[data-rot="1"] #stage {
+        left: 50%; top: 50%;
+        transform: translate(-50%, -50%) rotate(90deg);
       }
       /* Канвас мира позиционируется фиксированно, так что #game — только система
          координат для #parking: растягиваем его на всю сцену. */
@@ -2250,10 +2251,6 @@
     }
     .win10-winbtn:hover { background: #e5e5e5; }
     .win10-winbtn.close:hover { background: #e81123; color: #fff; }
-    .win10-explorer-ribbon {
-      display: flex; align-items: center; gap: 8px; padding: 8px 12px;
-      background: #f3f3f3; border-bottom: 1px solid #e0e0e0; font-size: 12px; color: #444;
-    }
     .win10-explorer-body {
       flex: 1; overflow: auto; padding: 16px; background: #fff;
       display: flex; flex-wrap: wrap; gap: 12px; align-content: flex-start;
@@ -2539,18 +2536,30 @@
     html.bp-400 .wardrobe-card-actions button { padding: 6px 8px; font-size: 11px; min-height: 30px; }
 
     html.bp-560 .hud-panel { width: 176px; }
-    /* На телефоне панель занимает заметную долю короткой стороны экрана — ужимаем
-       кнопки и шапку, чтобы меню не перекрывало игру. */
+    /* На телефоне меню в правой полоске (без фона), ширина = полоска,
+       чтобы раскрытый список не заходил на карту и не накрывал кнопку действия. */
     @media (pointer: coarse) {
-      .hud-panel { width: 168px; border-radius: 12px; }
-      .hud-toggle { padding: 7px 10px; font-size: 13px; }
-      .hud-body { padding: 9px; gap: 10px; }
+      .hud-panel,
+      html.bp-560 .hud-panel {
+        top: 8px;
+        right: calc(4px - var(--sx, 0px));
+        width: max(72px, calc(var(--sx, 0px) - 8px));
+        max-height: calc(var(--sh) - 70px);
+        border-radius: 12px;
+      }
+      html[data-rot="1"] .hud-panel {
+        top: 8px;
+        right: 8px;
+        width: min(168px, calc(var(--sw) * 0.28));
+      }
+      .hud-toggle { padding: 7px 8px; font-size: 12px; }
+      .hud-body { padding: 8px; gap: 8px; max-height: calc(var(--sh) - 118px); }
       .hud-group { gap: 5px; }
-      .hud-group + .hud-group { padding-top: 9px; }
+      .hud-group + .hud-group { padding-top: 8px; }
       .hud-label { font-size: 10px; }
-      .hud-btn { padding: 7px 9px; font-size: 12px; border-radius: 8px; }
-      .hud-dropdown-btn { padding: 7px 9px; font-size: 12px; border-radius: 8px; }
-      .hud-dropdown-menu { max-height: 160px; border-radius: 8px; }
+      .hud-btn { padding: 7px 8px; font-size: 12px; border-radius: 8px; }
+      .hud-dropdown-btn { padding: 7px 8px; font-size: 12px; border-radius: 8px; }
+      .hud-dropdown-menu { max-height: 140px; border-radius: 8px; }
       .hud-dropdown-option { padding: 7px 8px; font-size: 12px; border-radius: 6px; }
     }
     .wotd-yesterday { font-size: 13px; opacity: .8; margin: 2px 0 6px; }
@@ -2616,6 +2625,18 @@
       right: auto;
       top: auto;
       bottom: calc(var(--sb, 0px) + 10px);
+    }
+    html[data-rot="1"] .touch-joy {
+      left: 10px;
+      right: auto;
+      top: auto;
+      bottom: 10px;
+    }
+    html[data-rot="1"] .touch-action {
+      left: auto;
+      right: 10px;
+      top: auto;
+      bottom: 12px;
     }
     .touch-action:active { filter: brightness(.9); transform: translateY(1px); }
 
@@ -3409,7 +3430,7 @@
                     <button type="button" class="win10-winbtn close" id="dayXExplorerClose" aria-label="Закрыть">✕</button>
                   </div>
                 </div>
-                <div class="win10-explorer-ribbon">📁 Этот компьютер › Рабочий стол › Новая папка (1)</div>
+                </div>
                 <div class="win10-explorer-body" id="dayXDesktopFolder">
                   <button type="button" class="win10-shortcut" id="dayXDesktopRightInFolder">
                     <span class="win10-shortcut-icon ppsx">📊</span>

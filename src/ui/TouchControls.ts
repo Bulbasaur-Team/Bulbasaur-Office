@@ -1,9 +1,9 @@
 // Тач-управление для мобильных браузеров: виртуальный джойстик + кнопка действия
 // для мира и панель удержания кнопок для аркад. Показывается только на тач-устройствах.
 
-export function isTouch(): boolean {
-  return typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
-}
+import { onStageChange, screenToStage, stage } from "./orientation";
+
+export { isTouch } from "./device";
 
 // Виртуальный аналоговый джойстик (мир) + круглая кнопка действия.
 export class Joystick {
@@ -25,9 +25,8 @@ export class Joystick {
     this.action.className = "touch-action hidden";
     this.action.setAttribute("aria-label", "действие");
     this.action.textContent = "✦";
-    // В body: сцена больше не крутится, контролы стоят в полях слева/справа от фона.
-    document.body.appendChild(this.wrap);
-    document.body.appendChild(this.action);
+    this.syncHost();
+    onStageChange(() => this.syncHost());
 
     this.base.addEventListener("pointerdown", this.onDown);
     this.base.addEventListener("pointermove", this.onMove);
@@ -44,6 +43,12 @@ export class Joystick {
     this.wrap.classList.toggle("hidden", !v);
     this.action.classList.toggle("hidden", !v);
     if (!v) this.reset();
+  }
+
+  private syncHost(): void {
+    const host = stage.rotated ? (document.getElementById("stage") ?? document.body) : document.body;
+    if (this.wrap.parentElement !== host) host.appendChild(this.wrap);
+    if (this.action.parentElement !== host) host.appendChild(this.action);
   }
 
   private onDown = (e: PointerEvent): void => {
@@ -71,7 +76,7 @@ export class Joystick {
     const cy = r.top + r.height / 2;
     // clientX/clientY экранные, а джойстик повёрнут вместе со сценой: переводим смещение
     // в координаты сцены — тогда и ручка едет за пальцем, и оси совпадают с осями мира.
-    const local = { x: e.clientX - cx, y: e.clientY - cy };
+    const local = screenToStage(e.clientX - cx, e.clientY - cy);
     let dx = local.x;
     let dy = local.y;
     const dist = Math.hypot(dx, dy);
