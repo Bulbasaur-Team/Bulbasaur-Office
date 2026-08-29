@@ -16,7 +16,7 @@ export class Joystick {
   private knob = div("touch-joy-knob");
   private action = document.createElement("button");
   private pid: number | null = null;
-  private readonly radius = 28;
+  private readonly radius = 35;
   private readonly dead = 0.18; // мёртвая зона, чтобы лёгкое касание не двигало
 
   constructor() {

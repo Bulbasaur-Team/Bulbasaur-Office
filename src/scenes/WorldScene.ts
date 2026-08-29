@@ -1070,7 +1070,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private refreshStoryHint(): void {
-    if (LOCATIONS[this.locIndex]?.id === "day-x-hall") {
+    if (!this.multiplayer || embedded || LOCATIONS[this.locIndex]?.id === "day-x-hall") {
       this.storyHint.hide();
       return;
     }
@@ -1360,8 +1360,13 @@ export class WorldScene extends Phaser.Scene {
   private setPhaserAsleep(asleep: boolean): void {
     if (asleep === this.phaserAsleep) return;
     this.phaserAsleep = asleep;
-    if (asleep) this.game.loop.sleep();
-    else this.game.loop.wake(true);
+    if (asleep) {
+      // update() больше не крутится — прячем джойстик сразу, иначе он останется на экране.
+      this.joystick?.setVisible(false);
+      this.game.loop.sleep();
+    } else {
+      this.game.loop.wake(true);
+    }
   }
 
   private setDayXHallWatching(watching: boolean): void {

@@ -2197,7 +2197,7 @@
       border-radius: 18px;
       padding: 18px 18px 40px;
       box-shadow: 0 18px 60px rgba(0,0,0,.6);
-      width: min(980px, calc(var(--sw) * 0.78));
+      width: min(980px, calc(var(--sw) * 0.92));
     }
     .dayx-pc-case .pc-screen {
       background: #000;
@@ -2205,7 +2205,7 @@
       border-radius: 8px;
       overflow: hidden;
       width: 100%;
-      height: min(520px, calc(var(--sh) * 0.52));
+      height: min(520px, calc(var(--sh) * 0.72));
     }
     .dayx-pc-case .pc-brand {
       position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
@@ -2234,11 +2234,12 @@
     .win10-shortcut-icon.folder { background: linear-gradient(180deg, #ffd966, #f4b400); }
     .win10-shortcut-label { font-size: 10px; line-height: 1.2; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,.9); }
     .win10-explorer {
-      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -52%);
-      width: min(88%, 440px); height: min(72%, 260px);
+      position: absolute; left: 6%; top: 8%; right: 6%; bottom: 40px;
+      width: auto; height: auto;
       display: flex; flex-direction: column; background: #fff; border: 1px solid #ababab;
       box-shadow: 0 12px 38px rgba(0,0,0,.45); z-index: 2;
     }
+    .win10-desktop:has(#dayXExplorer:not(.hidden)) .win10-icons { visibility: hidden; }
     .win10-explorer.hidden { display: none; }
     .win10-explorer-titlebar {
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -2593,7 +2594,7 @@
     @media (pointer: coarse) {
       h1 { display: none; }
       html, body { overflow: hidden; background: var(--bg); }
-      #storyHint { font-size: 12px; }
+      #storyHint { font-size: 10px; padding: 4px 10px; }
       #bottomDock {
         left: 50%;
         top: 100%;
@@ -2610,18 +2611,18 @@
     /* Тач-управление миром: джойстик и действие внизу боковых полосок. */
     .touch-joy {
       position: fixed; z-index: 35; touch-action: none;
-      left: max(4px, calc((var(--sx, 0px) - 64px) / 2));
+      left: max(4px, calc((var(--sx, 0px) - 80px) / 2));
       top: auto;
       bottom: calc(var(--sb, 0px) + 8px);
     }
-    .touch-joy-base { position: relative; width: 64px; height: 64px; border-radius: 50%; background: rgba(38,43,51,.45); border: 2px solid rgba(122,192,122,.55); }
-    .touch-joy-knob { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; background: rgba(122,192,122,.9); border: 2px solid #5aa05a; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
+    .touch-joy-base { position: relative; width: 80px; height: 80px; border-radius: 50%; background: rgba(38,43,51,.45); border: 2px solid rgba(122,192,122,.55); }
+    .touch-joy-knob { position: absolute; left: 50%; top: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%; background: rgba(122,192,122,.9); border: 2px solid #5aa05a; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
     .touch-action {
-      position: fixed; z-index: 35; width: 52px; height: 52px; border-radius: 50%;
+      position: fixed; z-index: 35; width: 65px; height: 65px; border-radius: 50%;
       border: 3px solid #5aa05a; background: var(--accent); color: #14210f;
-      font-size: 20px; font-weight: bold; cursor: pointer;
+      font-size: 24px; font-weight: bold; cursor: pointer;
       box-shadow: 0 6px 20px rgba(0,0,0,.5); touch-action: none;
-      left: calc(var(--sx, 0px) + var(--sw) + max(4px, calc((var(--sx, 0px) - 52px) / 2)));
+      left: calc(var(--sx, 0px) + var(--sw) + max(4px, calc((var(--sx, 0px) - 65px) / 2)));
       right: auto;
       top: auto;
       bottom: calc(var(--sb, 0px) + 10px);
@@ -3429,7 +3430,6 @@
                     <button type="button" class="win10-winbtn" aria-hidden="true">□</button>
                     <button type="button" class="win10-winbtn close" id="dayXExplorerClose" aria-label="Закрыть">✕</button>
                   </div>
-                </div>
                 </div>
                 <div class="win10-explorer-body" id="dayXDesktopFolder">
                   <button type="button" class="win10-shortcut" id="dayXDesktopRightInFolder">

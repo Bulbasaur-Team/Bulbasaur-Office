@@ -23,13 +23,16 @@ const SCREENS: ReadonlyArray<readonly [string, Orient]> = [
   ["bulbaPhone", "portrait"],
   // Ноутбук / BulbaTalk: тоже вертикально, иначе сетка звонка на телефоне схлопывается.
   ["laptop", "portrait"],
+  // Логи и мониторинг — широкие панели, как локации мира.
+  ["logs", "landscape"],
+  ["monitoring", "landscape"],
 ];
 
 // Ориентация мира: её же наследуют экраны без своей записи (лидерборд, слайды, HUD-меню).
 const WORLD: Orient = "landscape";
 const WORLD_ASPECT = 1408 / 768;
 /** Узкие поля под контролы — только когда телефон уже в нужной ориентации. */
-const TOUCH_SIDE_GUTTER = 76;
+const TOUCH_SIDE_GUTTER = 96;
 const TOUCH_BOTTOM_GUTTER = 56;
 
 // Логический размер сцены в CSS-пикселях. При несовпадении с телефоном стороны
