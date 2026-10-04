@@ -1,4 +1,5 @@
 import { fetchRetroMemeBlob, fetchRetroRoom, getLogin, uploadRetroMeme } from "../net/api";
+import { publicPath } from "../publicPath";
 import type {
   RetroHistorySummary,
   RetroReactionView,
@@ -7,12 +8,57 @@ import type {
   RetroStickerView,
 } from "../net/realtime";
 import { normalizeRetroState } from "../net/realtime";
+import { embedded } from "../embed";
+import { backgroundMusic } from "./BackgroundMusic";
 import type { KeyConsumer } from "./KeyboardRouter";
 
 const DEFAULT_ROOM_NAME = "Retro WDM";
-const MOOD_FACES = ["😢", "😕", "😐", "🙂", "😄"];
+const RETRO_MUSIC_KEY = "bulba_retro_music_enabled";
+const RETRO_MUSIC_VOLUME = 0.18;
+
+function formatFacil(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+const MOOD_FACES: { src: string; alt: string }[] = [
+  { src: publicPath("assets/retro/mood-awful.png"), alt: "всё плохо" },
+  { src: publicPath("assets/retro/mood-sad.png"), alt: "грустно" },
+  { src: publicPath("assets/retro/mood-neutral.png"), alt: "покерфейс" },
+  { src: publicPath("assets/retro/mood-smile.png"), alt: "улыбка" },
+  { src: publicPath("assets/retro/mood-happy.png"), alt: "праздник" },
+];
 const STICKER_EMOJIS = ["👍", "❤️", "😂", "😢", "🔥", "🎉"];
 const MEME_EMOJI = "😂";
+/** Видимый диаметр кружка. Центр метки считается по той же формуле, что и у input[type=range]. */
+const MOOD_THUMB_PX = 32;
+
+function moodValueFromPointer(clientX: number, rect: DOMRect): number {
+  const width = rect.width || 1;
+  const x = clientX - rect.left;
+  if (width <= MOOD_THUMB_PX) return Math.min(1, Math.max(0, x / width));
+  return Math.min(1, Math.max(0, (x - MOOD_THUMB_PX / 2) / (width - MOOD_THUMB_PX)));
+}
+
+function moodMarkerLeft(value: number, barWidth: number): string {
+  const width = Math.max(barWidth, 1);
+  const center = width <= MOOD_THUMB_PX
+    ? value * width
+    : MOOD_THUMB_PX / 2 + value * (width - MOOD_THUMB_PX);
+  return `${(center / width) * 100}%`;
+}
+
+function moodFaceEl(face: { src: string; alt: string }): HTMLImageElement {
+  const img = document.createElement("img");
+  img.className = "retro-mood-face";
+  img.src = face.src;
+  img.alt = face.alt;
+  img.draggable = false;
+  return img;
+}
 const STEPS: { id: string; label: string }[] = [
   { id: "mood", label: "Как настроение?" },
   { id: "good", label: "Что было хорошо?" },
@@ -43,6 +89,8 @@ export interface RetroNet {
   }): void;
   react(targetType: string, targetId: string, emoji: string): void;
   deleteMeme(memeId: string): void;
+  timerStart(minutes: number): void;
+  timerStop(): void;
 }
 
 /** Ретроспектива команды: лобби + комната с этапами (как Planning Poker). */
@@ -77,6 +125,11 @@ export class Retro implements KeyConsumer {
   private step = "mood";
   private selectedStickers = new Set<string>();
   private moodTimer: number | null = null;
+  private pendingMood: number | null = null;
+  /** Пока палец на ползунке, не пересобираем шкалу — иначе захват срывается. */
+  private moodDragging = false;
+  private moodPointerId: number | null = null;
+  private moodDragCleanup: (() => void) | null = null;
   private memeBlobs = new Map<string, string>();
   private memeFileInput: HTMLInputElement;
   /** Черновик формы стикера — сохраняется между рендерами. */
@@ -87,6 +140,21 @@ export class Retro implements KeyConsumer {
   private dragStickerId: string | null = null;
   private memeViewer = document.getElementById("retroMemeViewer")!;
   private memeViewerImg = document.getElementById("retroMemeViewerImg") as HTMLImageElement;
+  private dockEl = document.getElementById("retroDock")!;
+  private facilClock = document.getElementById("retroFacilClock")!;
+  private timerToggle = document.getElementById("retroTimerToggle") as HTMLButtonElement;
+  private facilForm = document.getElementById("retroFacilForm") as HTMLFormElement;
+  private facilMinutes = document.getElementById("retroFacilMinutes") as HTMLInputElement;
+  private facilStop = document.getElementById("retroFacilStop") as HTMLButtonElement;
+  private facilMusicBtn = document.getElementById("retroMusicToggle") as HTMLButtonElement;
+  /** Панель минут открыта у ведущего. */
+  private facilOpen = false;
+  /** Момент, когда таймер ведущего дойдёт до нуля. 0 — таймер не идёт. */
+  private facilDeadline = 0;
+  /** Свой флаг, не связан с музыкой игры. По умолчанию включено. */
+  private retroMusicOn = localStorage.getItem(RETRO_MUSIC_KEY) !== "0";
+  private retroAudio = new Audio(publicPath("assets/audio/background.mp3"));
+  private retroMusicHeld = false;
 
   constructor(private net: RetroNet) {
     document.getElementById("retroClose")!.onclick = () => this.close();
@@ -105,6 +173,31 @@ export class Retro implements KeyConsumer {
       this.net.create(this.nameInput.value.trim() || DEFAULT_ROOM_NAME);
     };
     this.nameInput.addEventListener("keydown", (e) => e.stopPropagation());
+
+    this.retroAudio.loop = true;
+    this.retroAudio.preload = "auto";
+    this.retroAudio.volume = RETRO_MUSIC_VOLUME;
+    this.timerToggle.onclick = () => {
+      this.facilOpen = !this.facilOpen;
+      this.renderFacil();
+    };
+    this.facilMinutes.addEventListener("keydown", (e) => e.stopPropagation());
+    this.facilForm.onsubmit = (e) => {
+      e.preventDefault();
+      const minutes = Number(this.facilMinutes.value);
+      if (!Number.isFinite(minutes) || minutes <= 0) {
+        this.errorEl.textContent = "Укажите длительность таймера в минутах.";
+        return;
+      }
+      this.errorEl.textContent = "";
+      this.net.timerStart(minutes);
+    };
+    this.facilStop.onclick = () => this.net.timerStop();
+    this.facilMusicBtn.onclick = () => {
+      this.retroMusicOn = !this.retroMusicOn;
+      localStorage.setItem(RETRO_MUSIC_KEY, this.retroMusicOn ? "1" : "0");
+      this.renderFacil();
+    };
 
     this.memeFileInput = document.createElement("input");
     this.memeFileInput.type = "file";
@@ -146,6 +239,17 @@ export class Retro implements KeyConsumer {
     this.disconnectBoardFit();
     this.closeMemeViewer();
     this.stopTimer();
+    this.facilDeadline = 0;
+    this.facilOpen = false;
+    this.stopRetroMusic();
+    this.moodDragCleanup?.();
+    this.moodDragging = false;
+    this.moodPointerId = null;
+    this.pendingMood = null;
+    if (this.moodTimer !== null) {
+      clearTimeout(this.moodTimer);
+      this.moodTimer = null;
+    }
     this.revokeMemeBlobs();
     this.root.classList.remove("maximized");
     this.root.classList.add("hidden");
@@ -163,6 +267,7 @@ export class Retro implements KeyConsumer {
     this.state = state;
     this.joinedRoomId = state.id;
     this.deadline = Date.now() + state.remainingMs;
+    this.facilDeadline = state.timerRemainingMs > 0 ? Date.now() + state.timerRemainingMs : 0;
     this.errorEl.textContent = "";
     this.lobbyEl.classList.add("hidden");
     this.roomEl.classList.remove("hidden");
@@ -212,6 +317,9 @@ export class Retro implements KeyConsumer {
     this.hideReactMenu();
     this.disconnectBoardFit();
     this.stopTimer();
+    this.facilDeadline = 0;
+    this.facilOpen = false;
+    this.stopRetroMusic();
     this.roomEl.classList.add("hidden");
     this.lobbyEl.classList.remove("hidden");
     this.createForm.classList.remove("hidden");
@@ -316,6 +424,65 @@ export class Retro implements KeyConsumer {
     const m = Math.floor((total % 3600) / 60);
     const s = total % 60;
     this.timerEl.textContent = `до закрытия ${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    this.renderFacil();
+  }
+
+  private isLiveRetro(): boolean {
+    return this.isOpen && !!this.joinedRoomId && !this.viewingHistory && !!this.state && !this.state.readOnly;
+  }
+
+  private facilLeftMs(): number {
+    if (this.facilDeadline <= 0) return 0;
+    return Math.max(0, this.facilDeadline - Date.now());
+  }
+
+  private renderFacil(): void {
+    const live = this.isLiveRetro();
+    const admin = live && !!this.state?.isAdmin;
+    const running = live && this.facilLeftMs() > 0;
+    this.dockEl.classList.toggle("hidden", !admin && !running);
+    this.timerToggle.classList.toggle("hidden", !admin);
+    this.timerToggle.classList.toggle("is-open", admin && this.facilOpen);
+    this.timerToggle.setAttribute("aria-expanded", admin && this.facilOpen ? "true" : "false");
+    this.facilForm.classList.toggle("hidden", !admin || !this.facilOpen);
+    this.facilStop.classList.toggle("hidden", !running);
+    this.facilClock.classList.toggle("hidden", !running);
+    this.facilClock.textContent = running ? formatFacil(this.facilLeftMs()) : "";
+    this.facilMusicBtn.classList.toggle("hidden", !running);
+    this.facilMusicBtn.classList.toggle("is-muted", !this.retroMusicOn);
+    this.facilMusicBtn.setAttribute("aria-pressed", this.retroMusicOn ? "true" : "false");
+    this.facilMusicBtn.setAttribute(
+      "aria-label",
+      this.retroMusicOn ? "выключить музыку ретро" : "включить музыку ретро",
+    );
+    this.syncRetroMusic();
+  }
+
+  /** Музыка ретро играет только пока идёт таймер и игрок её не выключил. */
+  private syncRetroMusic(): void {
+    const should = this.isLiveRetro() && this.facilLeftMs() > 0 && this.retroMusicOn && !embedded;
+    if (should) {
+      backgroundMusic.holdForRetro();
+      this.retroMusicHeld = true;
+      if (this.retroAudio.paused) void this.retroAudio.play().catch(() => {});
+      return;
+    }
+    if (!this.retroMusicHeld && this.retroAudio.paused) return;
+    this.retroAudio.pause();
+    if (this.facilLeftMs() <= 0 || !this.isOpen) this.retroAudio.currentTime = 0;
+    if (this.retroMusicHeld) {
+      this.retroMusicHeld = false;
+      backgroundMusic.releaseFromRetro();
+    }
+  }
+
+  private stopRetroMusic(): void {
+    this.retroAudio.pause();
+    this.retroAudio.currentTime = 0;
+    if (this.retroMusicHeld) {
+      this.retroMusicHeld = false;
+      backgroundMusic.releaseFromRetro();
+    }
   }
 
   private renderRoom(): void {
@@ -325,6 +492,7 @@ export class Retro implements KeyConsumer {
     this.renderStepper();
     this.renderStages();
     this.renderAdmin(state);
+    this.renderFacil();
   }
 
   private renderStepper(): void {
@@ -369,17 +537,19 @@ export class Retro implements KeyConsumer {
     const mine = state.moods.find((m) => m.login === myLogin);
     const value = mine?.value ?? 0.5;
 
+    if (this.moodDragging) {
+      const wrap = this.stageMood.querySelector(".retro-mood-wrap");
+      const slider = wrap?.querySelector(".retro-mood-slider");
+      if (wrap && slider) return;
+    }
+
     this.stageMood.innerHTML = "";
     const wrap = document.createElement("div");
     wrap.className = "retro-mood-wrap";
 
     const faces = document.createElement("div");
     faces.className = "retro-mood-faces";
-    for (const f of MOOD_FACES) {
-      const span = document.createElement("span");
-      span.textContent = f;
-      faces.appendChild(span);
-    }
+    for (const face of MOOD_FACES) faces.appendChild(moodFaceEl(face));
     wrap.appendChild(faces);
 
     const bar = document.createElement("div");
@@ -391,16 +561,22 @@ export class Retro implements KeyConsumer {
     slider.value = String(Math.round(value * 1000));
     slider.className = "retro-mood-slider";
     slider.disabled = state.readOnly;
-    slider.addEventListener("keydown", (e) => e.stopPropagation());
+    slider.setAttribute("aria-label", "Настроение");
+    slider.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key.startsWith("Arrow")) this.moodDragging = true;
+    });
+    slider.addEventListener("keyup", () => this.endMoodDrag());
     slider.oninput = () => {
       const v = Number(slider.value) / 1000;
       this.scheduleMood(v);
-      this.renderMoodMarkers(wrap, state, v);
+      if (this.state) this.renderMoodMarkers(wrap, this.state, v);
     };
     bar.appendChild(slider);
     wrap.appendChild(bar);
     this.stageMood.appendChild(wrap);
     this.renderMoodMarkers(wrap, state, value);
+    if (!state.readOnly) this.bindMoodDrag(wrap, bar, slider);
   }
 
   private renderMoodMarkers(wrap: HTMLElement, state: RetroStateView, myValue: number): void {
@@ -431,7 +607,9 @@ export class Retro implements KeyConsumer {
     const laneRight: number[] = [];
     const lanes: number[] = [];
     for (const item of items) {
-      const cx = item.value * barWidth;
+      const cx = barWidth <= MOOD_THUMB_PX
+        ? item.value * barWidth
+        : MOOD_THUMB_PX / 2 + item.value * (barWidth - MOOD_THUMB_PX);
       const left = cx - item.width / 2;
       const right = cx + item.width / 2;
       let lane = 0;
@@ -447,8 +625,8 @@ export class Retro implements KeyConsumer {
     items.forEach((item, i) => {
       const lane = lanes[i];
       const dot = document.createElement("div");
-      dot.className = "retro-mood-dot" + (item.isMine ? " mine" : "");
-      dot.style.left = `${item.value * 100}%`;
+      dot.className = "retro-mood-dot" + (item.isMine ? " mine" : "") + (item.isMine && !state.readOnly ? " can-drag" : "");
+      dot.style.left = moodMarkerLeft(item.value, barWidth);
       if (lane > 0) {
         const stem = document.createElement("div");
         stem.className = "retro-mood-dot-stem";
@@ -469,11 +647,77 @@ export class Retro implements KeyConsumer {
   }
 
   private scheduleMood(value: number): void {
+    this.pendingMood = value;
     if (this.moodTimer !== null) clearTimeout(this.moodTimer);
     this.moodTimer = window.setTimeout(() => {
       this.moodTimer = null;
-      this.net.mood(value);
+      const v = this.pendingMood;
+      this.pendingMood = null;
+      if (v !== null) this.net.mood(v);
     }, 100);
+  }
+
+  private flushMood(): void {
+    if (this.moodTimer !== null) {
+      clearTimeout(this.moodTimer);
+      this.moodTimer = null;
+    }
+    if (this.pendingMood === null) return;
+    const v = this.pendingMood;
+    this.pendingMood = null;
+    this.net.mood(v);
+  }
+
+  private endMoodDrag(): void {
+    if (!this.moodDragging && this.pendingMood === null) return;
+    this.moodDragging = false;
+    this.moodPointerId = null;
+    this.flushMood();
+  }
+
+  /** Тянем и кружок, и указатель «Вы». Слушаем document, чтобы палец не срывался с кружка. */
+  private bindMoodDrag(wrap: HTMLElement, bar: HTMLElement, slider: HTMLInputElement): void {
+    const apply = (e: PointerEvent) => {
+      const rect = bar.getBoundingClientRect();
+      const v = moodValueFromPointer(e.clientX, rect);
+      slider.value = String(Math.round(v * 1000));
+      this.scheduleMood(v);
+      const mine = wrap.querySelector(".retro-mood-dot.mine") as HTMLElement | null;
+      if (mine) mine.style.left = moodMarkerLeft(v, rect.width);
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!this.moodDragging || e.pointerId !== this.moodPointerId) return;
+      apply(e);
+    };
+    const stopListening = () => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onUp);
+      if (this.moodDragCleanup === stopListening) this.moodDragCleanup = null;
+    };
+    const onUp = (e: PointerEvent) => {
+      if (e.pointerId !== this.moodPointerId) return;
+      stopListening();
+      apply(e);
+      this.endMoodDrag();
+      if (this.state) this.renderMoodMarkers(wrap, this.state, Number(slider.value) / 1000);
+    };
+    wrap.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || this.moodPointerId !== null) return;
+      const target = e.target as HTMLElement;
+      const onMine = !!target.closest(".retro-mood-dot.can-drag");
+      const onBar = target === slider || !!target.closest(".retro-mood-bar");
+      if (!onMine && !onBar) return;
+      e.preventDefault();
+      this.moodDragging = true;
+      this.moodPointerId = e.pointerId;
+      this.moodDragCleanup = stopListening;
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+      document.addEventListener("pointercancel", onUp);
+      slider.focus({ preventScroll: true });
+      apply(e);
+    });
   }
 
   private renderBoard(board: string, container: HTMLElement): void {
@@ -962,10 +1206,12 @@ export class Retro implements KeyConsumer {
       const avg01 = moods.reduce((s, m) => s + m.value, 0) / moods.length;
       const avg5 = avg01 * 4 + 1;
       const faceIdx = Math.min(MOOD_FACES.length - 1, Math.max(0, Math.round(avg01 * (MOOD_FACES.length - 1))));
-      const face = MOOD_FACES[faceIdx];
       const row = document.createElement("div");
       row.className = "retro-summary-mood";
-      row.textContent = `${face} ${avg5.toFixed(1)} / 5 · проголосовали: ${moods.length}`;
+      row.appendChild(moodFaceEl(MOOD_FACES[faceIdx]));
+      const text = document.createElement("span");
+      text.textContent = `${avg5.toFixed(1)} / 5 · проголосовали: ${moods.length}`;
+      row.appendChild(text);
       moodBlock.appendChild(row);
     }
     root.appendChild(moodBlock);
@@ -1049,7 +1295,11 @@ export class Retro implements KeyConsumer {
 
   private renderAdmin(state: RetroStateView): void {
     this.adminEl.innerHTML = "";
-    if (state.readOnly || !state.isAdmin) return;
+    if (state.readOnly || !state.isAdmin) {
+      this.adminEl.classList.add("hidden");
+      return;
+    }
+    this.adminEl.classList.remove("hidden");
     const closeRoom = document.createElement("button");
     closeRoom.className = "retro-btn retro-btn-danger";
     closeRoom.textContent = "Завершить ретро";

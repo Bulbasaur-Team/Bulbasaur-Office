@@ -144,6 +144,8 @@ export interface RetroStateView {
   isAdmin: boolean;
   readOnly: boolean;
   remainingMs: number;
+  /** Сколько миллисекунд осталось у таймера ведущего. 0 — таймер не идёт. */
+  timerRemainingMs: number;
   participants: { login: string; role: string; admin: boolean }[];
   moods: RetroMoodView[];
   stickers: Record<string, RetroStickerView[]>;
@@ -400,6 +402,14 @@ export class Realtime {
 
   retroDeleteMeme(memeId: string): void {
     this.send({ type: "retroDeleteMeme", memeId });
+  }
+
+  retroTimerStart(minutes: number): void {
+    this.send({ type: "retroTimerStart", minutes });
+  }
+
+  retroTimerStop(): void {
+    this.send({ type: "retroTimerStop" });
   }
 
   projectorOn(ownerId: string): void {
@@ -664,6 +674,7 @@ export function normalizeRetroState(msg: any): RetroStateView {
     isAdmin: !!msg.isAdmin,
     readOnly: !!msg.readOnly,
     remainingMs: Number(msg.remainingMs) || 0,
+    timerRemainingMs: Math.max(0, Number(msg.timerRemainingMs) || 0),
     participants: Array.isArray(msg.participants) ? msg.participants : [],
     moods: Array.isArray(msg.moods)
       ? msg.moods.map((m: any) => ({

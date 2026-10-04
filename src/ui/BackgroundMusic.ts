@@ -30,6 +30,8 @@ class BackgroundMusic {
   /** Звук эффектов (бормотание героев и т.п.). По умолчанию выключен. */
   private sfxOn = localStorage.getItem(SFX_KEY) === "1";
   private unlocked = false;
+  /** Ретро временно перекрывает музыку игры, не меняя флаг включения. */
+  private heldByRetro = false;
   private trackId = this.validTrackId(localStorage.getItem(TRACK_KEY) ?? "chill");
   private toggleBtn: HTMLButtonElement | null = null;
   private sfxBtn: HTMLButtonElement | null = null;
@@ -70,6 +72,19 @@ class BackgroundMusic {
 
   isSfxOn(): boolean {
     return this.sfxOn;
+  }
+
+  /** Поставить музыку игры на паузу, пока играет музыка ретро. */
+  holdForRetro(): void {
+    this.heldByRetro = true;
+    this.audio.pause();
+  }
+
+  /** Вернуть музыку игры, если игрок её не выключал. */
+  releaseFromRetro(): void {
+    if (!this.heldByRetro) return;
+    this.heldByRetro = false;
+    if (this.enabled) this.play();
   }
 
   setSfxEnabled(on: boolean): void {
@@ -170,7 +185,7 @@ class BackgroundMusic {
       this.silence();
       return;
     }
-    if (!this.unlocked || !this.enabled) return;
+    if (this.heldByRetro || !this.unlocked || !this.enabled) return;
     this.audio.muted = false;
     this.audio.volume = MUSIC_VOLUME;
     void this.audio.play().catch(() => {});

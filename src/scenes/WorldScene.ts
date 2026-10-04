@@ -566,6 +566,8 @@ export class WorldScene extends Phaser.Scene {
       moveSticker: (payload) => this.realtime.retroMoveSticker(payload),
       react: (targetType, targetId, emoji) => this.realtime.retroReact(targetType, targetId, emoji),
       deleteMeme: (memeId) => this.realtime.retroDeleteMeme(memeId),
+      timerStart: (minutes) => this.realtime.retroTimerStart(minutes),
+      timerStop: () => this.realtime.retroTimerStop(),
     });
     document.getElementById("retroBtn")!.onclick = () => {
       (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
