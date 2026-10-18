@@ -1,4 +1,4 @@
-import { fetchRetroMemeBlob, fetchRetroRoom, getLogin, uploadRetroMeme } from "../net/api";
+import { fetchRetroMemeBlob, fetchRetroRoom, getLogin, RETRO_MEME_LIMIT_HINT, uploadRetroMeme } from "../net/api";
 import { publicPath } from "../publicPath";
 import type {
   RetroHistorySummary,
@@ -1051,7 +1051,7 @@ export class Retro implements KeyConsumer {
       const hint = document.createElement("span");
       hint.style.opacity = "0.7";
       hint.style.fontSize = "13px";
-      hint.textContent = "или Ctrl/⌘+V · реакция — ПКМ";
+      hint.textContent = `${RETRO_MEME_LIMIT_HINT} · Ctrl/⌘+V · реакция — ПКМ`;
       toolbar.appendChild(hint);
     }
     this.stageMemes.appendChild(toolbar);
@@ -1160,10 +1160,17 @@ export class Retro implements KeyConsumer {
 
   private async uploadMemeFile(file: File): Promise<void> {
     if (!this.joinedRoomId || this.viewingHistory || this.state?.readOnly) return;
+    this.errorEl.classList.remove("is-status");
+    this.errorEl.textContent = "";
     try {
+      await uploadRetroMeme(this.joinedRoomId, file, this.state?.memes.length ?? 0, (text) => {
+        this.errorEl.classList.add("is-status");
+        this.errorEl.textContent = text;
+      });
+      this.errorEl.classList.remove("is-status");
       this.errorEl.textContent = "";
-      await uploadRetroMeme(this.joinedRoomId, file);
     } catch (e) {
+      this.errorEl.classList.remove("is-status");
       this.errorEl.textContent = e instanceof Error ? e.message : "Не удалось загрузить мем.";
     }
   }

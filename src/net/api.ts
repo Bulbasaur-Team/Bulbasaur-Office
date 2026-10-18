@@ -494,12 +494,162 @@ export interface RetroMemeUploadResult {
   imageUrl: string;
 }
 
-export async function uploadRetroMeme(roomId: string, file: File): Promise<RetroMemeUploadResult> {
-  const dataBase64 = await fileToBase64(file);
+/** Совпадает с RetroConstants.MAX_MEME_BYTES / MAX_MEMES_PER_ROOM на сервере. */
+export const RETRO_MEME_MAX_BYTES = 2 * 1024 * 1024;
+export const RETRO_MEME_MAX_PER_ROOM = 40;
+export const RETRO_MEME_LIMIT_HINT = "PNG, JPEG, WebP или GIF · до 2 МБ, лишнее сожмём";
+
+const RETRO_MEME_MIME: Record<string, string> = {
+  "image/png": "image/png",
+  "image/jpeg": "image/jpeg",
+  "image/jpg": "image/jpeg",
+  "image/webp": "image/webp",
+  "image/gif": "image/gif",
+};
+
+const RETRO_MEME_EXT: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+};
+
+/** Формат, пустой файл и лимит комнаты. Вес больше 2 МБ сжимается в uploadRetroMeme. */
+export function retroMemeFileError(file: File, memeCount = 0): string | null {
+  const mime = retroMemeMime(file);
+  if (!mime) {
+    const label = retroMemeFormatLabel(file);
+    return label
+      ? `Формат ${label} не подходит. Нужны PNG, JPEG, WebP или GIF.`
+      : "Формат не подходит. Нужны PNG, JPEG, WebP или GIF.";
+  }
+  if (file.size === 0) return "Файл пустой.";
+  if (memeCount >= RETRO_MEME_MAX_PER_ROOM) {
+    return `В комнате уже ${RETRO_MEME_MAX_PER_ROOM} мемов — это максимум. Удалите один, чтобы добавить новый.`;
+  }
+  return null;
+}
+
+function retroMemeMime(file: File): string | null {
+  const type = RETRO_MEME_MIME[file.type.toLowerCase()];
+  if (type) return type;
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  return RETRO_MEME_EXT[ext] ?? null;
+}
+
+function retroMemeFormatLabel(file: File): string {
+  const type = file.type.toLowerCase();
+  if (type.startsWith("image/") && type.length > "image/".length) return type.slice("image/".length).toUpperCase();
+  const ext = file.name.split(".").pop();
+  if (ext && ext !== file.name) return ext.toUpperCase();
+  return "";
+}
+
+function formatWeight(bytes: number): string {
+  const mb = bytes / (1024 * 1024);
+  if (mb < 0.1) return `${Math.max(1, Math.ceil(bytes / 1024))} КБ`;
+  if (mb >= 10) return `${Math.round(mb)} МБ`;
+  const tenths = Math.ceil(mb * 10 - 1e-9);
+  const whole = Math.floor(tenths / 10);
+  const frac = tenths % 10;
+  return frac === 0 ? `${whole} МБ` : `${whole},${frac} МБ`;
+}
+
+export async function uploadRetroMeme(
+  roomId: string,
+  file: File,
+  memeCount = 0,
+  onStatus?: (message: string) => void,
+): Promise<RetroMemeUploadResult> {
+  const problem = retroMemeFileError(file, memeCount);
+  if (problem) throw new Error(problem);
+  let payload = file;
+  if (file.size > RETRO_MEME_MAX_BYTES) {
+    if ((retroMemeMime(file) ?? file.type) === "image/gif") {
+      throw new Error(
+        `GIF весит ${formatWeight(file.size)}. Анимацию больше 2 МБ сжать нельзя — урежьте файл или выберите другую картинку.`,
+      );
+    }
+    onStatus?.("Сжимаю картинку…");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    payload = await compressRetroMeme(file);
+  }
+  const mimeType = retroMemeMime(payload) ?? payload.type;
+  const dataBase64 = await fileToBase64(payload);
   return authedJson<RetroMemeUploadResult>(`/api/retro/rooms/${encodeURIComponent(roomId)}/memes`, {
     method: "POST",
-    body: JSON.stringify({ mimeType: file.type || "image/png", dataBase64 }),
+    body: JSON.stringify({ mimeType, dataBase64 }),
   });
+}
+
+/** Ужимает картинку в WebP (или JPEG), пока она не влезет в лимит сервера. */
+async function compressRetroMeme(file: File): Promise<File> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error("Не удалось прочитать картинку.");
+  }
+  try {
+    if (bitmap.width < 1 || bitmap.height < 1) throw new Error("Не удалось прочитать картинку.");
+    const type = await memeOutputType();
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Не удалось сжать картинку.");
+
+    let longEdge = Math.min(Math.max(bitmap.width, bitmap.height), 4096);
+    const qualities = [0.9, 0.8, 0.68, 0.55, 0.42];
+    while (longEdge >= 640) {
+      const scale = longEdge / Math.max(bitmap.width, bitmap.height);
+      const w = Math.max(1, Math.round(bitmap.width * scale));
+      const h = Math.max(1, Math.round(bitmap.height * scale));
+      canvas.width = w;
+      canvas.height = h;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      if (type === "image/jpeg") {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, w, h);
+      } else {
+        ctx.clearRect(0, 0, w, h);
+      }
+      ctx.drawImage(bitmap, 0, 0, w, h);
+      let smallest = Number.POSITIVE_INFINITY;
+      for (const quality of qualities) {
+        const blob = await canvasToBlob(canvas, type, quality);
+        if (!blob || blob.size === 0) continue;
+        if (blob.size <= RETRO_MEME_MAX_BYTES) {
+          const ext = type === "image/webp" ? "webp" : "jpg";
+          return new File([blob], `meme.${ext}`, { type });
+        }
+        smallest = Math.min(smallest, blob.size);
+      }
+      longEdge = Math.round(longEdge * (smallest > RETRO_MEME_MAX_BYTES * 2.5 ? 0.6 : 0.8));
+    }
+    throw new Error(
+      `Не получилось сжать картинку до 2 МБ (она весит ${formatWeight(file.size)}). Выберите файл поменьше.`,
+    );
+  } finally {
+    bitmap.close();
+  }
+}
+
+let memeOutputIsWebp: boolean | null = null;
+
+async function memeOutputType(): Promise<"image/webp" | "image/jpeg"> {
+  if (memeOutputIsWebp === null) {
+    const probe = document.createElement("canvas");
+    probe.width = 1;
+    probe.height = 1;
+    const blob = await canvasToBlob(probe, "image/webp", 0.8);
+    memeOutputIsWebp = !!blob && blob.size > 0 && blob.type === "image/webp";
+  }
+  return memeOutputIsWebp ? "image/webp" : "image/jpeg";
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> {
+  return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), type, quality));
 }
 
 export async function fetchRetroRoom(roomId: string): Promise<unknown> {
@@ -622,9 +772,11 @@ async function leaderboardRequest(path: string, init: RequestInit): Promise<Lead
 
 async function errorMessage(res: Response): Promise<string> {
   try {
-    const body = (await res.json()) as { message?: string };
-    return body.message ?? `Ошибка ${res.status}`;
+    const body = (await res.json()) as { message?: string; detail?: string };
+    const text = body.message || body.detail;
+    if (text) return text;
   } catch {
-    return `Ошибка ${res.status}`;
+    // тело не JSON
   }
+  return `Ошибка ${res.status}`;
 }
