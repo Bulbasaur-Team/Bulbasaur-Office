@@ -63,7 +63,7 @@ export interface PokerCurrentView {
   title: string;
   revealed: boolean;
   average: number | null;
-  recommended: number | null;
+  recommended: string | null;
   votes: PokerVoteView[];
 }
 
@@ -77,7 +77,7 @@ export interface PokerHistorySummary {
 export interface PokerDoneTaskView {
   title: string;
   average: number | null;
-  recommended: number | null;
+  recommended: string | null;
   votes?: PokerVoteView[];
 }
 
@@ -85,6 +85,10 @@ export interface PokerDoneTaskView {
 export interface PokerStateView {
   id: string;
   name: string;
+  /** Код колоды: sequential, fibonacci, powers, tshirts. */
+  scale: string;
+  /** Карты колоды, включая «?» и coffee. */
+  cards: string[];
   isAdmin: boolean;
   readOnly: boolean;
   remainingMs: number;
@@ -313,8 +317,8 @@ export class Realtime {
     this.send({ type: "pokerList" });
   }
 
-  pokerCreate(name: string): void {
-    this.send({ type: "pokerCreate", name });
+  pokerCreate(name: string, scale: string): void {
+    this.send({ type: "pokerCreate", name, scale });
   }
 
   pokerJoin(roomId: string): void {

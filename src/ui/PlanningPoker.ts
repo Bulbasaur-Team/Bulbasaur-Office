@@ -4,8 +4,13 @@ import { fetchPokerRoom, getLogin } from "../net/api";
 import type { PokerHistorySummary, PokerRoomSummary, PokerStateView } from "../net/realtime";
 import type { KeyConsumer } from "./KeyboardRouter";
 
-// Карты покера: числа Фибоначчи, «не знаю» и кофе-брейк.
-const CARDS = ["0", "1", "2", "3", "5", "8", "13", "?", "coffee"];
+// Коды колоды совпадают с сервером (PokerScale). Карты приходят в pokerState.cards.
+const SCALE_LABELS: Record<string, string> = {
+  sequential: "Последовательный ряд",
+  fibonacci: "Ряд Фибоначчи",
+  powers: "Степени двойки",
+  tshirts: "T-Shirts",
+};
 const DEFAULT_ROOM_NAME = "Planning Poker WDM";
 const ICON_SIZE = 44;
 
@@ -17,10 +22,16 @@ function formatAverage(average: number | null): string {
   return average === null ? "—" : average.toFixed(1);
 }
 
+// В списке задач: числовое среднее, а у футболок — рекомендованный размер.
+function formatDoneScore(average: number | null, recommended: string | null): string {
+  if (average !== null && Number.isFinite(average)) return average.toFixed(1);
+  return recommended ? cardLabel(recommended) : "—";
+}
+
 // Отправка покер-сообщений на сервер; реализацию (Realtime) подставляет WorldScene.
 export interface PokerNet {
   list(): void;
-  create(name: string): void;
+  create(name: string, scale: string): void;
   join(roomId: string): void;
   leave(): void;
   addTask(title: string): void;
@@ -43,7 +54,9 @@ export class PlanningPoker implements KeyConsumer {
   private roomsEl = document.getElementById("pokerRooms")!;
   private historyRoomsEl = document.getElementById("pokerHistoryRooms")!;
   private nameInput = document.getElementById("pokerName") as HTMLInputElement;
+  private scaleSelect = document.getElementById("pokerScale") as HTMLSelectElement;
   private roomNameEl = document.getElementById("pokerRoomName")!;
+  private scaleNameEl = document.getElementById("pokerScaleName")!;
   private timerEl = document.getElementById("pokerTimer")!;
   private readonlyEl = document.getElementById("pokerReadonly")!;
   private doneEl = document.getElementById("pokerDone")!;
@@ -70,7 +83,13 @@ export class PlanningPoker implements KeyConsumer {
     const createForm = document.getElementById("pokerCreateForm") as HTMLFormElement;
     createForm.onsubmit = (e) => {
       e.preventDefault();
-      this.net.create(this.nameInput.value.trim() || DEFAULT_ROOM_NAME);
+      const scale = this.scaleSelect.value;
+      if (!scale) {
+        this.errorEl.textContent = "Выберите последовательность.";
+        return;
+      }
+      this.errorEl.textContent = "";
+      this.net.create(this.nameInput.value.trim() || DEFAULT_ROOM_NAME, scale);
     };
     this.taskForm.onsubmit = (e) => {
       e.preventDefault();
@@ -81,7 +100,7 @@ export class PlanningPoker implements KeyConsumer {
       this.taskForm.classList.add("hidden");
     };
     // Клавиши в полях ввода не должны утекать в управление миром.
-    for (const input of [this.nameInput, this.taskInput]) {
+    for (const input of [this.nameInput, this.scaleSelect, this.taskInput]) {
       input.addEventListener("keydown", (e) => e.stopPropagation());
     }
   }
@@ -281,6 +300,7 @@ export class PlanningPoker implements KeyConsumer {
   private renderRoom(): void {
     const state = this.state!;
     this.roomNameEl.textContent = state.name;
+    this.scaleNameEl.textContent = SCALE_LABELS[state.scale] ?? "";
     this.readonlyEl.classList.toggle("hidden", !state.readOnly);
     this.renderDone(state);
     this.renderCurrent(state);
@@ -316,7 +336,7 @@ export class PlanningPoker implements KeyConsumer {
         + (selected ? " sel" : "");
       row.innerHTML = `<span class="poker-done-title"></span><span class="poker-done-avg"></span>`;
       (row.firstChild as HTMLElement).textContent = task.title;
-      (row.lastChild as HTMLElement).textContent = formatAverage(task.average);
+      (row.lastChild as HTMLElement).textContent = formatDoneScore(task.average, task.recommended);
       if (state.readOnly) {
         row.onclick = () => {
           this.historyIndex = i;
@@ -325,6 +345,16 @@ export class PlanningPoker implements KeyConsumer {
       }
       this.doneEl.appendChild(row);
     });
+  }
+
+  private resultText(scale: string, average: number | null, recommended: string | null): string {
+    if (average === null && !recommended) {
+      return scale === "tshirts" ? "Голосов с размером нет." : "Числовых голосов нет.";
+    }
+    if (average === null) {
+      return `Рекомендуемая: ${cardLabel(recommended ?? "")}`;
+    }
+    return `Средняя: ${formatAverage(average)} · Рекомендуемая: ${cardLabel(recommended ?? "")}`;
   }
 
   private renderCurrent(state: PokerStateView): void {
@@ -342,9 +372,7 @@ export class PlanningPoker implements KeyConsumer {
       ? current.title
       : `Голосуем: ${current.title}`;
     if (current.revealed) {
-      this.resultEl.textContent = current.average === null
-        ? "Числовых голосов нет."
-        : `Средняя: ${formatAverage(current.average)} · Рекомендуемая: ${current.recommended}`;
+      this.resultEl.textContent = this.resultText(state.scale, current.average, current.recommended);
     } else {
       this.resultEl.textContent = "";
     }
@@ -419,7 +447,7 @@ export class PlanningPoker implements KeyConsumer {
     if (state.readOnly) return;
     const current = this.focusedTask(state);
     if (!current || current.revealed) return;
-    for (const value of CARDS) {
+    for (const value of state.cards ?? []) {
       const btn = document.createElement("button");
       btn.className = "poker-hand-card" + (state.myVote === value ? " sel" : "");
       btn.textContent = cardLabel(value);

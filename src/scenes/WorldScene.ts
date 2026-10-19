@@ -538,7 +538,7 @@ export class WorldScene extends Phaser.Scene {
     // ответы сервера роутятся в неё из handlers в startAsRole.
     this.poker = new PlanningPoker({
       list: () => this.realtime.pokerList(),
-      create: (name) => this.realtime.pokerCreate(name),
+      create: (name, scale) => this.realtime.pokerCreate(name, scale),
       join: (roomId) => this.realtime.pokerJoin(roomId),
       leave: () => this.realtime.pokerLeave(),
       addTask: (title) => this.realtime.pokerAddTask(title),
