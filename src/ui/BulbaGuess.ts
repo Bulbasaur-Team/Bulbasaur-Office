@@ -1,31 +1,40 @@
-import { seedToIndex } from "../data/wotd";
-import type { DailyProgress } from "../net/api";
+import { dailyRoundIndex, moscowToday, shiftIsoDate } from "../data/wotd";
+import { buyGuessHint, type DailyProgress } from "../net/api";
 import { stage } from "./orientation";
 
 interface Round {
   t: string;      // загаданное слово (нормализованное)
   n: number[];    // индексы ближайших по смыслу слов в порядке близости; n[0] — само
                   // загаданное слово, дальше по убыванию близости (в словаре words).
+  h?: number[];   // позиции в n двух дальних подсказок, уже отобранные.
 }
 
 // Позиция соседа (0 — само слово) переводится в счёт 1..100 сглаживающей кривой:
 // синонимы у начала остаются 2-4, ассоциации по смежности дают «рядом» ~15-30,
 // а дальние слова плавно подходят к 100. Слово вне окна близости считаем за 100.
 const SIM_K = 120;
+const PAID_HINT_PRICE = 100;
 function posToScore(pos: number): number {
   if (pos === 0) return 1;
   return Math.min(100, 1 + Math.round((99 * pos) / (pos + SIM_K)));
 }
 
-// Слова-подсказки выдаются в начале раунда, чтобы игроку было от чего оттолкнуться.
-// Счёт выше 81 недостижим: дальше окна близости слово сразу получает 100.
-const HINT_SCORES = [70, 50];
+// Купленная подсказка открывает слово ближе к лучшему уже известному счёту.
+function paidHintDelta(best: number): number | null {
+  if (best > 50) return 25;
+  if (best > 20) return 10;
+  if (best > 10) return 5;
+  if (best > 5) return 3;
+  if (best > 2) return 1;
+  return null;
+}
 
 interface Attempt {
   word: string;
   score: number;  // 1..100, либо Infinity («бесконечность» — слово неизвестно)
   seq: number;    // порядок ввода — при равном score недавние показываем выше
-  hint?: boolean; // выданное игре слово-подсказка: не считается попыткой и не сохраняется
+  hint?: boolean; // выданное игре слово: не считается попыткой
+  paid?: boolean; // куплено за бульба коины — сохраняем в прогресс слова дня
 }
 
 interface Particle {
@@ -53,11 +62,11 @@ function normalize(w: string): string {
   return w.trim().toLowerCase().replace(/ё/g, "е");
 }
 
-// Bulba Guess — игра загадывает существительное, игрок вводит слова и получает
-// меру смыслового расстояния: 1 — само слово, чем больше — тем дальше по смыслу,
-// 100 — совсем не близко, «бесконечность» — слово неизвестно словарю. Данные
-// (словарь известных слов и предрассчитанные соседи) грузятся один раз при
-// первом открытии.
+// Bulba Guess — игра загадывает существительное в единственном числе и именительном
+// падеже. Игрок вводит слово и получает меру смыслового расстояния: 1 — само слово,
+// чем больше — тем дальше, 100 — совсем не близко, «бесконечность» — такого
+// существительного нет. Другая форма («корову», «коровы») приводится к начальной.
+// Словарь, соседи и подсказки грузятся один раз при первом открытии.
 export class BulbaGuess {
   isOpen = false;
   onClose: (() => void) | null = null;
@@ -65,6 +74,7 @@ export class BulbaGuess {
   onDailyOver: ((attempts: number) => void) | null = null;
   onDailyProgress: ((state: DailyProgress) => void | Promise<void>) | null = null;
   onLeaderboard: (() => void) | null = null;
+  onBalance: ((balance: number) => void) | null = null;
   private reported = false;
 
   private daily = false;                  // режим слова дня: без «Сдаться»/«Новое слово», со вчерашним словом
@@ -76,6 +86,9 @@ export class BulbaGuess {
   private giveUpBtn = document.getElementById("bgGiveUp")!;
   private restartBtn = document.getElementById("bgRestart")!;
   private yesterdayEl = document.getElementById("bgYesterday")!;
+  private hintBtn = document.getElementById("bgHint") as HTMLButtonElement;
+  private balanceEl = document.getElementById("bgBalanceValue")!;
+  private hintBusy = false;
   private form = document.getElementById("bgForm") as HTMLFormElement;
   private input = document.getElementById("bgInput") as HTMLInputElement;
   private listEl = document.getElementById("bgList")!;
@@ -89,9 +102,10 @@ export class BulbaGuess {
 
   private words: string[] = [];              // словарь известных слов (индекс = позиция)
   private wordIndex = new Map<string, number>(); // слово -> индекс в words
+  private forms = new Map<string, string>();     // косвенная форма -> начальная
   private rounds: Round[] = [];
+  private dataReady: Promise<void> | null = null;
   private loaded = false;
-  private loading = false;
 
   private round: Round | null = null;
   private posByIndex = new Map<number, number>(); // индекс слова -> позиция среди соседей
@@ -104,6 +118,9 @@ export class BulbaGuess {
     document.getElementById("bgLb")!.onclick = () => this.onLeaderboard?.();
     document.getElementById("bgRestart")!.onclick = () => this.newRound();
     document.getElementById("bgGiveUp")!.onclick = () => this.giveUp();
+    this.hintBtn.onclick = () => void this.buyHint();
+    const price = this.hintBtn.querySelector(".bg-price");
+    if (price?.lastChild) price.lastChild.textContent = String(PAID_HINT_PRICE);
     const help = document.getElementById("bgHelp")!;
     help.onclick = () => help.parentElement!.classList.toggle("bg-open");
     this.form.onsubmit = (e) => {
@@ -117,6 +134,10 @@ export class BulbaGuess {
       e.stopPropagation();
       if (e.code === "Escape") this.close();
     });
+  }
+
+  setBalance(balance: number): void {
+    this.balanceEl.textContent = String(balance);
   }
 
   async open(): Promise<void> {
@@ -137,7 +158,7 @@ export class BulbaGuess {
 
   // Режим слова дня: раунд выводится из сида, «Сдаться»/«Новое слово» скрыты, показано вчерашнее слово.
   // progress — сохранённый прогресс (восстанавливаем список догадок, блокируем если пройдено).
-  async openDaily(todaySeed: string, prevSeed: string | null, progress: DailyProgress): Promise<void> {
+  async openDaily(todaySeed: string, prevSeed: string | null, progress: DailyProgress, todayIso?: string | null): Promise<void> {
     this.isOpen = true;
     this.daily = true;
     this.giveUpBtn.classList.add("hidden");
@@ -146,10 +167,14 @@ export class BulbaGuess {
     window.addEventListener("keydown", this.onKeyDown);
     await this.ensureData();
     if (this.rounds.length === 0) return;
-    this.prevWord = prevSeed ? this.rounds[seedToIndex(prevSeed, this.rounds.length)].t : null;
+    // Сид по-прежнему приходит с сервера (вчера был или нет). Само слово — из
+    // перестановки пула по московской дате, поэтому по кругу оно не повторяется.
+    void todaySeed;
+    const today = todayIso && /^\d{4}-\d{2}-\d{2}$/.test(todayIso) ? todayIso : moscowToday();
+    this.prevWord = prevSeed ? this.rounds[dailyRoundIndex(shiftIsoDate(today, -1), this.rounds.length)].t : null;
     this.yesterdayEl.textContent = `Слово вчерашнего дня: ${this.prevWord ?? "—"}`;
     this.yesterdayEl.classList.remove("hidden");
-    this.startRound(this.rounds[seedToIndex(todaySeed, this.rounds.length)]);
+    this.startRound(this.rounds[dailyRoundIndex(today, this.rounds.length)]);
     this.restoreDaily(progress);
   }
 
@@ -157,6 +182,7 @@ export class BulbaGuess {
   private restoreDaily(progress: DailyProgress): void {
     this.dailyAttempts = progress.attempts;
     for (const word of progress.guesses) {
+      if (this.attempts.some((a) => a.word === word)) continue;
       this.attempts.push({ word, score: this.scoreOf(word), seq: this.attempts.length });
     }
     this.attempts.sort((a, b) => a.score - b.score || b.seq - a.seq);
@@ -169,11 +195,14 @@ export class BulbaGuess {
     }
     this.renderList();
     this.renderCanvas();
+    this.refreshHintButton();
   }
-
-  // Топ-20 подошедших слов (по возрастанию score) + счётчик — на сервер.
+  // Топ-20 подошедших слов и купленных подсказок — на сервер.
   private persistDaily(solved: boolean): void | Promise<void> {
-    const guesses = this.guesses().filter((a) => a.score !== Infinity).slice(0, 20).map((a) => a.word);
+    const guesses = this.attempts
+      .filter((a) => a.score !== Infinity && (!a.hint || a.paid))
+      .slice(0, 20)
+      .map((a) => a.word);
     return this.onDailyProgress?.({ solved, attempts: this.dailyAttempts, guesses });
   }
 
@@ -191,25 +220,79 @@ export class BulbaGuess {
   };
 
   private async ensureData(): Promise<void> {
-    if (this.loaded || this.loading) return;
-    this.loading = true;
+    if (!this.dataReady) {
+      this.dataReady = this.loadData().catch((err) => {
+        this.dataReady = null;
+        throw err;
+      });
+    }
+    await this.dataReady;
+  }
+
+  private async loadData(): Promise<void> {
     this.statusEl.textContent = "Загрузка словаря...";
-    // Относительный путь (как у остальных ассетов) — резолвится с учётом base.
-    const [wordsRes, roundsRes] = await Promise.all([
-      fetch("assets/bulbaguess/words.txt"),
-      fetch("assets/bulbaguess/rounds.json"),
+    // Версия в адресе сбрасывает кэш браузера: старый словарь и новые индексы
+    // вместе дали бы бессмысленные счета.
+    const [wordsRes, roundsRes, formsRes] = await Promise.all([
+      fetch("assets/bulbaguess/words.txt?v=4"),
+      fetch("assets/bulbaguess/rounds.json?v=4"),
+      fetch("assets/bulbaguess/forms.txt?v=4"),
     ]);
     const wordsText = await wordsRes.text();
-    this.words = wordsText.split("\n");
+    this.words = wordsText.split("\n").filter((w) => w.length > 0);
     this.wordIndex = new Map(this.words.map((w, i) => [w, i]));
+    this.forms = new Map();
+    for (const line of (await formsRes.text()).split("\n")) {
+      const sp = line.indexOf(" ");
+      if (sp <= 0) continue;
+      this.forms.set(line.slice(0, sp), line.slice(sp + 1));
+    }
     this.rounds = await roundsRes.json();
-    this.loading = false;
     this.loaded = true;
   }
 
   private newRound(): void {
     if (!this.loaded || this.rounds.length === 0) return;
-    this.startRound(this.rounds[Math.floor(Math.random() * this.rounds.length)]);
+    this.startRound(this.pickRound());
+  }
+
+  // Свободная игра не повторяет недавние слова и сегодняшнее слово дня,
+  // пока пул не кончится.
+  private pickRound(): Round {
+    const today = this.rounds[dailyRoundIndex(moscowToday(), this.rounds.length)].t;
+    const seen = new Set(this.readSeen());
+    seen.add(today);
+    let pool = this.rounds.filter((r) => !seen.has(r.t));
+    if (pool.length === 0) {
+      const stored = this.readSeen();
+      const last = stored.length ? stored[stored.length - 1] : undefined;
+      this.writeSeen([]);
+      pool = this.rounds.filter((r) => r.t !== last && r.t !== today);
+      if (pool.length === 0) pool = this.rounds;
+    }
+    const round = pool[Math.floor(Math.random() * pool.length)];
+    const stored = this.readSeen().filter((w) => w !== round.t);
+    stored.push(round.t);
+    this.writeSeen(stored.slice(-this.rounds.length));
+    return round;
+  }
+
+  private readSeen(): string[] {
+    try {
+      const raw = localStorage.getItem("bulbaguess-seen-v2");
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter((w) => typeof w === "string") : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private writeSeen(words: string[]): void {
+    try {
+      localStorage.setItem("bulbaguess-seen-v2", JSON.stringify(words));
+    } catch {
+      // В приватном режиме запоминать недавние слова негде.
+    }
   }
 
   // Начать раунд с заданным словом (общий путь для обычной игры и слова дня).
@@ -232,15 +315,18 @@ export class BulbaGuess {
       : "Угадай слово по смыслу. Попыток: 0";
     this.renderList();
     this.renderCanvas();
+    this.refreshHintButton();
     this.input.focus();
   }
 
-  // Слова-подсказки: по одному соседу на каждый счёт из HINT_SCORES.
+  // Слова-подсказки выбраны при сборке: понятные соседи около счетов 50 и 70.
   private hintWords(round: Round): { word: string; score: number }[] {
     const hints: { word: string; score: number }[] = [];
-    for (const score of HINT_SCORES) {
-      const pos = round.n.findIndex((_, i) => posToScore(i) === score);
-      if (pos !== -1) hints.push({ word: this.words[round.n[pos]], score });
+    for (const pos of round.h ?? []) {
+      const idx = round.n[pos];
+      const word = idx === undefined ? undefined : this.words[idx];
+      if (!word) continue;
+      hints.push({ word, score: posToScore(pos) });
     }
     return hints;
   }
@@ -250,6 +336,78 @@ export class BulbaGuess {
     return this.attempts.filter((a) => !a.hint);
   }
 
+  // Лучший уже открытый счёт: и догадки, и подсказки. Иначе покупка могла бы
+  // показать слово хуже того, что уже лежит в списке.
+  private bestKnownScore(): number {
+    let best = Infinity;
+    for (const attempt of this.attempts) {
+      if (attempt.score < best) best = attempt.score;
+    }
+    return best === Infinity ? 100 : best;
+  }
+
+  private pickPaidHint(): { word: string; score: number } | null {
+    if (!this.round || this.won || this.surrendered) return null;
+    const anchor = this.bestKnownScore();
+    const delta = paidHintDelta(anchor);
+    if (delta == null) return null;
+    const target = anchor - delta;
+    const used = new Set(this.attempts.map((attempt) => attempt.word));
+    let pick: { word: string; score: number; dist: number } | null = null;
+    for (let pos = 1; pos < this.round.n.length; pos++) {
+      const score = posToScore(pos);
+      if (score <= 1 || score >= anchor) continue;
+      const word = this.words[this.round.n[pos]];
+      if (!word || used.has(word) || word === this.round.t) continue;
+      const dist = Math.abs(score - target);
+      if (!pick || dist < pick.dist || (dist === pick.dist && score > pick.score)) {
+        pick = { word, score, dist };
+      }
+    }
+    return pick ? { word: pick.word, score: pick.score } : null;
+  }
+
+  private refreshHintButton(): void {
+    const pick = this.pickPaidHint();
+    this.hintBtn.disabled = this.hintBusy || pick == null;
+    this.hintBtn.classList.toggle("busy", this.hintBusy);
+    if (this.won || this.surrendered) this.hintBtn.title = "";
+    else if (paidHintDelta(this.bestKnownScore()) == null) this.hintBtn.title = "Уже совсем близко";
+    else if (pick == null) this.hintBtn.title = "Ближе подсказать нечего";
+    else this.hintBtn.title = "Открыть слово ближе к загадке";
+  }
+
+  private async buyHint(): Promise<void> {
+    const pick = this.pickPaidHint();
+    const round = this.round;
+    if (!pick || !round || this.hintBusy) return;
+    this.hintBusy = true;
+    this.refreshHintButton();
+    try {
+      const res = await buyGuessHint();
+      this.onBalance?.(res.balance);
+      if (this.round !== round || this.attempts.some((attempt) => attempt.word === pick.word)) return;
+      this.attempts.push({
+        word: pick.word,
+        score: pick.score,
+        seq: this.attempts.length,
+        hint: true,
+        paid: true,
+      });
+      this.attempts.sort((a, b) => a.score - b.score || b.seq - a.seq);
+      const count = this.daily ? this.dailyAttempts : this.guesses().length;
+      this.statusEl.textContent = `Подсказка: «${pick.word}». Попыток: ${count}`;
+      if (this.daily) this.persistDaily(false);
+      this.renderList(pick.word);
+      this.renderCanvas();
+    } catch (e) {
+      this.statusEl.textContent = e instanceof Error ? e.message : "Не удалось купить подсказку";
+    } finally {
+      this.hintBusy = false;
+      this.refreshHintButton();
+    }
+  }
+
   // Сдаться: показать загаданное слово и остановить приём догадок. Результат не
   // отправляется в лидерборд (это не победа). Дальше — «Новое слово».
   private giveUp(): void {
@@ -257,12 +415,13 @@ export class BulbaGuess {
     this.surrendered = true;
     this.input.disabled = true;
     this.statusEl.textContent = `Загадано было «${this.round.t}». Жми «Новое слово».`;
+    this.refreshHintButton();
     this.renderCanvas();
   }
 
   private submitGuess(): void {
     if (this.won || this.surrendered || !this.round || !this.loaded) return;
-    const g = normalize(this.input.value);
+    const g = this.lemmaOf(this.input.value);
     this.input.value = "";
     if (!g) return;
 
@@ -286,7 +445,9 @@ export class BulbaGuess {
     if (score === 1) {
       this.won = true;
       this.input.disabled = true;
-      this.statusEl.textContent = `Угадал! «${g}» за ${count()} попыток.`;
+      this.statusEl.textContent = this.daily
+        ? `Угадал! «${g}» за ${count()} попыток.`
+        : `Угадал! «${g}» за ${count()} попыток. +200 бульба коинов`;
       this.launchConfetti();
       if (this.daily) {
         // Лидерборд открываем только ПОСЛЕ подтверждения сохранения прогресса сервером:
@@ -302,6 +463,7 @@ export class BulbaGuess {
     }
     this.renderList(g);
     this.renderCanvas();
+    this.refreshHintButton();
   }
 
   private finish(value: number): void {
@@ -316,8 +478,15 @@ export class BulbaGuess {
     this.onDailyOver?.(attempts);
   }
 
+  // Начальная форма: «корову» и «коровы» считаются как «корова».
+  private lemmaOf(raw: string): string {
+    const n = normalize(raw);
+    if (this.wordIndex.has(n)) return n;
+    return this.forms.get(n) ?? n;
+  }
+
   private scoreOf(g: string): number {
-    const gi = this.wordIndex.get(g);
+    const gi = this.wordIndex.get(this.lemmaOf(g));
     if (gi === undefined) return Infinity;      // «бесконечность» — слово неизвестно
     const pos = this.posByIndex.get(gi);
     if (pos === undefined) return 100;          // слово известно, но далеко по смыслу

@@ -524,6 +524,7 @@ export class WorldScene extends Phaser.Scene {
         (e) => console.error("Не удалось сохранить прогресс слова дня:", e),
       );
     this.bulbaGuess.onDailyProgress = (s) => saveDaily("bulbaguess", s);
+    this.bulbaGuess.onBalance = (balance) => this.setBcBalance(balance);
     this.bulbaWordle.onDailyProgress = (s) => saveDaily("bulbawordle", s);
 
     // Тач-управление (только на мобильных): джойстик двигает игрока, кнопка — действие.
@@ -698,6 +699,7 @@ export class WorldScene extends Phaser.Scene {
 
   private setBcBalance(balance: number): void {
     this.bcBalanceEl.textContent = String(balance);
+    this.bulbaGuess?.setBalance(balance);
   }
 
   private applyLocalAppearance(appearance: PlayerAppearance): void {
@@ -713,6 +715,10 @@ export class WorldScene extends Phaser.Scene {
       await api.ensureSession();
       const before = await api.fetchLeaderboard(gameId);
       const after = await api.submitScore(gameId, value);
+      if (gameId === "bulbaguess") {
+        const profile = await api.fetchProfile();
+        this.setBcBalance(profile.bulbaCoinBalance);
+      }
       if (!boardChangedForYou(before, after)) return;
       this.leaderboard.showBoard(gameId, after, rankDeltas(before, after));
     } catch (e) {
@@ -747,7 +753,7 @@ export class WorldScene extends Phaser.Scene {
       ]);
       this.wotdBoardSnap.set(gameId, boardSnap);
       if (gameId === "bulbaguess") {
-        await this.bulbaGuess.openDaily(wotd.guess.today, wotd.guess.prev, progress);
+        await this.bulbaGuess.openDaily(wotd.guess.today, wotd.guess.prev, progress, wotd.today);
       } else {
         await this.bulbaWordle.openDaily(wotd.wordle.today, wotd.wordle.prev, progress);
       }

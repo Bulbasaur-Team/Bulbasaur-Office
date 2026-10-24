@@ -678,6 +678,12 @@
     .ttt-restart { background: var(--panel); border: 2px solid var(--accent); border-radius: 12px; padding: 8px 22px; color: var(--text); font-family: inherit; font-size: 15px; font-weight: bold; cursor: pointer; }
     .ttt-restart:hover { background: var(--accent); color: #14210f; }
     .bg-actions, .arcade-actions { display: flex; gap: 10px; align-items: center; justify-content: center; }
+    .bg-actions { flex-wrap: wrap; }
+    .bg-hint-btn { display: inline-flex; align-items: center; gap: 8px; }
+    .bg-price, .bg-balance { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+    .bg-hint-btn img, .bg-balance img { width: 18px; height: 18px; image-rendering: pixelated; }
+    .bg-balance { font-weight: bold; color: #f9c74f; padding: 0 2px; }
+    #bgHint:disabled, #bgHint:disabled:hover { opacity: .45; cursor: default; background: var(--panel); color: var(--text); }
 
     /* Bulba Colors */
     .bc-hud { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; width: min(360px, calc(var(--sw) * .8)); }
@@ -2940,7 +2946,7 @@
         </button>
         <h2 class="arcade-title">Bulba Guess<span class="bg-help">
           <button class="bg-help-btn" id="bgHelp" type="button" aria-label="правила">i</button>
-          <div class="bg-tip">Нужно найти слово с номером 1. Чем ближе слово по смыслу к загаданному, тем меньше его номер. Знак ∞ значит, что слова нет в словаре. Словарь составлен на основе художественной литературы. Среди подсказок могут попасться незнакомые слова — хороший повод узнать что-то новое.</div>
+          <div class="bg-tip">Нужно найти слово с номером 1. Чем ближе слово по смыслу к загаданному, тем меньше номер. Знак ∞ значит, что такого существительного нет в словаре. Загадывается слово в единственном числе и именительном падеже. Другую форму можно вводить как есть: «корову» засчитается как «корова». За 100 бульба коинов можно открыть слово ближе к уже найденному.</div>
         </span></h2>
         <div class="ttt-status" id="bgStatus">Угадай слово по смыслу</div>
         <div class="wotd-yesterday hidden" id="bgYesterday"></div>
@@ -2950,6 +2956,11 @@
         </form>
         <div class="bg-list" id="bgList"></div>
         <div class="bg-actions">
+          <button class="ttt-restart bg-hint-btn" id="bgHint" type="button" disabled>
+            <span>Подсказка</span>
+            <span class="bg-price"><img src="assets/wardrobe/ui/bc_coin.png" alt="" />100</span>
+          </button>
+          <span class="bg-balance" id="bgBalance" title="Бульба коины"><img src="assets/wardrobe/ui/bc_coin.png" alt="" /><span id="bgBalanceValue">0</span></span>
           <button class="ttt-restart" id="bgGiveUp">Сдаться</button>
           <button class="ttt-restart" id="bgRestart">Новое слово</button>
           <button class="arcade-lb" id="bgLb" aria-label="лидерборд" title="Лидерборд">

@@ -29,6 +29,8 @@ export interface WotdGameSeeds {
 export interface Wotd {
   guess: WotdGameSeeds;
   wordle: WotdGameSeeds;
+  /** Календарный день сервера, Europe/Moscow, YYYY-MM-DD. */
+  today?: string;
 }
 
 export function getToken(): string | null {
@@ -149,6 +151,10 @@ export async function fetchWotd(): Promise<Wotd> {
   }
   if (!res.ok) throw new Error(await errorMessage(res));
   return (await res.json()) as Wotd;
+}
+
+export function buyGuessHint(): Promise<{ balance: number }> {
+  return authedJson("/api/guess/hint", { method: "POST", body: "{}" });
 }
 
 export function fetchDailyLeaderboard(gameId: string): Promise<Leaderboard> {
