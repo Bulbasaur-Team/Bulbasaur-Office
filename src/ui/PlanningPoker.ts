@@ -1,8 +1,9 @@
 import { defaultAppearance, type PlayerAppearance } from "../data/wardrobe";
 import { drawAppearance, loadWardrobeDomImages } from "../entities/PlayerAvatar";
-import { fetchPokerRoom, getLogin } from "../net/api";
+import { fetchPokerRoom, getLogin, unlockPokerRoom } from "../net/api";
 import type { PokerHistorySummary, PokerRoomSummary, PokerStateView } from "../net/realtime";
 import type { KeyConsumer } from "./KeyboardRouter";
+import { askRoomPassword, cancelRoomPassword, isRoomPasswordDialogOpen, setRoomTitle } from "./roomAccess";
 
 // Коды колоды совпадают с сервером (PokerScale). Карты приходят в pokerState.cards.
 const SCALE_LABELS: Record<string, string> = {
@@ -31,8 +32,8 @@ function formatDoneScore(average: number | null, recommended: string | null): st
 // Отправка покер-сообщений на сервер; реализацию (Realtime) подставляет WorldScene.
 export interface PokerNet {
   list(): void;
-  create(name: string, scale: string): void;
-  join(roomId: string): void;
+  create(name: string, scale: string, password?: string): void;
+  join(roomId: string, password?: string): void;
   leave(): void;
   addTask(title: string): void;
   vote(value: string): void;
@@ -54,6 +55,7 @@ export class PlanningPoker implements KeyConsumer {
   private roomsEl = document.getElementById("pokerRooms")!;
   private historyRoomsEl = document.getElementById("pokerHistoryRooms")!;
   private nameInput = document.getElementById("pokerName") as HTMLInputElement;
+  private passwordInput = document.getElementById("pokerPassword") as HTMLInputElement;
   private scaleSelect = document.getElementById("pokerScale") as HTMLSelectElement;
   private roomNameEl = document.getElementById("pokerRoomName")!;
   private scaleNameEl = document.getElementById("pokerScaleName")!;
@@ -89,7 +91,7 @@ export class PlanningPoker implements KeyConsumer {
         return;
       }
       this.errorEl.textContent = "";
-      this.net.create(this.nameInput.value.trim() || DEFAULT_ROOM_NAME, scale);
+      this.net.create(this.nameInput.value.trim() || DEFAULT_ROOM_NAME, scale, this.passwordInput.value);
     };
     this.taskForm.onsubmit = (e) => {
       e.preventDefault();
@@ -100,7 +102,7 @@ export class PlanningPoker implements KeyConsumer {
       this.taskForm.classList.add("hidden");
     };
     // Клавиши в полях ввода не должны утекать в управление миром.
-    for (const input of [this.nameInput, this.scaleSelect, this.taskInput]) {
+    for (const input of [this.nameInput, this.passwordInput, this.scaleSelect, this.taskInput]) {
       input.addEventListener("keydown", (e) => e.stopPropagation());
     }
   }
@@ -122,6 +124,7 @@ export class PlanningPoker implements KeyConsumer {
 
   close(): void {
     if (!this.isOpen) return;
+    if (isRoomPasswordDialogOpen()) cancelRoomPassword();
     if (this.joinedRoomId && !this.viewingHistory) this.net.leave();
     this.isOpen = false;
     this.joinedRoomId = null;
@@ -177,6 +180,10 @@ export class PlanningPoker implements KeyConsumer {
 
   handleKey(e: KeyboardEvent): boolean {
     if (e.code === "Escape") {
+      if (isRoomPasswordDialogOpen()) {
+        cancelRoomPassword();
+        return true;
+      }
       this.close();
       return true;
     }
@@ -191,6 +198,7 @@ export class PlanningPoker implements KeyConsumer {
     this.roomEl.classList.add("hidden");
     this.lobbyEl.classList.remove("hidden");
     this.nameInput.value = DEFAULT_ROOM_NAME;
+    this.passwordInput.value = "";
     this.roomsEl.innerHTML = "";
     this.historyRoomsEl.innerHTML = "";
   }
@@ -214,10 +222,14 @@ export class PlanningPoker implements KeyConsumer {
       const btn = document.createElement("button");
       btn.className = "poker-room-btn";
       btn.innerHTML = `<span class="poker-room-title"></span><span class="poker-room-meta"></span>`;
-      (btn.firstChild as HTMLElement).textContent = room.name;
+      const granted = !!room.locked && room.needsPassword === false;
+      setRoomTitle(btn.firstChild as HTMLElement, room.name, !!room.locked, granted);
+      if (room.locked) {
+        btn.setAttribute("aria-label", granted ? `${room.name}, пароль уже введён` : `${room.name}, закрыта паролем`);
+      }
       (btn.lastChild as HTMLElement).textContent =
         `админ: ${room.adminLogin} · участников: ${room.participants}`;
-      btn.onclick = () => this.net.join(room.id);
+      btn.onclick = () => void this.enterActive(room);
       this.roomsEl.appendChild(btn);
     }
   }
@@ -235,19 +247,39 @@ export class PlanningPoker implements KeyConsumer {
       const btn = document.createElement("button");
       btn.className = "poker-room-btn history";
       btn.innerHTML = `<span class="poker-room-title"></span><span class="poker-room-meta"></span>`;
-      (btn.firstChild as HTMLElement).textContent = room.name;
+      const granted = !!room.locked && room.needsPassword === false;
+      setRoomTitle(btn.firstChild as HTMLElement, room.name, !!room.locked, granted);
+      if (room.locked) {
+        btn.setAttribute("aria-label", granted ? `${room.name}, пароль уже введён` : `${room.name}, закрыта паролем`);
+      }
       const closed = new Date(room.closedAt);
       (btn.lastChild as HTMLElement).textContent =
         `админ: ${room.adminLogin} · ${closed.toLocaleString("ru-RU")}`;
-      btn.onclick = () => void this.openHistory(room.id);
+      btn.onclick = () => void this.openHistory(room);
       this.historyRoomsEl.appendChild(btn);
     }
   }
 
-  private async openHistory(roomId: string): Promise<void> {
+  private async enterActive(room: PokerRoomSummary): Promise<void> {
+    let password: string | undefined;
+    if (room.needsPassword) {
+      const entered = await askRoomPassword();
+      if (entered == null) return;
+      password = entered;
+    }
+    this.errorEl.textContent = "";
+    this.net.join(room.id, password);
+  }
+
+  private async openHistory(room: PokerHistorySummary): Promise<void> {
     try {
       this.errorEl.textContent = "";
-      const raw = await fetchPokerRoom(roomId);
+      if (room.needsPassword) {
+        const password = await askRoomPassword();
+        if (password == null) return;
+        await unlockPokerRoom(room.id, password);
+      }
+      const raw = await fetchPokerRoom(room.id);
       const state = raw as PokerStateView;
       this.viewingHistory = true;
       this.joinedRoomId = state.id;

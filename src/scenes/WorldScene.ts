@@ -539,8 +539,8 @@ export class WorldScene extends Phaser.Scene {
     // ответы сервера роутятся в неё из handlers в startAsRole.
     this.poker = new PlanningPoker({
       list: () => this.realtime.pokerList(),
-      create: (name, scale) => this.realtime.pokerCreate(name, scale),
-      join: (roomId) => this.realtime.pokerJoin(roomId),
+      create: (name, scale, password) => this.realtime.pokerCreate(name, scale, password),
+      join: (roomId, password) => this.realtime.pokerJoin(roomId, password),
       leave: () => this.realtime.pokerLeave(),
       addTask: (title) => this.realtime.pokerAddTask(title),
       vote: (value) => this.realtime.pokerVote(value),
@@ -555,8 +555,8 @@ export class WorldScene extends Phaser.Scene {
 
     this.retro = new Retro({
       list: () => this.realtime.retroList(),
-      create: (name) => this.realtime.retroCreate(name),
-      join: (roomId) => this.realtime.retroJoin(roomId),
+      create: (name, password) => this.realtime.retroCreate(name, password),
+      join: (roomId, password) => this.realtime.retroJoin(roomId, password),
       leave: () => this.realtime.retroLeave(),
       close: () => this.realtime.retroClose(),
       mood: (value) => this.realtime.retroMood(value),

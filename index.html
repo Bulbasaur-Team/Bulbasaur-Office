@@ -1083,7 +1083,34 @@
     .poker-room-btn:hover { background: var(--accent); color: #14210f; }
     .poker-room-btn.history { border-color: #555c68; opacity: .9; }
     .poker-room-btn.history:hover { background: #3a414c; color: var(--text); }
-    .poker-room-title { font-weight: bold; }
+    .poker-room-title, .retro-room-title { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-weight: bold; text-align: left; }
+    .room-lock {
+      width: 20px; height: 15px; flex: 0 0 auto;
+      stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .room-lock-check-outline { stroke: #14210f; stroke-width: 5.5; fill: none; }
+    .room-lock-check { stroke: #5dce6a; stroke-width: 2.8; fill: none; }
+    #roomPassword {
+      position: fixed; inset: 0; z-index: 60; background: rgba(8,10,14,.55);
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .room-password-box {
+      width: min(420px, 100%); background: #1a1f28; border: 3px solid var(--accent);
+      border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 12px;
+    }
+    .room-password-title { margin: 0; text-align: center; font-weight: bold; }
+    .room-password-input {
+      width: 100%; background: #f4f1e8; border: 2px solid var(--accent); border-radius: 10px;
+      padding: 9px 14px; color: #1b1f24; font-family: inherit; font-size: 15px;
+    }
+    .room-password-input:focus { outline: none; border-color: #8fd06b; }
+    .room-password-error { min-height: 18px; color: #e6807a; font-size: 14px; text-align: center; }
+    .room-password-actions { display: flex; justify-content: center; gap: 8px; }
+    .room-password-btn {
+      background: var(--accent); border: 2px solid #5aa05a; border-radius: 10px; padding: 9px 16px;
+      color: #14210f; font-family: inherit; font-size: 14px; font-weight: bold; cursor: pointer;
+    }
+    .room-password-btn.ghost { background: transparent; border-color: #555c68; color: var(--text); }
     .poker-room-meta { font-size: 12px; opacity: .75; }
     .poker-form { display: flex; gap: 8px; justify-content: center; }
     .poker-create-form {
@@ -1091,6 +1118,7 @@
       width: min(560px, 100%); margin: 0 auto;
     }
     .poker-create-form .poker-input { max-width: none; }
+    .poker-create-form .poker-password { grid-column: 1 / -1; }
     .poker-create-form .poker-scale { grid-column: 1 / -1; cursor: pointer; }
     .poker-input { flex: 1; max-width: 380px; background: #f4f1e8; border: 2px solid var(--accent); border-radius: 10px; padding: 9px 14px; color: #1b1f24; font-family: inherit; font-size: 15px; }
     .poker-input:focus { outline: none; border-color: #8fd06b; }
@@ -1173,9 +1201,14 @@
     .retro-room-btn:hover { background: var(--accent); color: #14210f; }
     .retro-room-btn.history { border-color: #555c68; opacity: .9; }
     .retro-room-btn.history:hover { background: #3a414c; color: var(--text); }
-    .retro-room-title { font-weight: bold; }
     .retro-room-meta { font-size: 12px; opacity: .75; }
     .retro-form { display: flex; gap: 8px; justify-content: center; }
+    .retro-create-form {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center;
+      width: min(560px, 100%); margin: 0 auto;
+    }
+    .retro-create-form .retro-input { max-width: none; }
+    .retro-create-form .retro-password { grid-column: 1 / -1; }
     .retro-input { flex: 1; max-width: 380px; background: #f4f1e8; border: 2px solid var(--accent); border-radius: 10px; padding: 9px 14px; color: #1b1f24; font-family: inherit; font-size: 15px; }
     .retro-input:focus { outline: none; border-color: #8fd06b; }
     .retro-btn { background: var(--accent); border: 2px solid #5aa05a; border-radius: 10px; padding: 9px 16px; color: #14210f; font-family: inherit; font-size: 14px; font-weight: bold; cursor: pointer; }
@@ -3325,6 +3358,18 @@
       </div>
     </details>
 
+    <div id="roomPassword" class="hidden" role="dialog" aria-modal="true" aria-label="Пароль комнаты">
+      <form id="roomPasswordForm" class="room-password-box" autocomplete="off">
+        <p class="room-password-title">Комната закрыта паролем</p>
+        <input id="roomPasswordInput" class="room-password-input" type="password" maxlength="72" placeholder="Пароль" autocomplete="off" />
+        <div class="room-password-error" id="roomPasswordError"></div>
+        <div class="room-password-actions">
+          <button id="roomPasswordCancel" class="room-password-btn ghost" type="button">Отмена</button>
+          <button class="room-password-btn" type="submit">Войти</button>
+        </div>
+      </form>
+    </div>
+
     <div id="poker" class="hidden">
       <div class="poker-box">
         <button class="slides-icon poker-full-btn" id="pokerFull" aria-label="во весь экран">
@@ -3341,6 +3386,7 @@
           <form id="pokerCreateForm" class="poker-form poker-create-form" autocomplete="off">
             <input id="pokerName" class="poker-input" type="text" maxlength="60" value="Planning Poker WDM" />
             <button class="poker-btn" type="submit">Создать комнату</button>
+            <input id="pokerPassword" class="poker-input poker-password" type="password" maxlength="72" placeholder="Пароль (необязательно)" autocomplete="new-password" aria-label="пароль комнаты" />
             <select id="pokerScale" class="poker-input poker-scale" required aria-label="последовательность оценок">
               <option value="sequential" selected>Последовательный ряд</option>
               <option value="fibonacci">Ряд Фибоначчи</option>
@@ -3387,9 +3433,10 @@
         <div id="retroLobby">
           <h2 class="retro-title">Retro</h2>
           <div class="retro-rooms" id="retroActiveRooms"></div>
-          <form id="retroCreateForm" class="retro-form" autocomplete="off">
+          <form id="retroCreateForm" class="retro-form retro-create-form" autocomplete="off">
             <input id="retroName" class="retro-input" type="text" maxlength="60" value="Retro WDM" />
             <button class="retro-btn" type="submit">Создать комнату</button>
+            <input id="retroPassword" class="retro-input retro-password" type="password" maxlength="72" placeholder="Пароль (необязательно)" autocomplete="new-password" aria-label="пароль комнаты" />
           </form>
           <div class="retro-section-label">Прошедшие</div>
           <div class="retro-rooms" id="retroHistoryRooms"></div>

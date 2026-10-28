@@ -1,4 +1,4 @@
-import { fetchRetroMemeBlob, fetchRetroRoom, getLogin, RETRO_MEME_LIMIT_HINT, uploadRetroMeme } from "../net/api";
+import { fetchRetroMemeBlob, fetchRetroRoom, getLogin, RETRO_MEME_LIMIT_HINT, unlockRetroRoom, uploadRetroMeme } from "../net/api";
 import { publicPath } from "../publicPath";
 import type {
   RetroHistorySummary,
@@ -11,6 +11,7 @@ import { normalizeRetroState } from "../net/realtime";
 import { embedded } from "../embed";
 import { backgroundMusic } from "./BackgroundMusic";
 import type { KeyConsumer } from "./KeyboardRouter";
+import { askRoomPassword, cancelRoomPassword, isRoomPasswordDialogOpen, setRoomTitle } from "./roomAccess";
 
 const DEFAULT_ROOM_NAME = "Retro WDM";
 const RETRO_MUSIC_KEY = "bulba_retro_music_enabled";
@@ -70,8 +71,8 @@ const STEPS: { id: string; label: string }[] = [
 
 export interface RetroNet {
   list(): void;
-  create(name: string): void;
-  join(roomId: string): void;
+  create(name: string, password?: string): void;
+  join(roomId: string, password?: string): void;
   leave(): void;
   close(): void;
   mood(value: number): void;
@@ -104,6 +105,7 @@ export class Retro implements KeyConsumer {
   private activeRoomsEl = document.getElementById("retroActiveRooms")!;
   private historyRoomsEl = document.getElementById("retroHistoryRooms")!;
   private nameInput = document.getElementById("retroName") as HTMLInputElement;
+  private passwordInput = document.getElementById("retroPassword") as HTMLInputElement;
   private roomNameEl = document.getElementById("retroRoomName")!;
   private timerEl = document.getElementById("retroTimer")!;
   private readonlyEl = document.getElementById("retroReadonly")!;
@@ -170,9 +172,10 @@ export class Retro implements KeyConsumer {
 
     this.createForm.onsubmit = (e) => {
       e.preventDefault();
-      this.net.create(this.nameInput.value.trim() || DEFAULT_ROOM_NAME);
+      this.net.create(this.nameInput.value.trim() || DEFAULT_ROOM_NAME, this.passwordInput.value);
     };
     this.nameInput.addEventListener("keydown", (e) => e.stopPropagation());
+    this.passwordInput.addEventListener("keydown", (e) => e.stopPropagation());
 
     this.retroAudio.loop = true;
     this.retroAudio.preload = "auto";
@@ -228,6 +231,7 @@ export class Retro implements KeyConsumer {
 
   close(): void {
     if (!this.isOpen) return;
+    if (isRoomPasswordDialogOpen()) cancelRoomPassword();
     if (this.joinedRoomId && !this.viewingHistory) this.net.leave();
     this.isOpen = false;
     this.joinedRoomId = null;
@@ -298,6 +302,10 @@ export class Retro implements KeyConsumer {
 
   handleKey(e: KeyboardEvent): boolean {
     if (e.code === "Escape") {
+      if (isRoomPasswordDialogOpen()) {
+        cancelRoomPassword();
+        return true;
+      }
       if (!this.memeViewer.classList.contains("hidden")) {
         this.closeMemeViewer();
         return true;
@@ -324,6 +332,7 @@ export class Retro implements KeyConsumer {
     this.lobbyEl.classList.remove("hidden");
     this.createForm.classList.remove("hidden");
     this.nameInput.value = DEFAULT_ROOM_NAME;
+    this.passwordInput.value = "";
     this.activeRoomsEl.innerHTML = "";
     this.historyRoomsEl.innerHTML = "";
   }
@@ -347,10 +356,14 @@ export class Retro implements KeyConsumer {
       const btn = document.createElement("button");
       btn.className = "retro-room-btn";
       btn.innerHTML = `<span class="retro-room-title"></span><span class="retro-room-meta"></span>`;
-      (btn.firstChild as HTMLElement).textContent = room.name;
+      const granted = !!room.locked && room.needsPassword === false;
+      setRoomTitle(btn.firstChild as HTMLElement, room.name, !!room.locked, granted);
+      if (room.locked) {
+        btn.setAttribute("aria-label", granted ? `${room.name}, пароль уже введён` : `${room.name}, закрыта паролем`);
+      }
       (btn.lastChild as HTMLElement).textContent =
         `админ: ${room.adminLogin} · участников: ${room.participants}`;
-      btn.onclick = () => this.net.join(room.id);
+      btn.onclick = () => void this.enterActive(room);
       this.activeRoomsEl.appendChild(btn);
     }
   }
@@ -368,19 +381,39 @@ export class Retro implements KeyConsumer {
       const btn = document.createElement("button");
       btn.className = "retro-room-btn history";
       btn.innerHTML = `<span class="retro-room-title"></span><span class="retro-room-meta"></span>`;
-      (btn.firstChild as HTMLElement).textContent = room.name;
+      const granted = !!room.locked && room.needsPassword === false;
+      setRoomTitle(btn.firstChild as HTMLElement, room.name, !!room.locked, granted);
+      if (room.locked) {
+        btn.setAttribute("aria-label", granted ? `${room.name}, пароль уже введён` : `${room.name}, закрыта паролем`);
+      }
       const closed = new Date(room.closedAt);
       (btn.lastChild as HTMLElement).textContent =
         `админ: ${room.adminLogin} · ${closed.toLocaleString("ru-RU")}`;
-      btn.onclick = () => void this.openHistory(room.id);
+      btn.onclick = () => void this.openHistory(room);
       this.historyRoomsEl.appendChild(btn);
     }
   }
 
-  private async openHistory(roomId: string): Promise<void> {
+  private async enterActive(room: RetroRoomSummary): Promise<void> {
+    let password: string | undefined;
+    if (room.needsPassword) {
+      const entered = await askRoomPassword();
+      if (entered == null) return;
+      password = entered;
+    }
+    this.errorEl.textContent = "";
+    this.net.join(room.id, password);
+  }
+
+  private async openHistory(room: RetroHistorySummary): Promise<void> {
     try {
       this.errorEl.textContent = "";
-      const raw = await fetchRetroRoom(roomId);
+      if (room.needsPassword) {
+        const password = await askRoomPassword();
+        if (password == null) return;
+        await unlockRetroRoom(room.id, password);
+      }
+      const raw = await fetchRetroRoom(room.id);
       const state = normalizeRetroState(raw);
       this.viewingHistory = true;
       this.joinedRoomId = state.id;

@@ -43,6 +43,9 @@ export interface PokerRoomSummary {
   name: string;
   adminLogin: string;
   participants: number;
+  locked?: boolean;
+  /** true — этому игроку ещё нужно ввести пароль. */
+  needsPassword?: boolean;
 }
 
 export interface PokerParticipantView {
@@ -72,6 +75,8 @@ export interface PokerHistorySummary {
   name: string;
   adminLogin: string;
   closedAt: number;
+  locked?: boolean;
+  needsPassword?: boolean;
 }
 
 export interface PokerDoneTaskView {
@@ -103,6 +108,8 @@ export interface RetroRoomSummary {
   name: string;
   adminLogin: string;
   participants: number;
+  locked?: boolean;
+  needsPassword?: boolean;
 }
 
 export interface RetroHistorySummary {
@@ -110,6 +117,8 @@ export interface RetroHistorySummary {
   name: string;
   adminLogin: string;
   closedAt: number;
+  locked?: boolean;
+  needsPassword?: boolean;
 }
 
 export interface RetroReactionView {
@@ -317,12 +326,12 @@ export class Realtime {
     this.send({ type: "pokerList" });
   }
 
-  pokerCreate(name: string, scale: string): void {
-    this.send({ type: "pokerCreate", name, scale });
+  pokerCreate(name: string, scale: string, password?: string): void {
+    this.send({ type: "pokerCreate", name, scale, password: password ?? "" });
   }
 
-  pokerJoin(roomId: string): void {
-    this.send({ type: "pokerJoin", roomId });
+  pokerJoin(roomId: string, password?: string): void {
+    this.send({ type: "pokerJoin", roomId, password: password ?? "" });
   }
 
   pokerLeave(): void {
@@ -353,12 +362,12 @@ export class Realtime {
     this.send({ type: "retroList" });
   }
 
-  retroCreate(name: string): void {
-    this.send({ type: "retroCreate", name });
+  retroCreate(name: string, password?: string): void {
+    this.send({ type: "retroCreate", name, password: password ?? "" });
   }
 
-  retroJoin(roomId: string): void {
-    this.send({ type: "retroJoin", roomId });
+  retroJoin(roomId: string, password?: string): void {
+    this.send({ type: "retroJoin", roomId, password: password ?? "" });
   }
 
   retroLeave(): void {

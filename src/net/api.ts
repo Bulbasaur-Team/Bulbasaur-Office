@@ -666,6 +666,20 @@ export async function fetchPokerRoom(roomId: string): Promise<unknown> {
   return authedJson<unknown>(`/api/poker/rooms/${encodeURIComponent(roomId)}`);
 }
 
+export function unlockRetroRoom(roomId: string, password: string): Promise<void> {
+  return authedVoid(`/api/retro/rooms/${encodeURIComponent(roomId)}/access`, {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
+}
+
+export function unlockPokerRoom(roomId: string, password: string): Promise<void> {
+  return authedVoid(`/api/poker/rooms/${encodeURIComponent(roomId)}/access`, {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
+}
+
 export async function fetchRetroMemeBlob(imageUrl: string): Promise<string> {
   const path = imageUrl.startsWith("http") ? imageUrl : `${API_BASE}${imageUrl}`;
   const res = await fetch(path, {
