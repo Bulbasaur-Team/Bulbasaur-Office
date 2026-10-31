@@ -32,7 +32,19 @@ const MOOD_FACES: { src: string; alt: string }[] = [
   { src: publicPath("assets/retro/mood-smile.png"), alt: "улыбка" },
   { src: publicPath("assets/retro/mood-happy.png"), alt: "праздник" },
 ];
-const STICKER_EMOJIS = ["👍", "❤️", "😂", "😢", "🔥", "🎉"];
+const STICKER_EMOJI_TITLES: Record<string, string> = {
+  "👍": "Класс",
+  "❤️": "Сердце",
+  "😂": "Смешно",
+  "😢": "Грустно",
+  "🔥": "Огонь",
+  "🎉": "Праздник",
+  "👏": "Аплодисменты",
+  "💯": "100%",
+  "🌭": "Хотдог",
+  "🚀": "Поехали",
+};
+const STICKER_EMOJIS = Object.keys(STICKER_EMOJI_TITLES);
 const MEME_EMOJI = "😂";
 /** Видимый диаметр кружка. Центр метки считается по той же формуле, что и у input[type=range]. */
 const MOOD_THUMB_PX = 32;
@@ -104,6 +116,8 @@ export class Retro implements KeyConsumer {
   private errorEl = document.getElementById("retroError")!;
   private activeRoomsEl = document.getElementById("retroActiveRooms")!;
   private historyRoomsEl = document.getElementById("retroHistoryRooms")!;
+  private createDialog = document.getElementById("retroCreate")!;
+  private createErrorEl = document.getElementById("retroCreateError")!;
   private nameInput = document.getElementById("retroName") as HTMLInputElement;
   private passwordInput = document.getElementById("retroPassword") as HTMLInputElement;
   private roomNameEl = document.getElementById("retroRoomName")!;
@@ -170,12 +184,23 @@ export class Retro implements KeyConsumer {
       }
     };
 
+    document.getElementById("retroCreateOpen")!.onclick = () => this.openCreateDialog();
+    document.getElementById("retroCreateCancel")!.onclick = () => this.closeCreateDialog();
+    this.createDialog.addEventListener("click", (e) => {
+      if (e.target === this.createDialog) this.closeCreateDialog();
+    });
+    this.createDialog.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.code === "Escape") {
+        e.preventDefault();
+        this.closeCreateDialog();
+      }
+    });
     this.createForm.onsubmit = (e) => {
       e.preventDefault();
+      this.createErrorEl.textContent = "";
       this.net.create(this.nameInput.value.trim() || DEFAULT_ROOM_NAME, this.passwordInput.value);
     };
-    this.nameInput.addEventListener("keydown", (e) => e.stopPropagation());
-    this.passwordInput.addEventListener("keydown", (e) => e.stopPropagation());
 
     this.retroAudio.loop = true;
     this.retroAudio.preload = "auto";
@@ -232,6 +257,7 @@ export class Retro implements KeyConsumer {
   close(): void {
     if (!this.isOpen) return;
     if (isRoomPasswordDialogOpen()) cancelRoomPassword();
+    this.closeCreateDialog();
     if (this.joinedRoomId && !this.viewingHistory) this.net.leave();
     this.isOpen = false;
     this.joinedRoomId = null;
@@ -275,7 +301,7 @@ export class Retro implements KeyConsumer {
     this.errorEl.textContent = "";
     this.lobbyEl.classList.add("hidden");
     this.roomEl.classList.remove("hidden");
-    this.createForm.classList.add("hidden");
+    this.closeCreateDialog();
     this.startTimer();
     this.renderRoom();
   }
@@ -288,6 +314,7 @@ export class Retro implements KeyConsumer {
   onError(message: string): void {
     if (!this.isOpen) return;
     this.errorEl.textContent = message;
+    if (this.isCreateDialogOpen()) this.createErrorEl.textContent = message;
   }
 
   onReconnect(): void {
@@ -306,6 +333,10 @@ export class Retro implements KeyConsumer {
         cancelRoomPassword();
         return true;
       }
+      if (this.isCreateDialogOpen()) {
+        this.closeCreateDialog();
+        return true;
+      }
       if (!this.memeViewer.classList.contains("hidden")) {
         this.closeMemeViewer();
         return true;
@@ -314,6 +345,24 @@ export class Retro implements KeyConsumer {
       return true;
     }
     return false;
+  }
+
+  private isCreateDialogOpen(): boolean {
+    return !this.createDialog.classList.contains("hidden");
+  }
+
+  private openCreateDialog(): void {
+    this.createErrorEl.textContent = "";
+    this.nameInput.value = DEFAULT_ROOM_NAME;
+    this.passwordInput.value = "";
+    this.createDialog.classList.remove("hidden");
+    this.nameInput.focus();
+    this.nameInput.select();
+  }
+
+  private closeCreateDialog(): void {
+    this.createDialog.classList.add("hidden");
+    this.createErrorEl.textContent = "";
   }
 
   private showLobby(): void {
@@ -330,9 +379,7 @@ export class Retro implements KeyConsumer {
     this.stopRetroMusic();
     this.roomEl.classList.add("hidden");
     this.lobbyEl.classList.remove("hidden");
-    this.createForm.classList.remove("hidden");
-    this.nameInput.value = DEFAULT_ROOM_NAME;
-    this.passwordInput.value = "";
+    this.closeCreateDialog();
     this.activeRoomsEl.innerHTML = "";
     this.historyRoomsEl.innerHTML = "";
   }
@@ -420,7 +467,7 @@ export class Retro implements KeyConsumer {
       this.state = state;
       this.lobbyEl.classList.add("hidden");
       this.roomEl.classList.remove("hidden");
-      this.createForm.classList.add("hidden");
+      this.closeCreateDialog();
       this.stopTimer();
       this.timerEl.textContent = "";
       this.renderRoom();
@@ -1033,7 +1080,7 @@ export class Retro implements KeyConsumer {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.textContent = emoji;
-      btn.title = emoji;
+      btn.title = STICKER_EMOJI_TITLES[emoji] ?? emoji;
       btn.onclick = (e) => {
         e.stopPropagation();
         this.net.react(targetType, targetId, emoji);

@@ -1203,12 +1203,17 @@
     .retro-room-btn.history:hover { background: #3a414c; color: var(--text); }
     .retro-room-meta { font-size: 12px; opacity: .75; }
     .retro-form { display: flex; gap: 8px; justify-content: center; }
-    .retro-create-form {
-      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center;
-      width: min(560px, 100%); margin: 0 auto;
+    #retroCreate {
+      position: absolute; inset: 0; z-index: 5; background: rgba(8,10,14,.55);
+      display: flex; align-items: center; justify-content: center; padding: 24px;
     }
-    .retro-create-form .retro-input { max-width: none; }
-    .retro-create-form .retro-password { grid-column: 1 / -1; }
+    .retro-create-box {
+      width: min(420px, 100%); background: #1a1f28; border: 3px solid var(--accent);
+      border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 12px;
+    }
+    .retro-create-title { margin: 0; text-align: center; font-weight: bold; }
+    .retro-create-box .retro-input { max-width: none; width: 100%; }
+    .retro-create-actions { display: flex; justify-content: center; gap: 8px; }
     .retro-input { flex: 1; max-width: 380px; background: #f4f1e8; border: 2px solid var(--accent); border-radius: 10px; padding: 9px 14px; color: #1b1f24; font-family: inherit; font-size: 15px; }
     .retro-input:focus { outline: none; border-color: #8fd06b; }
     .retro-btn { background: var(--accent); border: 2px solid #5aa05a; border-radius: 10px; padding: 9px 16px; color: #14210f; font-family: inherit; font-size: 14px; font-weight: bold; cursor: pointer; }
@@ -1383,6 +1388,7 @@
     .retro-react:disabled { cursor: default; opacity: .85; }
     .retro-react-menu {
       position: fixed; z-index: 60; display: flex; gap: 4px; flex-wrap: wrap;
+      width: max-content; max-width: 198px;
       background: #1b212b; border: 2px solid var(--accent); border-radius: 10px;
       padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.45);
     }
@@ -3433,11 +3439,9 @@
         <div id="retroLobby">
           <h2 class="retro-title">Retro</h2>
           <div class="retro-rooms" id="retroActiveRooms"></div>
-          <form id="retroCreateForm" class="retro-form retro-create-form" autocomplete="off">
-            <input id="retroName" class="retro-input" type="text" maxlength="60" value="Retro WDM" />
-            <button class="retro-btn" type="submit">Создать комнату</button>
-            <input id="retroPassword" class="retro-input retro-password" type="password" maxlength="72" placeholder="Пароль (необязательно)" autocomplete="new-password" aria-label="пароль комнаты" />
-          </form>
+          <div class="retro-form">
+            <button id="retroCreateOpen" class="retro-btn" type="button">Создать комнату</button>
+          </div>
           <div class="retro-section-label">Прошедшие</div>
           <div class="retro-rooms" id="retroHistoryRooms"></div>
         </div>
@@ -3475,6 +3479,18 @@
             </button>
           </div>
         </div>
+      </div>
+      <div id="retroCreate" class="hidden" role="dialog" aria-modal="true" aria-labelledby="retroCreateTitle">
+        <form id="retroCreateForm" class="retro-create-box" autocomplete="off">
+          <p class="retro-create-title" id="retroCreateTitle">Создать комнату</p>
+          <input id="retroName" class="retro-input" type="text" maxlength="60" value="Retro WDM" placeholder="Название" aria-label="название комнаты" />
+          <input id="retroPassword" class="retro-input" type="password" maxlength="72" placeholder="Пароль (необязательно)" autocomplete="new-password" aria-label="пароль комнаты" />
+          <div class="retro-error" id="retroCreateError"></div>
+          <div class="retro-create-actions">
+            <button id="retroCreateCancel" class="retro-btn retro-btn-ghost" type="button">Отмена</button>
+            <button class="retro-btn" type="submit">Создать</button>
+          </div>
+        </form>
       </div>
     </div>
 
