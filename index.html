@@ -607,7 +607,36 @@
     /* safe center — второй строкой: если окно игры выше экрана, верх не уезжает
        за край (иначе flex-центрирование делает его недоступным для скролла). */
     #bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki, #bulbaquiz, #airhockey { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; align-items: safe center; justify-content: center; padding: 24px; overflow: auto; }
-    #bjCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 420 / 640; touch-action: none; }
+    #bjCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72 - 52px)); width: auto; aspect-ratio: 420 / 640; touch-action: none; }
+    .bj-stage { display: flex; flex-direction: column; align-items: stretch; width: max-content; max-width: 100%; min-width: 0; }
+    .bj-speed {
+      display: flex; flex-direction: column; gap: 4px;
+      width: 0; min-width: 100%; box-sizing: border-box;
+      margin-bottom: 8px; line-height: 1.15; pointer-events: none;
+    }
+    .bj-speed-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .bj-speed-head { display: flex; align-items: baseline; justify-content: center; gap: 8px; }
+    .bj-speed-name { font-size: 13px; font-weight: bold; color: #d7e0d4; }
+    .bj-speed-val {
+      font-size: 13px; font-weight: bold;
+      font-variant-numeric: tabular-nums; color: #3cba6a;
+    }
+    .bj-speed-row { display: flex; align-items: flex-end; gap: 8px; }
+    .bj-speed-bound {
+      flex: 0 0 auto; min-width: 38px; font-size: 11px;
+      font-variant-numeric: tabular-nums; color: #d7e0d4;
+    }
+    .bj-speed-bound:last-child { text-align: right; }
+    .bj-speed-track {
+      position: relative; width: 100%; height: 10px; flex: none; border-radius: 999px;
+      background: linear-gradient(90deg, #3cba6a 0%, #e2d24a 50%, #e23b3b 100%);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+    }
+    .bj-speed-thumb {
+      position: absolute; top: 50%; left: 0%; width: 16px; height: 16px;
+      border-radius: 50%; background: #f4f7f2; border: 2px solid #142018;
+      transform: translate(-50%, -50%); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+    }
     #bulbajump { touch-action: none; }
     #bpCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(600px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 600; }
     #bpkCanvas { background: #26303a; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 640; }
@@ -2679,6 +2708,9 @@
     html.bp-640 .bc-options { gap: 10px; width: min(240px, calc(var(--sw) * .78)); }
     html.bp-640 .arcade-frame { padding: 16px 14px; gap: 10px; }
     html.bp-640 .arcade-title { font-size: 18px; }
+    html.bp-640 .bj-speed { margin-bottom: 6px; gap: 2px; }
+    html.bp-640 .bj-speed-name, html.bp-640 .bj-speed-val { font-size: 12px; }
+    html.bp-640 .bj-speed-bound { font-size: 10px; min-width: 32px; }
     /* Кнопки окна вынесены за рамку на -16px — на узком экране убираем их внутрь. */
     html.bp-640 .arcade-close { top: 6px; right: 6px; width: 34px; height: 34px; }
     /* Доска Wordle задана в фиксированных px — ужимаем под узкий экран. */
@@ -2918,7 +2950,24 @@
         </button>
         <h2 class="arcade-title">Bulba Jump</h2>
         <div class="ttt-status" id="bjStatus">Доставлено: 0</div>
-        <canvas id="bjCanvas" width="420" height="640"></canvas>
+        <div class="bj-stage">
+          <div class="bj-speed" id="bjSpeed" role="meter" aria-label="скорость" aria-valuemin="0.75" aria-valuemax="1.25" aria-valuenow="0.75">
+            <div class="bj-speed-row">
+              <span class="bj-speed-bound" id="bjSpeedMin">0.75×</span>
+              <div class="bj-speed-col">
+                <div class="bj-speed-head">
+                  <span class="bj-speed-name">скорость</span>
+                  <span class="bj-speed-val" id="bjSpeedVal">0.75×</span>
+                </div>
+                <div class="bj-speed-track">
+                  <div class="bj-speed-thumb" id="bjSpeedThumb"></div>
+                </div>
+              </div>
+              <span class="bj-speed-bound" id="bjSpeedMax">1.25×</span>
+            </div>
+          </div>
+          <canvas id="bjCanvas" width="420" height="640"></canvas>
+        </div>
         <div class="arcade-actions">
           <button class="arcade-lb" id="bjLb" aria-label="лидерборд" title="Лидерборд">
             <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>

@@ -26,17 +26,49 @@ const RENDER_MS = 1000 / 60; // рисуем не чаще 60 fps — на ProMo
 // Бонусы как в Doodle Jump: подъём на N очков (очко = 1 px набранной высоты).
 const HELI_SCORE = 3000;
 const JET_SCORE = 5000;
+const ROCKET_SCORE = 10000;
 const HELI_SPAWN = 0.008; // вероятность шапочки на платформе
-const JET_SPAWN = 0.005;  // вероятность ранца (взаимоисключающе с шапочкой)
+const JET_SPAWN = 0.005;  // вероятность ранца (взаимоисключающе с шапочкой и ракетой)
+const ROCKET_SPAWN = JET_SPAWN / 2; // ракета вдвое реже ранца
 const HELI_VY = -7.5;    // постоянная скорость подъёма в полёте
 const JET_VY = -10.5;
+const ROCKET_VY = JET_VY * 2; // ракета летит вверх вдвое быстрее ранца
 const POWER_SIZE = 28;   // размер спрайта бонуса на платформе
 const FRAGILE_SPAWN = 0.05; // хрупкая платформа: ломается после двух прыжков
+const MOVER_SPAWN = FRAGILE_SPAWN; // подвижные платформы — примерно так же редки
+const MOVER_AMP = 26;    // амплитуда хода вверх-вниз, px
+const MOVER_OMEGA = (Math.PI * 2) / (1.7 * 90); // полный цикл ~1.7 с при скорости 1×
 const FRAGILE_HITS = 2;     // сколько приземлений выдерживает до исчезновения
 const SAFETY_GAP = 28;      // отступ страховочной платформы под ногами после бонуса
 
-type PlatformType = "box" | "belt" | "fragile" | "safety";
-type PowerUpKind = "heli" | "jet";
+// Скорость игры: прежняя физика (шаг 90 Гц) — это 1×.
+// Отметки шкалы 0.75×…1.25×, каждую минуту плавно +0.1×.
+// На игру отметка умножается на 1.12: фактически 0.84×…1.40×.
+const SPEED_MARK_MIN = 0.75;
+const SPEED_MARK_MAX = 1.25;
+const SPEED_FACTOR = 1.12;
+const SPEED_STEP = 0.1;
+const SPEED_STEP_MS = 60_000;
+
+// Ракета в полёте. Ноль — центр иллюминатора (там же центр игрока).
+const ROCKET_WINDOW_R = 28;
+const R_NOSE = -96;
+const R_SHOULDER = -46;
+const R_HALF = 36;
+const R_BODY_BOT = 52;
+const R_NOZZLE_BOT = 66;
+const R_NOZZLE_HALF = 11;
+const R_FIN_OUTER = 54;
+const R_FIN_TOP = 18;
+const R_FIN_BOT = 62;
+const ROCKET_LOCAL_H = R_NOZZLE_BOT - R_NOSE;
+// В зазоре между платформами свободно ~GAP_MIN − PLAT_H. Пикап ниже этого, чтобы не втыкаться в потолок.
+const ROCKET_PICKUP_H = 50;
+const ROCKET_PICKUP_SCALE = ROCKET_PICKUP_H / ROCKET_LOCAL_H;
+const ROCKET_PICKUP_W = R_FIN_OUTER * 2 * ROCKET_PICKUP_SCALE;
+
+type PlatformType = "box" | "belt" | "fragile" | "safety" | "mover";
+type PowerUpKind = "heli" | "jet" | "rocket";
 interface Platform {
   x: number;
   y: number;
@@ -48,11 +80,13 @@ interface Platform {
   hits: number;     // сколько раз уже приземлялись (для fragile: 0 — малая трещина, 1 — большая)
   falling: boolean; // хрупкая уже сломалась и падает
   fallVy: number;
+  anchorY: number;  // центр вертикального хода; у остальных совпадает с y и едет вместе с миром
+  movePhase: number;
 }
 
 // Bulba Jump — аналог Doodle Jump в антураже склада: посылки-платформы,
-// ленты-конвейеры, батуты, хрупкие коробки, шапочка-вертолёт и реактивный ранец.
-// Игрок — текущий аватар с одеждой из гардероба.
+// ленты-конвейеры, батуты, хрупкие коробки, лифты, шапочка-вертолёт,
+// реактивный ранец и ракета. Игрок — текущий аватар с одеждой из гардероба.
 export class BulbaJump {
   isOpen = false;
   onClose: (() => void) | null = null;
@@ -64,6 +98,9 @@ export class BulbaJump {
   private canvas = document.getElementById("bjCanvas") as HTMLCanvasElement;
   private ctx = this.canvas.getContext("2d")!;
   private statusEl = document.getElementById("bjStatus")!;
+  private speedValEl = document.getElementById("bjSpeedVal")!;
+  private speedThumbEl = document.getElementById("bjSpeedThumb")!;
+  private speedMeterEl = document.getElementById("bjSpeed")!;
 
   private wardrobeImages: Map<string, HTMLImageElement> | null = null;
   private sprite: HTMLCanvasElement | null = null;
@@ -76,6 +113,7 @@ export class BulbaJump {
   private faceRight = false;
   private platforms: Platform[] = [];
   private topY = 0;           // Y самой верхней платформы (без Math.min по массиву каждый тик)
+  private topIsMover = false; // верхняя платформа — лифт: следующему зазору нужен запас на амплитуду
   private score = 0;
   private shownScore = -1;    // что уже вывели в DOM — не трогаем textContent чаще, чем меняется целые
   private boost: { kind: PowerUpKind; startScore: number } | null = null;
@@ -89,10 +127,18 @@ export class BulbaJump {
   private lastT = 0;  // время предыдущего кадра для аккумулятора фиксированного шага
   private acc = 0;    // накопленное время, ещё не отработанное шагами физики
   private lastRenderT = 0;
+  private runMs = 0;          // реальное время забега, по нему растёт отметка шкалы
+  private speedMark = SPEED_MARK_MIN;
+  private speed = SPEED_MARK_MIN * SPEED_FACTOR;
+  private shownSpeedLabel = "";
 
   constructor() {
     this.heliImg.src = publicPath("assets/bulbajump/heli.png");
     this.jetImg.src = publicPath("assets/bulbajump/jetpack.png");
+    this.speedMeterEl.setAttribute("aria-valuemin", String(SPEED_MARK_MIN));
+    this.speedMeterEl.setAttribute("aria-valuemax", String(SPEED_MARK_MAX));
+    document.getElementById("bjSpeedMin")!.textContent = formatSpeed(SPEED_MARK_MIN);
+    document.getElementById("bjSpeedMax")!.textContent = formatSpeed(SPEED_MARK_MAX);
     document.getElementById("bjClose")!.onclick = () => this.close();
     document.getElementById("bjLb")!.onclick = () => this.onLeaderboard?.();
     this.root.addEventListener("pointerdown", this.onPointerDown);
@@ -196,6 +242,10 @@ export class BulbaJump {
     this.shownScore = -1;
     this.boost = null;
     this.over = false;
+    this.runMs = 0;
+    this.speedMark = SPEED_MARK_MIN;
+    this.speed = SPEED_MARK_MIN * SPEED_FACTOR;
+    this.shownSpeedLabel = "";
     this.reported = false;
     this.keyLeft = this.keyRight = false;
     this.touches.clear();
@@ -210,12 +260,11 @@ export class BulbaJump {
     this.platforms = [{
       x: W / 2 - PLAT_W / 2, y: H - 50, w: PLAT_W, type: "box", vx: 0,
       spring: false, powerUp: null, hits: 0, falling: false, fallVy: 0,
+      anchorY: H - 50, movePhase: 0,
     }];
     this.topY = H - 50;
-    while (this.topY > 0) {
-      this.topY -= GAP_MIN + Math.random() * (GAP_MAX - GAP_MIN);
-      this.platforms.push(this.makePlatform(this.topY));
-    }
+    this.topIsMover = false;
+    while (this.topY > 0) this.spawnNext();
 
     this.updateStatus();
     this.lastT = performance.now();
@@ -229,29 +278,50 @@ export class BulbaJump {
     const kindRoll = Math.random();
     const belt = kindRoll < 0.22;
     const fragile = !belt && kindRoll < 0.22 + FRAGILE_SPAWN;
-    const spring = !belt && !fragile && Math.random() < 0.14;
+    const mover = !belt && !fragile && kindRoll < 0.22 + FRAGILE_SPAWN + MOVER_SPAWN;
+    const spring = !belt && !fragile && !mover && Math.random() < 0.14;
     // Бонус не ставим на батут и хрупкую — иначе визуально и по геймплею мешаются.
     let powerUp: PowerUpKind | null = null;
     if (!spring && !fragile) {
       const roll = Math.random();
-      if (roll < JET_SPAWN) powerUp = "jet";
-      else if (roll < JET_SPAWN + HELI_SPAWN) powerUp = "heli";
+      if (roll < ROCKET_SPAWN) powerUp = "rocket";
+      else if (roll < ROCKET_SPAWN + JET_SPAWN) powerUp = "jet";
+      else if (roll < ROCKET_SPAWN + JET_SPAWN + HELI_SPAWN) powerUp = "heli";
     }
     return {
       x: Math.random() * (W - PLAT_W),
       y,
       w: PLAT_W,
-      type: belt ? "belt" : fragile ? "fragile" : "box",
+      type: belt ? "belt" : fragile ? "fragile" : mover ? "mover" : "box",
       vx: belt ? (Math.random() < 0.5 ? -1.5 : 1.5) : 0,
       spring,
       powerUp,
       hits: 0,
       falling: false,
       fallVy: 0,
+      anchorY: y,
+      movePhase: mover ? Math.random() * Math.PI * 2 : 0,
     };
   }
 
-  // После шапочки/ранца — широкая платформа прямо под ногами, чтобы не упасть в пустоту.
+  // Следующая платформа выше верхней. Лифту оставляем запас, чтобы ход вниз не съел зазор.
+  private spawnNext(): void {
+    let gap = GAP_MIN + Math.random() * (GAP_MAX - GAP_MIN);
+    if (this.topIsMover) gap += MOVER_AMP;
+    this.topY -= gap;
+    const platform = this.makePlatform(this.topY);
+    if (platform.type === "mover") {
+      this.topY -= MOVER_AMP;
+      platform.anchorY = this.topY;
+      platform.y = this.topY + Math.sin(platform.movePhase) * MOVER_AMP;
+      this.topIsMover = true;
+    } else {
+      this.topIsMover = false;
+    }
+    this.platforms.push(platform);
+  }
+
+  // После шапочки, ранца или ракеты — широкая платформа прямо под ногами, чтобы не упасть в пустоту.
   private spawnSafetyPlatform(): void {
     this.platforms.push({
       x: 0,
@@ -264,6 +334,8 @@ export class BulbaJump {
       hits: 0,
       falling: false,
       fallVy: 0,
+      anchorY: this.py + PLAYER_H / 2 + SAFETY_GAP,
+      movePhase: 0,
     });
   }
 
@@ -273,10 +345,18 @@ export class BulbaJump {
     let dt = now - this.lastT;
     this.lastT = now;
     if (dt > 100) dt = 100; // после сворачивания/лага не навёрстываем лавину шагов
+    if (!this.over) {
+      this.runMs += dt;
+      const grown = SPEED_MARK_MIN + SPEED_STEP * (this.runMs / SPEED_STEP_MS);
+      this.speedMark = grown > SPEED_MARK_MAX ? SPEED_MARK_MAX : grown;
+      this.speed = this.speedMark * SPEED_FACTOR;
+    }
+    // Множитель крутит ту же физику: 1× — прежний темп. Отметки 0.75×…1.25×, фактически ×1.12.
     this.acc += dt;
-    while (this.acc >= STEP_MS) {
+    const stepMs = STEP_MS / this.speed;
+    while (this.acc >= stepMs) {
       this.step();
-      this.acc -= STEP_MS;
+      this.acc -= stepMs;
       if (this.over) break;
     }
     // Физика 90 Hz, отрисовка ≤60 Hz — меньше работы на 120 Гц дисплеях.
@@ -298,7 +378,10 @@ export class BulbaJump {
     else if (this.px > W + HALF_W) this.px = -HALF_W;
 
     for (const p of this.platforms) {
-      if (p.type === "belt" && !p.falling) {
+      if (p.type === "mover") {
+        p.movePhase += MOVER_OMEGA;
+        p.y = p.anchorY + Math.sin(p.movePhase) * MOVER_AMP;
+      } else if (p.type === "belt" && !p.falling) {
         p.x += p.vx;
         if (p.x < 0 || p.x > W - p.w) p.vx *= -1;
       }
@@ -312,11 +395,14 @@ export class BulbaJump {
     if (!this.boost) {
       for (const p of this.platforms) {
         if (!p.powerUp || p.falling) continue;
-        const cx = p.x + PLAT_W / 2;
-        const cy = p.y - POWER_SIZE / 2 - 2;
+        const rocket = p.powerUp === "rocket";
+        const hw = rocket ? ROCKET_PICKUP_W / 2 : POWER_SIZE / 2;
+        const hh = rocket ? ROCKET_PICKUP_H / 2 : POWER_SIZE / 2;
+        const cx = p.x + p.w / 2;
+        const cy = p.y - hh - 2;
         const hit =
-          Math.abs(this.px - cx) < HALF_W + POWER_SIZE / 2 &&
-          Math.abs(this.py - cy) < PLAYER_H / 2 + POWER_SIZE / 2;
+          Math.abs(this.px - cx) < HALF_W + hw &&
+          Math.abs(this.py - cy) < PLAYER_H / 2 + hh;
         if (hit) {
           this.boost = { kind: p.powerUp, startScore: this.score };
           p.powerUp = null;
@@ -326,13 +412,13 @@ export class BulbaJump {
     }
 
     if (this.boost) {
-      const need = this.boost.kind === "heli" ? HELI_SCORE : JET_SCORE;
+      const need = boostScore(this.boost.kind);
       if (this.score - this.boost.startScore >= need) {
         this.boost = null;
         this.vy = JUMP_V * 0.35; // мягкий выход из полёта
         this.spawnSafetyPlatform();
       } else {
-        this.vy = this.boost.kind === "heli" ? HELI_VY : JET_VY;
+        this.vy = boostVy(this.boost.kind);
       }
     } else {
       this.vy += GRAVITY;
@@ -378,13 +464,13 @@ export class BulbaJump {
       for (let i = 0; i < this.platforms.length; i++) {
         const p = this.platforms[i];
         p.y += dy;
-        if (p.y < H + PLAT_H) this.platforms[write++] = p;
+        p.anchorY += dy;
+        // Лифт прячем, только когда вся амплитуда ушла под экран — иначе он моргнёт и пропадёт.
+        const low = p.type === "mover" ? p.anchorY - MOVER_AMP : p.y;
+        if (low < H + PLAT_H) this.platforms[write++] = p;
       }
       this.platforms.length = write;
-      while (this.topY > 0) {
-        this.topY -= GAP_MIN + Math.random() * (GAP_MAX - GAP_MIN);
-        this.platforms.push(this.makePlatform(this.topY));
-      }
+      while (this.topY > 0) this.spawnNext();
     }
 
     // Упал ниже экрана — конец.
@@ -414,6 +500,7 @@ export class BulbaJump {
     for (const p of this.platforms) this.drawPlatform(p);
     this.drawPlayer();
     if (this.over) this.drawGameOver();
+    this.syncSpeedHud();
   }
 
   private drawPlatform(p: Platform): void {
@@ -467,7 +554,7 @@ export class BulbaJump {
       ctx.stroke();
       ctx.restore();
     } else if (p.type === "safety") {
-      // Страховочная сетка на всю ширину — после шапочки/ранца.
+      // Страховочная сетка на всю ширину — после шапочки, ранца или ракеты.
       ctx.fillStyle = "#2a3d34";
       ctx.fillRect(p.x, p.y, pw, PLAT_H);
       ctx.fillStyle = "#7ac07a";
@@ -485,6 +572,8 @@ export class BulbaJump {
       ctx.moveTo(p.x, p.y + PLAT_H / 2);
       ctx.lineTo(p.x + pw, p.y + PLAT_H / 2);
       ctx.stroke();
+    } else if (p.type === "mover") {
+      this.drawMover(p);
     } else {
       ctx.fillStyle = "#c8965a";
       ctx.fillRect(p.x, p.y, pw, PLAT_H);
@@ -503,11 +592,15 @@ export class BulbaJump {
     if (p.powerUp && !p.falling) this.drawPowerUp(p.x + pw / 2, p.y - 2, p.powerUp, POWER_SIZE);
   }
 
-  private powerImg(kind: PowerUpKind): HTMLImageElement {
+  private powerImg(kind: Exclude<PowerUpKind, "rocket">): HTMLImageElement {
     return kind === "heli" ? this.heliImg : this.jetImg;
   }
 
   private drawPowerUp(cx: number, bottomY: number, kind: PowerUpKind, size: number): void {
+    if (kind === "rocket") {
+      this.drawRocketPickup(cx, bottomY);
+      return;
+    }
     const img = this.powerImg(kind);
     const ctx = this.ctx;
     const x = cx - size / 2;
@@ -526,6 +619,10 @@ export class BulbaJump {
 
   private drawPlayer(): void {
     if (!this.sprite) return;
+    if (this.boost?.kind === "rocket") {
+      this.drawRocketFlight();
+      return;
+    }
     const ctx = this.ctx;
     const h = PLAYER_H;
     const w = this.sprite.height ? (this.sprite.width / this.sprite.height) * h : h;
@@ -608,6 +705,285 @@ export class BulbaJump {
     ctx.restore();
   }
 
+  private drawMover(p: Platform): void {
+    const ctx = this.ctx;
+    const top = p.anchorY - MOVER_AMP;
+    const bot = p.anchorY + MOVER_AMP + PLAT_H;
+    const left = p.x + 7;
+    const right = p.x + p.w - 7;
+    ctx.save();
+    ctx.strokeStyle = "rgba(176, 206, 222, 0.75)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(left, top);
+    ctx.lineTo(left, bot);
+    ctx.moveTo(right, top);
+    ctx.lineTo(right, bot);
+    ctx.moveTo(left - 4, top);
+    ctx.lineTo(left + 4, top);
+    ctx.moveTo(right - 4, top);
+    ctx.lineTo(right + 4, top);
+    ctx.moveTo(left - 4, bot);
+    ctx.lineTo(left + 4, bot);
+    ctx.moveTo(right - 4, bot);
+    ctx.lineTo(right + 4, bot);
+    ctx.stroke();
+
+    ctx.fillStyle = "#5d8eae";
+    ctx.fillRect(p.x, p.y, p.w, PLAT_H);
+    ctx.strokeStyle = "#2a5168";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(p.x + 1, p.y + 1, p.w - 2, PLAT_H - 2);
+    ctx.fillStyle = "#c5e4f4";
+    ctx.fillRect(p.x, p.y, p.w, 3);
+
+    const down = Math.cos(p.movePhase) > 0;
+    const mid = p.x + p.w / 2;
+    ctx.fillStyle = "#f4fbff";
+    ctx.beginPath();
+    if (down) {
+      ctx.moveTo(mid - 7, p.y + 5);
+      ctx.lineTo(mid + 7, p.y + 5);
+      ctx.lineTo(mid, p.y + 12);
+    } else {
+      ctx.moveTo(mid - 7, p.y + 11);
+      ctx.lineTo(mid + 7, p.y + 11);
+      ctx.lineTo(mid, p.y + 4);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  private drawRocketPickup(cx: number, bottomY: number): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(cx, bottomY - R_NOZZLE_BOT * ROCKET_PICKUP_SCALE);
+    ctx.scale(ROCKET_PICKUP_SCALE, ROCKET_PICKUP_SCALE);
+    this.paintRocketShell(ctx);
+    this.paintRocketWindow(ctx);
+    ctx.restore();
+  }
+
+  private drawRocketFlight(): void {
+    const sprite = this.sprite;
+    if (!sprite) return;
+    const ctx = this.ctx;
+    const h = PLAYER_H;
+    const w = sprite.height ? (sprite.width / sprite.height) * h : h;
+    const top = this.py - h / 2;
+
+    this.drawRocketFlame(this.px, this.py + R_NOZZLE_BOT - 3);
+
+    ctx.save();
+    ctx.translate(this.px, this.py);
+    this.paintRocketShell(ctx);
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(this.px, this.py, ROCKET_WINDOW_R - 2, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.imageSmoothingEnabled = false;
+    if (this.faceRight) {
+      ctx.translate(this.px, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(sprite, -w / 2, top, w, h);
+    } else {
+      ctx.drawImage(sprite, this.px - w / 2, top, w, h);
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(this.px, this.py);
+    this.paintRocketWindow(ctx);
+    ctx.restore();
+  }
+
+  private drawRocketFlame(cx: number, top: number): void {
+    const ctx = this.ctx;
+    const t = performance.now();
+    const tongues = [
+      { x: -11, w: 13, ph: 0 },
+      { x: 0, w: 18, ph: 1.7 },
+      { x: 11, w: 13, ph: 3.2 },
+    ];
+    for (const tongue of tongues) {
+      const sway = Math.sin(t / 80 + tongue.ph) * 3.5;
+      const len = 28 + Math.sin(t / 42 + tongue.ph) * 14 + (Math.sin(t / 17 + tongue.ph * 2) + 1) * 9;
+      const x = cx + tongue.x + sway;
+      ctx.fillStyle = "#ff7418";
+      ctx.beginPath();
+      ctx.moveTo(x - tongue.w / 2, top);
+      ctx.lineTo(x + tongue.w / 2, top);
+      ctx.lineTo(x + sway * 0.35, top + len);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#ffc14a";
+      ctx.beginPath();
+      ctx.moveTo(x - tongue.w / 4, top);
+      ctx.lineTo(x + tongue.w / 4, top);
+      ctx.lineTo(x + sway * 0.15, top + len * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#fff6c4";
+      ctx.beginPath();
+      ctx.moveTo(x - 2.2, top);
+      ctx.lineTo(x + 2.2, top);
+      ctx.lineTo(x, top + len * 0.34);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // Корпус с вырезом под иллюминатор. Контекст уже сдвинут в центр ракеты.
+  private paintRocketShell(ctx: CanvasRenderingContext2D): void {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-140, -180, 280, 360);
+    ctx.arc(0, 0, ROCKET_WINDOW_R, 0, Math.PI * 2, true);
+    ctx.clip("evenodd");
+
+    ctx.fillStyle = "#d0dde8";
+    this.traceFin(ctx, -1);
+    ctx.fill();
+    this.traceFin(ctx, 1);
+    ctx.fill();
+
+    ctx.fillStyle = "#e7eef5";
+    this.traceHull(ctx);
+    ctx.fill();
+
+    ctx.fillStyle = "#2c4254";
+    ctx.fillRect(-7, R_BODY_BOT + 5, 14, 8);
+    ctx.restore();
+
+    ctx.save();
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#17344a";
+    ctx.lineWidth = 2.5;
+    this.traceFin(ctx, -1);
+    ctx.stroke();
+    this.traceFin(ctx, 1);
+    ctx.stroke();
+    this.traceHull(ctx);
+    ctx.stroke();
+
+    ctx.strokeStyle = "#3e6d8c";
+    ctx.lineWidth = 1.25;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(0, R_NOSE + 10);
+    ctx.lineTo(0, R_SHOULDER + 6);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.beginPath();
+    ctx.moveTo(-R_HALF + 3, R_SHOULDER + 8);
+    ctx.lineTo(R_HALF - 3, R_SHOULDER + 8);
+    ctx.moveTo(-R_HALF + 3, ROCKET_WINDOW_R + 8);
+    ctx.lineTo(R_HALF - 3, ROCKET_WINDOW_R + 8);
+    ctx.moveTo(-R_NOZZLE_HALF + 3, R_BODY_BOT + 8);
+    ctx.lineTo(-R_NOZZLE_HALF + 3, R_NOZZLE_BOT - 3);
+    ctx.moveTo(R_NOZZLE_HALF - 3, R_BODY_BOT + 8);
+    ctx.lineTo(R_NOZZLE_HALF - 3, R_NOZZLE_BOT - 3);
+    ctx.stroke();
+
+    ctx.fillStyle = "#17344a";
+    for (const [rx, ry] of [
+      [-R_HALF + 7, R_SHOULDER + 8],
+      [R_HALF - 7, R_SHOULDER + 8],
+      [-R_HALF + 7, R_BODY_BOT - 6],
+      [R_HALF - 7, R_BODY_BOT - 6],
+    ] as const) {
+      ctx.beginPath();
+      ctx.arc(rx, ry, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = "#17344a";
+    ctx.beginPath();
+    ctx.arc(0, R_NOSE + 16, 3.2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private traceFin(ctx: CanvasRenderingContext2D, side: 1 | -1): void {
+    const s = side;
+    ctx.beginPath();
+    ctx.moveTo(s * (R_HALF - 2), R_FIN_TOP);
+    ctx.lineTo(s * R_FIN_OUTER, R_FIN_BOT - 6);
+    ctx.lineTo(s * (R_FIN_OUTER - 8), R_FIN_BOT);
+    ctx.lineTo(s * (R_HALF - 6), R_BODY_BOT - 2);
+    ctx.closePath();
+  }
+
+  private traceHull(ctx: CanvasRenderingContext2D): void {
+    ctx.beginPath();
+    ctx.moveTo(-R_HALF, R_SHOULDER);
+    ctx.quadraticCurveTo(-16, R_NOSE + 12, 0, R_NOSE);
+    ctx.quadraticCurveTo(16, R_NOSE + 12, R_HALF, R_SHOULDER);
+    ctx.lineTo(R_HALF, R_BODY_BOT);
+    ctx.lineTo(R_NOZZLE_HALF, R_BODY_BOT + 3);
+    ctx.lineTo(R_NOZZLE_HALF + 3, R_NOZZLE_BOT);
+    ctx.lineTo(-(R_NOZZLE_HALF + 3), R_NOZZLE_BOT);
+    ctx.lineTo(-R_NOZZLE_HALF, R_BODY_BOT + 3);
+    ctx.lineTo(-R_HALF, R_BODY_BOT);
+    ctx.closePath();
+  }
+
+  // Стекло рисуется после модельки: заливка с alpha 0.1 — это 90% прозрачности.
+  private paintRocketWindow(ctx: CanvasRenderingContext2D): void {
+    ctx.save();
+    ctx.fillStyle = "rgba(186, 216, 232, 0.1)";
+    ctx.beginPath();
+    ctx.arc(0, 0, ROCKET_WINDOW_R - 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#17344a";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, ROCKET_WINDOW_R, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = "#7eafc8";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, ROCKET_WINDOW_R - 3.5, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, ROCKET_WINDOW_R - 6, Math.PI * 1.15, Math.PI * 1.48);
+    ctx.stroke();
+
+    ctx.fillStyle = "#17344a";
+    for (let i = 0; i < 8; i++) {
+      const a = (Math.PI * 2 * i) / 8;
+      const br = ROCKET_WINDOW_R + 4.5;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * br, Math.sin(a) * br, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  private syncSpeedHud(): void {
+    const t = (this.speedMark - SPEED_MARK_MIN) / (SPEED_MARK_MAX - SPEED_MARK_MIN);
+    const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+    const label = formatSpeed(this.speedMark);
+    if (label !== this.shownSpeedLabel) {
+      this.shownSpeedLabel = label;
+      this.speedValEl.textContent = label;
+      this.speedMeterEl.setAttribute("aria-valuenow", String(Math.round(this.speedMark * 100) / 100));
+      this.speedMeterEl.setAttribute("aria-valuetext", label);
+    }
+    this.speedValEl.style.color = speedColor(clamped);
+    this.speedThumbEl.style.left = `${clamped * 100}%`;
+  }
+
   private drawGameOver(): void {
     const ctx = this.ctx;
     ctx.fillStyle = "rgba(8,10,14,0.8)";
@@ -633,4 +1009,39 @@ export class BulbaJump {
     this.shownScore = n;
     this.statusEl.textContent = `Результат: ${n}`;
   }
+}
+
+function boostScore(kind: PowerUpKind): number {
+  if (kind === "heli") return HELI_SCORE;
+  if (kind === "jet") return JET_SCORE;
+  return ROCKET_SCORE;
+}
+
+function boostVy(kind: PowerUpKind): number {
+  if (kind === "heli") return HELI_VY;
+  if (kind === "jet") return JET_VY;
+  return ROCKET_VY;
+}
+
+function formatSpeed(v: number): string {
+  const n = Math.round(v * 100) / 100;
+  return `${n.toFixed(2)}×`;
+}
+
+type Rgb = [number, number, number];
+
+function speedColor(t: number): string {
+  const green: Rgb = [0x3c, 0xba, 0x6a];
+  const yellow: Rgb = [0xe2, 0xd2, 0x4a];
+  const red: Rgb = [0xe2, 0x3b, 0x3b];
+  const c = t < 0.5 ? mixRgb(green, yellow, t * 2) : mixRgb(yellow, red, (t - 0.5) * 2);
+  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+}
+
+function mixRgb(a: Rgb, b: Rgb, t: number): Rgb {
+  return [
+    Math.round(a[0] + (b[0] - a[0]) * t),
+    Math.round(a[1] + (b[1] - a[1]) * t),
+    Math.round(a[2] + (b[2] - a[2]) * t),
+  ];
 }
