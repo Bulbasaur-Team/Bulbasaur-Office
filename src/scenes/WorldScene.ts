@@ -783,7 +783,8 @@ export class WorldScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(DEPTH.player);
 
-    // Без fromId — игрок встанет на точку своего персонажа из слоя spawns.
+    // Без fromId — в одиночке точка своего персонажа, в мультиплеере случайная
+    // точка слоя spawns главного офиса.
     this.loadLocation(0);
     this.started = true;
     // Внутри компьютера меню не показываем совсем: мини-игр там нет, а лидерборд, ачивки
@@ -1191,6 +1192,16 @@ export class WorldScene extends Phaser.Scene {
     }));
   }
 
+  // Стартовая точка. В мультиплеере в главном офисе — случайная метка слоя spawns
+  // (те же точки, где в одиночке стоят NPC). В одиночке — точка выбранного персонажа.
+  private entrySpawn(spawns: Map<string, Spawn>, locationId: string): Spawn | undefined {
+    if (this.multiplayer && locationId === "main-office") {
+      const points = [...spawns.values()];
+      return points.length ? Phaser.Math.RND.pick(points) : undefined;
+    }
+    return spawns.get(this.chosen.id);
+  }
+
   // Отправить локацию/позицию как вход в мир (в т.ч. после реконнекта).
   private sendJoin(): void {
     if (!this.multiplayer) return;
@@ -1204,8 +1215,8 @@ export class WorldScene extends Phaser.Scene {
 
   // Строит локацию index, снося предыдущую. fromId — id локации, откуда пришли:
   // игрок встаёт в одноимённую дверь (слой doors); если её нет (фаст-тревел с парковки
-  // в локацию без её двери) — в первую дверь. undefined — старт игры: игрок встаёт в
-  // точку своего персонажа (слой spawns).
+  // в локацию без её двери) — в первую дверь. undefined — старт игры: в одиночке точка
+  // своего персонажа, в мультиплеере случайная точка слоя spawns главного офиса.
   private loadLocation(index: number, fromId?: string): void {
     const cfg = LOCATIONS[index];
     this.locIndex = index;
@@ -1293,7 +1304,7 @@ export class WorldScene extends Phaser.Scene {
       const p =
         fromId !== undefined
           ? doors.get(fromId) ?? doors.values().next().value
-          : spawns.get(this.chosen.id) ?? (this.multiplayer ? spawns.values().next().value : undefined);
+          : this.entrySpawn(spawns, cfg.id);
       if (p) this.player.setPosition(p.x, p.y);
     }
     this.syncBeachQuestNpc(cfg.id);
