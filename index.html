@@ -1524,6 +1524,19 @@
     .lb-row .lb-value { font-weight: bold; }
     .lb-row.lb-you { border-color: var(--accent); background: rgba(122,192,122,.16); }
     .lb-sep { text-align: center; opacity: .5; line-height: 1; }
+    .lb-box.lb-index-view { width: min(520px, calc(var(--sw) * .92)); }
+    .lb-index { position: absolute; top: -16px; left: -16px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+    .lb-index:hover { background: var(--accent); color: #14210f; }
+    .lb-index svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .lb-game { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 12px; border: 1px solid #353c46; border-radius: 8px; }
+    .lb-game-current { border-color: var(--accent); }
+    .lb-game-title { flex: 1 1 auto; min-width: 0; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lb-game-champ { display: flex; align-items: center; gap: 4px; flex: 0 1 auto; max-width: 46%; min-width: 0; }
+    .lb-game-champ .lb-login { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lb-game-champ.is-you .lb-login { color: var(--accent); font-weight: bold; }
+    .lb-medal { font-size: 18px; line-height: 1; flex-shrink: 0; }
+    .lb-medal-empty { filter: grayscale(1); opacity: .4; }
+    .lb-champ-empty { opacity: .55; font-size: 13px; }
     .lb-close { position: absolute; top: -16px; right: -16px; width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
     .lb-close:hover { background: var(--accent); color: #14210f; }
     .lb-close svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
@@ -3558,8 +3571,9 @@
         <button class="lb-close" id="lbClose" aria-label="закрыть">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
-        <button class="lb-nav prev" id="lbPrev" aria-label="предыдущая игра">‹</button>
-        <button class="lb-nav next" id="lbNext" aria-label="следующая игра">›</button>
+        <button class="lb-index hidden" id="lbIndex" type="button" aria-label="все лидерборды" title="Все лидерборды">
+          <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
+        </button>
         <h2 class="lb-title" id="lbTitle">Лидерборд</h2>
         <div class="lb-status" id="lbStatus"></div>
         <div class="lb-list" id="lbList"></div>

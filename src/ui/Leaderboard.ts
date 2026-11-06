@@ -6,6 +6,8 @@ const MEDALS: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
 const CONFETTI_COLORS = ["#f94144", "#f8961e", "#f9c74f", "#90be6d", "#43aa8b", "#577590", "#ff70a6"];
 
+const LB_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>`;
+
 export interface LeaderboardGame {
   id: string;
   title: string;
@@ -60,21 +62,27 @@ function youAreFirst(board: Board): boolean {
   return board.entries[0]?.you === true;
 }
 
-// Экран лидерборда поверх игры. Открывается по кнопке (грузит с сервера) или после
-// сыгранной партии, если результат изменил таблицу (тогда — со стрелками рангов).
+type View = "index" | "board";
+
+// Экран лидерборда поверх игры. Из меню открывается список игр с рекордсменами,
+// из мини-игры — борд только этой игры. После партии, если результат изменил
+// таблицу, борд показывается со стрелками рангов.
 export class Leaderboard {
   isOpen = false;
 
   private root = document.getElementById("leaderboard")!;
+  private box = this.root.querySelector(".lb-box")!;
   private titleEl = document.getElementById("lbTitle")!;
   private statusEl = document.getElementById("lbStatus")!;
   private listEl = document.getElementById("lbList")!;
-  private prevBtn = document.getElementById("lbPrev")!;
-  private nextBtn = document.getElementById("lbNext")!;
+  private indexBtn = document.getElementById("lbIndex")!;
   private confetti = document.getElementById("lbConfetti") as HTMLCanvasElement;
   private confettiCtx = this.confetti.getContext("2d")!;
 
   private index = 0;
+  private view: View = "board";
+  private highlightId: string | null = null;
+  private loadToken = 0;
   private deltas: RankDeltas | null = null;
   private particles: Particle[] = [];
   private confettiRaf = 0;
@@ -82,29 +90,40 @@ export class Leaderboard {
 
   constructor(private games: LeaderboardGame[]) {
     document.getElementById("lbClose")!.onclick = () => this.close();
-    this.prevBtn.onclick = () => this.step(-1);
-    this.nextBtn.onclick = () => this.step(1);
+    this.indexBtn.onclick = () => {
+      this.highlightId = this.games[this.index]?.id ?? null;
+      void this.showIndex();
+    };
   }
 
-  // Открыть по кнопке / пьедесталу — обычный вид без стрелок.
+  // Из меню — список всех игр. Из мини-игры — борд только этой игры.
   async open(gameId?: string): Promise<void> {
     this.deltas = null;
-    this.setIndex(gameId);
+    this.highlightId = null;
     this.reveal();
-    await this.load();
+    if (gameId) {
+      this.setIndex(gameId);
+      await this.loadBoard();
+    } else {
+      await this.showIndex();
+    }
   }
 
   // Показать борд после партии со стрелками изменения ранга.
   showBoard(gameId: string, board: Board, deltas?: RankDeltas | null): void {
     this.deltas = deltas ?? null;
+    this.highlightId = null;
     this.setIndex(gameId);
+    this.loadToken++;
     this.reveal();
+    this.showBoardChrome();
     this.render(board);
   }
 
   close(): void {
     this.isOpen = false;
     this.deltas = null;
+    this.loadToken++;
     this.stopConfetti();
     this.root.classList.add("hidden");
     window.removeEventListener("keydown", this.onKey, true);
@@ -121,27 +140,123 @@ export class Leaderboard {
     this.index = i >= 0 ? i : 0;
   }
 
-  private step(delta: number): void {
-    // При листании — обычный вид, без стрелок прошлой попытки.
-    this.deltas = null;
-    this.stopConfetti();
-    this.index = (this.index + delta + this.games.length) % this.games.length;
-    void this.load();
+  private showBoardChrome(): void {
+    this.view = "board";
+    this.indexBtn.classList.remove("hidden");
+    this.box.classList.remove("lb-index-view");
   }
 
-  private async load(): Promise<void> {
+  private async showIndex(): Promise<void> {
+    this.view = "index";
+    this.deltas = null;
+    this.stopConfetti();
+    this.indexBtn.classList.add("hidden");
+    this.box.classList.add("lb-index-view");
+    this.titleEl.textContent = "Лидерборды";
+    this.statusEl.textContent = "";
+    this.listEl.innerHTML = "";
+
+    const champs = new Map<string, HTMLElement>();
+    for (const game of this.games) {
+      const champ = this.champPlaceholder();
+      champs.set(game.id, champ);
+      this.listEl.appendChild(this.gameRow(game, champ));
+    }
+    this.listEl.querySelector(".lb-game-current")?.scrollIntoView({ block: "nearest" });
+
+    const token = ++this.loadToken;
+    await Promise.all(this.games.map(async (game) => {
+      const champ = champs.get(game.id)!;
+      try {
+        const board = await this.fetch(game);
+        if (!this.alive("index", token)) return;
+        this.fillChamp(champ, board.entries[0] ?? null, null);
+      } catch (e) {
+        if (!this.alive("index", token)) return;
+        this.fillChamp(champ, null, (e as Error).message);
+      }
+    }));
+  }
+
+  private async loadBoard(): Promise<void> {
     const game = this.games[this.index];
+    const token = ++this.loadToken;
+    this.showBoardChrome();
     this.titleEl.textContent = game.title;
     this.statusEl.textContent = "Загрузка...";
     this.listEl.innerHTML = "";
     try {
-      const board = game.daily
-        ? await fetchDailyLeaderboard(game.code ?? game.id)
-        : await fetchLeaderboard(game.id);
+      const board = await this.fetch(game);
+      if (!this.alive("board", token)) return;
       this.render(board);
     } catch (e) {
+      if (!this.alive("board", token)) return;
       this.statusEl.textContent = (e as Error).message;
     }
+  }
+
+  private fetch(game: LeaderboardGame): Promise<Board> {
+    return game.daily
+      ? fetchDailyLeaderboard(game.code ?? game.id)
+      : fetchLeaderboard(game.id);
+  }
+
+  private alive(view: View, token: number): boolean {
+    return this.isOpen && this.view === view && token === this.loadToken;
+  }
+
+  private champPlaceholder(): HTMLElement {
+    const champ = document.createElement("span");
+    champ.className = "lb-game-champ";
+    const medal = document.createElement("span");
+    medal.className = "lb-medal";
+    medal.textContent = "🥇";
+    const login = document.createElement("span");
+    login.className = "lb-login lb-champ-empty";
+    login.textContent = "…";
+    champ.append(medal, login);
+    return champ;
+  }
+
+  private fillChamp(champ: HTMLElement, top: LeaderboardEntry | null, error: string | null): void {
+    champ.className = "lb-game-champ" + (top?.you ? " is-you" : "");
+    champ.replaceChildren();
+    const medal = document.createElement("span");
+    medal.className = "lb-medal" + (top ? "" : " lb-medal-empty");
+    medal.textContent = "🥇";
+    const login = document.createElement("span");
+    login.className = "lb-login" + (top ? "" : " lb-champ-empty");
+    if (top) login.textContent = top.login;
+    else if (error) {
+      login.textContent = "ошибка";
+      login.title = error;
+    } else login.textContent = "пока нет";
+    champ.append(medal, login);
+  }
+
+  private gameRow(game: LeaderboardGame, champ: HTMLElement): HTMLDivElement {
+    const row = document.createElement("div");
+    row.className = "lb-game" + (game.id === this.highlightId ? " lb-game-current" : "");
+
+    const title = document.createElement("span");
+    title.className = "lb-game-title";
+    title.textContent = game.title;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "arcade-lb";
+    btn.setAttribute("aria-label", `Открыть лидерборд: ${game.title}`);
+    btn.title = "Открыть лидерборд";
+    btn.innerHTML = LB_ICON;
+    btn.onclick = () => {
+      this.deltas = null;
+      this.stopConfetti();
+      this.setIndex(game.id);
+      void this.loadBoard();
+    };
+
+    row.append(title, champ, btn);
+    return row;
   }
 
   private render(board: Board): void {
@@ -228,19 +343,20 @@ export class Leaderboard {
 
   private onKey = (e: KeyboardEvent): void => {
     if (!this.isOpen) return;
-    if (e.key === "ArrowLeft") {
+    // Стрелки больше не листают борды, но не должны уходить в игру под модалкой.
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       e.preventDefault();
       e.stopPropagation();
-      this.step(-1);
-    } else if (e.key === "ArrowRight") {
-      e.preventDefault();
-      e.stopPropagation();
-      this.step(1);
-    } else if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      e.stopPropagation();
-      this.close();
+      return;
     }
+    if (e.key !== "Escape" && e.key !== "Enter" && e.key !== " ") return;
+    const target = e.target;
+    if ((e.key === "Enter" || e.key === " ") && target instanceof HTMLElement && this.root.contains(target) && target.closest("button")) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    this.close();
   };
 
   private row(entry: LeaderboardEntry, format: (value: number) => string): HTMLDivElement {

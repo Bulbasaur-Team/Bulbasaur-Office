@@ -84,7 +84,7 @@ function formatAttempts(v: number): string {
   return `${v} ${ruPlural(v, "попытка", "попытки", "попыток")}`;
 }
 
-// Мини-игры для лидерборда: порядок листания, заголовок и формат значения.
+// Мини-игры для лидерборда: порядок в общем списке, заголовок и формат значения.
 const GAMES: LeaderboardGame[] = [
   // Отдельные лидерборды слова дня (по числу попыток, меньше — лучше).
   { id: "wotd-bulbaguess", code: "bulbaguess", daily: true, title: "Слово дня: Bulba Guess", format: formatAttempts },
