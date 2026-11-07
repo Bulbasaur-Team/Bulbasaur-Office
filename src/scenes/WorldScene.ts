@@ -13,6 +13,7 @@ import { slidePathsByOwnerId } from "../ui/slides";
 import { LocationMenu } from "../ui/LocationMenu";
 import { GameMenu } from "../ui/GameMenu";
 import { BulbaJump } from "../ui/BulbaJump";
+import { BulbaJumpSeason } from "../ui/BulbaJumpSeason";
 import { BulbaPacker } from "../ui/BulbaPacker";
 import { BulbaParking } from "../ui/BulbaParking";
 import { BulbaTanks } from "../ui/BulbaTanks";
@@ -155,6 +156,7 @@ export class WorldScene extends Phaser.Scene {
   private projectorFromDialogue = false;    // сюжетный показ из диалога с NPC
   private gameMenu!: GameMenu;
   private bulbaJump!: BulbaJump;
+  private jumpSeason!: BulbaJumpSeason;
   private bulbaPacker!: BulbaPacker;
   private bulbaParking!: BulbaParking;
   private bulbaTanks!: BulbaTanks;
@@ -403,6 +405,12 @@ export class WorldScene extends Phaser.Scene {
       .setVisible(false);
 
     this.bulbaJump = new BulbaJump();
+    this.jumpSeason = new BulbaJumpSeason();
+    this.jumpSeason.onPlay = () => {
+      this.jumpSeason.close();
+      void this.openGame("bulbajump");
+    };
+    this.jumpSeason.onLeave = () => this.jumpSeason.close();
     this.bulbaPacker = new BulbaPacker();
     this.bulbaParking = new BulbaParking();
     this.bulbaTanks = new BulbaTanks();
@@ -429,6 +437,10 @@ export class WorldScene extends Phaser.Scene {
     // По завершении партии игра отдаёт результат — отправляем его и показываем лидерборд.
     this.leaderboard = new Leaderboard(GAMES);
     document.getElementById("lbBtn")!.onclick = () => void this.leaderboard.open();
+    document.getElementById("jumpSeasonBtn")!.onclick = () => {
+      (document.getElementById("hudPanel") as HTMLDetailsElement).open = false;
+      void this.jumpSeason.open();
+    };
     this.achievements = new Achievements();
     this.achievementPopup = new AchievementPopup();
     document.getElementById("achBtn")!.onclick = () => void this.achievements.open();
@@ -795,7 +807,7 @@ export class WorldScene extends Phaser.Scene {
     // На ПК меню сразу развёрнуто; на тач-устройствах — свёрнуто, чтобы не занимать экран.
     if (!isTouch()) hudPanel.open = true;
     this.syncHudPanel();
-    if (!this.multiplayer) void this.storyIntro.showIfNeeded();
+    void this.storyIntro.showIfNeeded().then(() => void this.jumpSeason.open());
   }
 
   // Удалить аккаунт: подтверждение, запрос на сервер, затем выход и перезагрузка.
@@ -1330,6 +1342,7 @@ export class WorldScene extends Phaser.Scene {
       this.catDialogue.isOpen ||
       this.gameMenu.isOpen ||
       this.bulbaGames.isOpen ||
+      this.jumpSeason.isOpen ||
       this.bulbaJump.isOpen ||
       this.bulbaPacker.isOpen ||
       this.bulbaParking.isOpen ||

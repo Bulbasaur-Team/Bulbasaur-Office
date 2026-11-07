@@ -20,6 +20,25 @@ export interface Leaderboard {
   you: LeaderboardEntry | null;
 }
 
+export interface JumpSeasonWinner {
+  /** 0 — рекорд до сезонов (Sodnom). Дальше номер закрытого сезона. */
+  season?: number;
+  login: string;
+  value: number;
+}
+
+/** Текущий сезон Bulba Jump: таблица только из рекордов этого окна. */
+export interface JumpSeason {
+  number: number;
+  startsAt: string;
+  endsAt: string;
+  serverNow: string;
+  prizes: number[];
+  previousWinner: JumpSeasonWinner;
+  entries: LeaderboardEntry[];
+  you: LeaderboardEntry | null;
+}
+
 // Сиды слова дня: today — для сегодняшнего слова, prev — для вчерашнего (null, если вчера не было).
 export interface WotdGameSeeds {
   today: string;
@@ -138,6 +157,10 @@ export function submitScore(gameId: string, value: number): Promise<Leaderboard>
 
 export function fetchLeaderboard(gameId: string): Promise<Leaderboard> {
   return leaderboardRequest(`/api/leaderboard/${gameId}`, { method: "GET" });
+}
+
+export function fetchJumpSeason(): Promise<JumpSeason> {
+  return authedJson<JumpSeason>("/api/jump-season");
 }
 
 // Слово дня: сиды (сегодня/вчера) для обеих игр.

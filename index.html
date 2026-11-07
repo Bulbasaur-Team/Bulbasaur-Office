@@ -608,7 +608,27 @@
        за край (иначе flex-центрирование делает его недоступным для скролла). */
     #bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki, #bulbaquiz, #airhockey { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; align-items: safe center; justify-content: center; padding: 24px; overflow: auto; }
     #bjCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72 - 52px)); width: auto; aspect-ratio: 420 / 640; touch-action: none; }
-    .bj-stage { display: flex; flex-direction: column; align-items: stretch; width: max-content; max-width: 100%; min-width: 0; }
+    .bj-stage { position: relative; display: flex; flex-direction: column; align-items: stretch; width: max-content; max-width: 100%; min-width: 0; }
+    .bj-heli {
+      position: absolute; right: 10px; bottom: 10px; z-index: 2;
+      width: 52px; height: auto; padding: 4px 4px 3px; box-sizing: border-box;
+      border-radius: 14px; border: 2px solid var(--accent);
+      background: rgba(20, 28, 22, 0.9); color: #d7e0d4; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+      box-shadow: 0 4px 14px rgba(0,0,0,.4);
+    }
+    .bj-heli img {
+      width: 30px; height: 30px; object-fit: contain; pointer-events: none;
+    }
+    .bj-heli-key {
+      font-size: 9px; line-height: 1; font-weight: 700; letter-spacing: 0.03em;
+      pointer-events: none;
+    }
+    .bj-heli:hover:not(:disabled) { filter: brightness(1.08); }
+    .bj-heli:active:not(:disabled) { transform: translateY(1px); }
+    .bj-heli:disabled {
+      opacity: 0.4; cursor: default; filter: grayscale(0.75);
+    }
     .bj-speed {
       display: flex; flex-direction: column; gap: 4px;
       width: 0; min-width: 100%; box-sizing: border-box;
@@ -638,6 +658,47 @@
       transform: translate(-50%, -50%); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
     }
     #bulbajump { touch-action: none; }
+    .bj-season {
+      position: fixed; inset: 0; z-index: 80;
+      background: rgba(8,10,14,.88);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .bj-season-box {
+      width: min(440px, calc(var(--sw) * .92));
+      max-height: calc(var(--sh) * .9);
+      display: flex; flex-direction: column;
+    }
+    .bj-season-title {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .bj-season .bg-help { position: static; }
+    .bj-season .bj-season-tip {
+      top: 0; left: calc(100% + 12px); right: auto; transform: none;
+      width: min(260px, calc(var(--sw) * .7)); z-index: 5;
+    }
+    html.bp-640 .bj-season .bj-season-tip {
+      top: calc(100% + 8px); left: 0; right: auto; width: 100%; transform: none;
+    }
+    .bj-season-tip p { margin: 0 0 8px; }
+    .bj-season-tip p:last-of-type { margin-bottom: 0; }
+    .bj-season-num { text-align: center; font-size: 13px; opacity: .75; margin-bottom: 6px; }
+    .bj-season-timer {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      text-align: center; font-weight: bold; margin-bottom: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+    .bj-season-timer-icon { font-size: 16px; line-height: 1; }
+    .bj-season-prev { text-align: center; font-size: 14px; margin-bottom: 8px; }
+    .bj-season-champ { color: #f0c14a; font-weight: bold; }
+    .bj-season-prizes { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+    .bj-season-prizes img {
+      width: 16px; height: 16px; vertical-align: -3px; margin-left: 2px;
+      image-rendering: pixelated; border-radius: 50%;
+    }
+    .bj-season-box .lb-list { max-height: calc(var(--sh) * .38); }
+    .bj-season-play { width: 100%; margin-top: 12px; }
+    html.bp-400 .bj-season { padding: 10px; }
     #bpCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(600px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 600; }
     #bpkCanvas { background: #26303a; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 640; }
     #btCanvas { background: #101418; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 456 / 504; }
@@ -2482,6 +2543,7 @@
     .hud-btn-danger { border-color: #6b3535; color: #e6807a; }
     .hud-btn-danger:hover { background: #c94f4f; color: #fff; border-color: #c94f4f; }
     .bc-icon { width: 18px; height: 18px; vertical-align: -3px; margin-right: 4px; image-rendering: pixelated; border-radius: 50%; }
+    .hud-btn-icon { width: 18px; height: 18px; vertical-align: -3px; margin-right: 4px; image-rendering: pixelated; }
     #bulbaCoins, #wardrobe { position: fixed; inset: 0; z-index: 50; background: rgba(8,10,14,.88); display: flex; align-items: center; justify-content: center; padding: 20px; }
     .bc-box, .wardrobe-box { position: relative; background: var(--panel); border: 3px solid var(--accent); border-radius: 16px; padding: 18px 20px; width: min(520px, 100%); max-height: calc(var(--sh) - 40px); overflow: auto; }
     .wardrobe-box {
@@ -2980,12 +3042,48 @@
             </div>
           </div>
           <canvas id="bjCanvas" width="420" height="640"></canvas>
+          <button class="bj-heli" id="bjHeli" type="button" aria-label="Бесплатная шапочка-вертолёт" title="Бесплатная шапочка-вертолёт — один раз за игру">
+            <img src="assets/bulbajump/heli.png" alt="" />
+            <span class="bj-heli-key">enter</span>
+          </button>
         </div>
         <div class="arcade-actions">
           <button class="arcade-lb" id="bjLb" aria-label="лидерборд" title="Лидерборд">
             <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
           </button>
         </div>
+      </div>
+    </div>
+
+    <div id="bjSeason" class="bj-season hidden" role="dialog" aria-modal="true" aria-labelledby="bjSeasonTitle">
+      <div class="lb-box bj-season-box">
+        <button class="lb-close" id="bjSeasonClose" type="button" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <h2 class="lb-title bj-season-title" id="bjSeasonTitle">
+          Сезон Bulba Jump
+          <span class="bg-help" id="bjSeasonHelpWrap">
+            <button class="bg-help-btn" id="bjSeasonInfo" type="button" aria-label="Что такое сезоны" aria-expanded="false" title="Что такое сезоны">i</button>
+            <div class="bg-tip bj-season-tip" id="bjSeasonHelp">
+              <p>В таблице только рекорды, которые поставлены за это время.</p>
+              <p>В конце сезона победителям начисляются Bulba Coins:</p>
+              <ul class="bj-season-prizes">
+                <li>🥇 1 место — 10 000 <img src="assets/wardrobe/ui/bc_coin.png" alt="" /></li>
+                <li>🥈 2 место — 5 000 <img src="assets/wardrobe/ui/bc_coin.png" alt="" /></li>
+                <li>🥉 3 место — 3 000 <img src="assets/wardrobe/ui/bc_coin.png" alt="" /></li>
+              </ul>
+            </div>
+          </span>
+        </h2>
+        <div class="bj-season-num" id="bjSeasonNum"></div>
+        <div class="bj-season-timer" aria-live="polite">
+          <span class="bj-season-timer-icon" aria-hidden="true">⏱️</span>
+          <span id="bjSeasonTimerValue"></span>
+        </div>
+        <div class="bj-season-prev hidden" id="bjSeasonPrev">Победитель сезона <span id="bjSeasonPrevNum"></span>: <span class="bj-season-champ" id="bjSeasonChamp"></span></div>
+        <div class="lb-status" id="bjSeasonStatus"></div>
+        <div class="lb-list" id="bjSeasonList"></div>
+        <button class="auth-submit bj-season-play" id="bjSeasonPlay" type="button">Играть</button>
       </div>
     </div>
 
@@ -3394,6 +3492,7 @@
         <div class="hud-group">
           <div class="hud-label">Игра</div>
           <button id="lbBtn" class="hud-btn" aria-label="лидерборд">🏆 Лидерборд</button>
+          <button id="jumpSeasonBtn" class="hud-btn" aria-label="сезон bulba jump"><img class="hud-btn-icon" src="assets/bulbajump/jetpack.png" alt="" />Сезон Bulba Jump</button>
           <button id="bulbaGamesBtn" class="hud-btn" aria-label="bulba games">🎮 Bulba Games</button>
           <button id="achBtn" class="hud-btn" aria-label="мои ачивки">🎖 Мои ачивки</button>
           <button id="communityBtn" class="hud-btn" aria-label="сообщество">👥 Сообщество</button>

@@ -101,6 +101,7 @@ export class BulbaJump {
   private speedValEl = document.getElementById("bjSpeedVal")!;
   private speedThumbEl = document.getElementById("bjSpeedThumb")!;
   private speedMeterEl = document.getElementById("bjSpeed")!;
+  private heliBtn = document.getElementById("bjHeli") as HTMLButtonElement;
 
   private wardrobeImages: Map<string, HTMLImageElement> | null = null;
   private sprite: HTMLCanvasElement | null = null;
@@ -131,7 +132,7 @@ export class BulbaJump {
   private speedMark = SPEED_MARK_MIN;
   private speed = SPEED_MARK_MIN * SPEED_FACTOR;
   private shownSpeedLabel = "";
-
+  private freeHeliUsed = false;
   constructor() {
     this.heliImg.src = publicPath("assets/bulbajump/heli.png");
     this.jetImg.src = publicPath("assets/bulbajump/jetpack.png");
@@ -141,6 +142,7 @@ export class BulbaJump {
     document.getElementById("bjSpeedMax")!.textContent = formatSpeed(SPEED_MARK_MAX);
     document.getElementById("bjClose")!.onclick = () => this.close();
     document.getElementById("bjLb")!.onclick = () => this.onLeaderboard?.();
+    this.heliBtn.onclick = () => this.useFreeHeli();
     this.root.addEventListener("pointerdown", this.onPointerDown);
     this.root.addEventListener("pointermove", this.onPointerMove);
     this.root.addEventListener("pointerup", this.onPointerUp);
@@ -201,7 +203,11 @@ export class BulbaJump {
     } else if (e.code === "ArrowRight" || e.code === "KeyD") {
       this.keyRight = true;
       e.preventDefault();
-    } else if (this.over && (e.code === "Enter" || e.code === "Space")) {
+    } else if (e.code === "Enter") {
+      e.preventDefault();
+      if (this.over) this.reset();
+      else this.useFreeHeli();
+    } else if (this.over && e.code === "Space") {
       e.preventDefault();
       this.reset();
     } else if (e.code === "Escape") {
@@ -221,6 +227,7 @@ export class BulbaJump {
     this.root.classList.remove("hidden");
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
+    cancelAnimationFrame(this.raf);
     this.reset();
   }
 
@@ -241,6 +248,7 @@ export class BulbaJump {
     this.score = 0;
     this.shownScore = -1;
     this.boost = null;
+    this.freeHeliUsed = false;
     this.over = false;
     this.runMs = 0;
     this.speedMark = SPEED_MARK_MIN;
@@ -267,6 +275,7 @@ export class BulbaJump {
     while (this.topY > 0) this.spawnNext();
 
     this.updateStatus();
+    this.syncHeliBtn();
     this.lastT = performance.now();
     this.lastRenderT = 0;
     this.acc = 0;
@@ -404,7 +413,7 @@ export class BulbaJump {
           Math.abs(this.px - cx) < HALF_W + hw &&
           Math.abs(this.py - cy) < PLAYER_H / 2 + hh;
         if (hit) {
-          this.boost = { kind: p.powerUp, startScore: this.score };
+          this.grantBoost(p.powerUp);
           p.powerUp = null;
           break;
         }
@@ -479,7 +488,31 @@ export class BulbaJump {
       this.touches.clear();
       this.syncTouch();
       this.finish(Math.floor(this.score));
+      this.syncHeliBtn();
     }
+  }
+
+  // Один раз за забег: та же шапочка, что лежит на платформе.
+  // Пока уже летишь — не тратим заряд, иначе полёт просто оборвётся или обновится.
+  private useFreeHeli(): void {
+    if (!this.isOpen || this.over || this.freeHeliUsed || this.boost) return;
+    this.freeHeliUsed = true;
+    this.grantBoost("heli");
+    this.syncHeliBtn();
+  }
+
+  private grantBoost(kind: PowerUpKind): void {
+    this.boost = { kind, startScore: this.score };
+  }
+
+  private syncHeliBtn(): void {
+    const used = this.freeHeliUsed;
+    this.heliBtn.disabled = used || this.over;
+    const label = used
+      ? "Шапочка уже использована в этой игре"
+      : "Бесплатная шапочка-вертолёт — один раз за игру, Enter";
+    this.heliBtn.title = label;
+    this.heliBtn.setAttribute("aria-label", label);
   }
 
   private render(): void {
