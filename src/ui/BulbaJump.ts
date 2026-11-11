@@ -24,16 +24,25 @@ const STEP_MS = 1000 / 90;   // 90 тиков физики/сек — игра �
 const RENDER_MS = 1000 / 60; // рисуем не чаще 60 fps — на ProMotion 120 Гц иначе двойная нагрузка с Phaser
 
 // Бонусы как в Doodle Jump: подъём на N очков (очко = 1 px набранной высоты).
+// Страховка не поднимает сама: 20 с пузырь и крылья, падение вниз тратит её и даёт взлёт.
 const HELI_SCORE = 3000;
 const JET_SCORE = 5000;
 const ROCKET_SCORE = 10000;
+const WING_SCORE = 1000; // взлёт, если со страховкой упал вниз
 const HELI_SPAWN = 0.008; // вероятность шапочки на платформе
-const JET_SPAWN = 0.005;  // вероятность ранца (взаимоисключающе с шапочкой и ракетой)
+const JET_SPAWN = 0.005;  // вероятность ранца (взаимоисключающе с остальными бонусами)
 const ROCKET_SPAWN = JET_SPAWN / 2; // ракета вдвое реже ранца
+const INSURANCE_SPAWN = JET_SPAWN; // страховка с той же частотой, что ранец
 const HELI_VY = -7.5;    // постоянная скорость подъёма в полёте
 const JET_VY = -10.5;
 const ROCKET_VY = JET_VY * 2; // ракета летит вверх вдвое быстрее ранца
+const WING_VY = -7;
+const INSURANCE_MS = 20_000; // реальное время; множитель скорости его не сжимает
 const POWER_SIZE = 28;   // размер спрайта бонуса на платформе
+const INSURANCE_R = 18;  // радиус пузыря-пикапа
+const BUBBLE_RX = 50;    // пузырь на игроке, пока страховка активна
+const BUBBLE_RY = 46;
+const BUBBLE_LIFT = 6;   // чуть выше центра, чтобы низ не тонул в платформе
 const FRAGILE_SPAWN = 0.05; // хрупкая платформа: ломается после двух прыжков
 const MOVER_SPAWN = FRAGILE_SPAWN; // подвижные платформы — примерно так же редки
 const MOVER_AMP = 26;    // амплитуда хода вверх-вниз, px
@@ -68,7 +77,8 @@ const ROCKET_PICKUP_SCALE = ROCKET_PICKUP_H / ROCKET_LOCAL_H;
 const ROCKET_PICKUP_W = R_FIN_OUTER * 2 * ROCKET_PICKUP_SCALE;
 
 type PlatformType = "box" | "belt" | "fragile" | "safety" | "mover";
-type PowerUpKind = "heli" | "jet" | "rocket";
+type FlightKind = "heli" | "jet" | "rocket" | "wings";
+type PowerUpKind = "heli" | "jet" | "rocket" | "insurance";
 interface Platform {
   x: number;
   y: number;
@@ -86,7 +96,7 @@ interface Platform {
 
 // Bulba Jump — аналог Doodle Jump в антураже склада: посылки-платформы,
 // ленты-конвейеры, батуты, хрупкие коробки, лифты, шапочка-вертолёт,
-// реактивный ранец и ракета. Игрок — текущий аватар с одеждой из гардероба.
+// реактивный ранец, ракета и страховка. Игрок — текущий аватар с одеждой из гардероба.
 export class BulbaJump {
   isOpen = false;
   onClose: (() => void) | null = null;
@@ -117,7 +127,9 @@ export class BulbaJump {
   private topIsMover = false; // верхняя платформа — лифт: следующему зазору нужен запас на амплитуду
   private score = 0;
   private shownScore = -1;    // что уже вывели в DOM — не трогаем textContent чаще, чем меняется целые
-  private boost: { kind: PowerUpKind; startScore: number } | null = null;
+  private boost: { kind: FlightKind; startScore: number } | null = null;
+  private insuranceLeft = 0; // страховка, мс реального времени; 0 — нет
+  private bubblePopUntil = 0;
   private over = false;
   private keyLeft = false;
   private keyRight = false;
@@ -248,6 +260,8 @@ export class BulbaJump {
     this.score = 0;
     this.shownScore = -1;
     this.boost = null;
+    this.insuranceLeft = 0;
+    this.bubblePopUntil = 0;
     this.freeHeliUsed = false;
     this.over = false;
     this.runMs = 0;
@@ -294,8 +308,9 @@ export class BulbaJump {
     if (!spring && !fragile) {
       const roll = Math.random();
       if (roll < ROCKET_SPAWN) powerUp = "rocket";
-      else if (roll < ROCKET_SPAWN + JET_SPAWN) powerUp = "jet";
-      else if (roll < ROCKET_SPAWN + JET_SPAWN + HELI_SPAWN) powerUp = "heli";
+      else if (roll < ROCKET_SPAWN + INSURANCE_SPAWN) powerUp = "insurance";
+      else if (roll < ROCKET_SPAWN + INSURANCE_SPAWN + JET_SPAWN) powerUp = "jet";
+      else if (roll < ROCKET_SPAWN + INSURANCE_SPAWN + JET_SPAWN + HELI_SPAWN) powerUp = "heli";
     }
     return {
       x: Math.random() * (W - PLAT_W),
@@ -330,7 +345,7 @@ export class BulbaJump {
     this.platforms.push(platform);
   }
 
-  // После шапочки, ранца или ракеты — широкая платформа прямо под ногами, чтобы не упасть в пустоту.
+  // После шапочки, ранца, ракеты или взлёта на крыльях — широкая платформа прямо под ногами.
   private spawnSafetyPlatform(): void {
     this.platforms.push({
       x: 0,
@@ -359,6 +374,7 @@ export class BulbaJump {
       const grown = SPEED_MARK_MIN + SPEED_STEP * (this.runMs / SPEED_STEP_MS);
       this.speedMark = grown > SPEED_MARK_MAX ? SPEED_MARK_MAX : grown;
       this.speed = this.speedMark * SPEED_FACTOR;
+      if (this.insuranceLeft > 0) this.insuranceLeft = Math.max(0, this.insuranceLeft - dt);
     }
     // Множитель крутит ту же физику: 1× — прежний темп. Отметки 0.75×…1.25×, фактически ×1.12.
     this.acc += dt;
@@ -404,16 +420,16 @@ export class BulbaJump {
     if (!this.boost) {
       for (const p of this.platforms) {
         if (!p.powerUp || p.falling) continue;
-        const rocket = p.powerUp === "rocket";
-        const hw = rocket ? ROCKET_PICKUP_W / 2 : POWER_SIZE / 2;
-        const hh = rocket ? ROCKET_PICKUP_H / 2 : POWER_SIZE / 2;
+        const hw = pickupHalf(p.powerUp, true);
+        const hh = pickupHalf(p.powerUp, false);
         const cx = p.x + p.w / 2;
         const cy = p.y - hh - 2;
         const hit =
           Math.abs(this.px - cx) < HALF_W + hw &&
           Math.abs(this.py - cy) < PLAYER_H / 2 + hh;
         if (hit) {
-          this.grantBoost(p.powerUp);
+          if (p.powerUp === "insurance") this.grantInsurance();
+          else this.grantBoost(p.powerUp);
           p.powerUp = null;
           break;
         }
@@ -482,8 +498,9 @@ export class BulbaJump {
       while (this.topY > 0) this.spawnNext();
     }
 
-    // Упал ниже экрана — конец.
-    if (this.py > H + PLAYER_H) {
+    // Ниже экрана — конец. Страховка здесь ещё не включает крылья:
+    // кадр с падением рисуется первым, крылья стартуют уже из-под экрана.
+    if (this.py > H + PLAYER_H && this.boost?.kind !== "wings" && this.insuranceLeft <= 0) {
       this.over = true;
       this.touches.clear();
       this.syncTouch();
@@ -501,8 +518,20 @@ export class BulbaJump {
     this.syncHeliBtn();
   }
 
-  private grantBoost(kind: PowerUpKind): void {
+  private grantBoost(kind: FlightKind): void {
     this.boost = { kind, startScore: this.score };
+  }
+
+  private grantInsurance(): void {
+    this.insuranceLeft = INSURANCE_MS;
+  }
+
+  // Уже под экраном: пузырь гаснет, крылья поднимают вверх на WING_SCORE. Позицию не подтягиваем.
+  private beginWingRescue(): void {
+    this.insuranceLeft = 0;
+    this.bubblePopUntil = performance.now() + 320;
+    this.vy = WING_VY;
+    this.grantBoost("wings");
   }
 
   private syncHeliBtn(): void {
@@ -532,8 +561,13 @@ export class BulbaJump {
 
     for (const p of this.platforms) this.drawPlatform(p);
     this.drawPlayer();
+    this.drawBubblePop();
     if (this.over) this.drawGameOver();
     this.syncSpeedHud();
+    // Крылья только после кадра, в котором Бульбазавр уже ниже экрана.
+    if (!this.over && this.insuranceLeft > 0 && this.py > H + PLAYER_H) {
+      this.beginWingRescue();
+    }
   }
 
   private drawPlatform(p: Platform): void {
@@ -587,7 +621,7 @@ export class BulbaJump {
       ctx.stroke();
       ctx.restore();
     } else if (p.type === "safety") {
-      // Страховочная сетка на всю ширину — после шапочки, ранца или ракеты.
+      // Страховочная сетка на всю ширину — после шапочки, ранца, ракеты или крыльев.
       ctx.fillStyle = "#2a3d34";
       ctx.fillRect(p.x, p.y, pw, PLAT_H);
       ctx.fillStyle = "#7ac07a";
@@ -625,13 +659,17 @@ export class BulbaJump {
     if (p.powerUp && !p.falling) this.drawPowerUp(p.x + pw / 2, p.y - 2, p.powerUp, POWER_SIZE);
   }
 
-  private powerImg(kind: Exclude<PowerUpKind, "rocket">): HTMLImageElement {
+  private powerImg(kind: "heli" | "jet"): HTMLImageElement {
     return kind === "heli" ? this.heliImg : this.jetImg;
   }
 
   private drawPowerUp(cx: number, bottomY: number, kind: PowerUpKind, size: number): void {
     if (kind === "rocket") {
       this.drawRocketPickup(cx, bottomY);
+      return;
+    }
+    if (kind === "insurance") {
+      this.drawInsurancePickup(cx, bottomY);
       return;
     }
     const img = this.powerImg(kind);
@@ -660,24 +698,200 @@ export class BulbaJump {
     const h = PLAYER_H;
     const w = this.sprite.height ? (this.sprite.width / this.sprite.height) * h : h;
     const y = this.py - h / 2;
+    const insured = this.insuranceLeft > 0;
+    const flapping = this.boost?.kind === "wings";
+    const showWings = insured || flapping;
+
+    if (insured) {
+      ctx.save();
+      ctx.globalAlpha = this.insuranceAlpha();
+      this.paintBubble(this.px, this.py - BUBBLE_LIFT, BUBBLE_RX, BUBBLE_RY, "fill");
+      ctx.restore();
+    }
+
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     // Спрайт по умолчанию смотрит влево; вправо — отзеркаливаем.
-    // Ранец (+пламя) — до игрока (позади), шапочка — после (поверх головы).
+    // Ранец — позади, крылья и шапочка — поверх тела. Взмах — только у спасения.
     if (this.faceRight) {
       ctx.translate(this.px, 0);
       ctx.scale(-1, 1);
       if (this.boost?.kind === "jet") this.drawJetpackBehind(0, y, w, h);
       ctx.drawImage(this.sprite, -w / 2, y, w, h);
+      if (showWings) this.drawWings(0, y, w, h, flapping);
       if (this.boost?.kind === "heli") this.drawHeliHat(0, y);
     } else {
       if (this.boost?.kind === "jet") this.drawJetpackBehind(this.px, y, w, h);
       ctx.drawImage(this.sprite, this.px - w / 2, y, w, h);
+      if (showWings) this.drawWings(this.px, y, w, h, flapping);
       if (this.boost?.kind === "heli") this.drawHeliHat(this.px, y);
     }
     ctx.restore();
 
     if (this.boost?.kind === "heli") this.drawHeliFx();
+
+    if (insured) {
+      ctx.save();
+      ctx.globalAlpha = this.insuranceAlpha();
+      this.paintBubble(this.px, this.py - BUBBLE_LIFT, BUBBLE_RX, BUBBLE_RY, "glass");
+      ctx.restore();
+    }
+  }
+
+  private insuranceAlpha(): number {
+    if (this.insuranceLeft > 3000) return 1;
+    // Последние 3 секунды пузырь пульсирует — страховка кончается.
+    return 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(this.insuranceLeft / 80));
+  }
+
+  private drawWings(originX: number, top: number, w: number, h: number, flapping: boolean): void {
+    const ctx = this.ctx;
+    const now = performance.now();
+    const lift = flapping ? wingLift(now, 320) : 0;
+    const farLift = flapping ? wingLift(now + 40, 320) : 0;
+    const breathe = flapping ? 0 : Math.sin(now / 480) * 0.07;
+    // В покое крылья раскрыты парой (верхнее и нижнее). В полёте пара машет целиком.
+    const near = (flapping ? -0.12 - lift * 0.95 : -0.22) + breathe;
+    const far = (flapping ? -0.28 - farLift * 0.72 : -0.9) + breathe;
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    if (!flapping) ctx.globalAlpha *= this.insuranceAlpha();
+    // Корень на луковице: +x в локальных координатах — спина.
+    ctx.translate(originX + w * 0.24, top + h * 0.32);
+    this.paintWing(ctx, far, flapping ? 0.94 : 0.86, 0.75);
+    this.paintWing(ctx, near, flapping ? 1.18 : 1.02, 1);
+    ctx.restore();
+  }
+
+  // Пикап: полупрозрачный пузырь, внутри пара крыльев.
+  private drawInsurancePickup(cx: number, bottomY: number): void {
+    const r = INSURANCE_R;
+    const bob = Math.sin(performance.now() / 280) * 1.4;
+    const cy = bottomY - r + bob;
+    const lift = Math.sin(performance.now() / 220) * 0.16;
+    this.paintBubble(cx, cy, r, r, "fill");
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(cx, cy + 1);
+    ctx.imageSmoothingEnabled = true;
+    this.paintWing(ctx, -0.58 - lift, 0.5, 1);
+    ctx.scale(-1, 1);
+    this.paintWing(ctx, -0.58 - lift, 0.5, 1);
+    ctx.restore();
+    this.paintBubble(cx, cy, r, r, "glass");
+  }
+
+  private paintBubble(cx: number, cy: number, rx: number, ry: number, phase: "fill" | "glass"): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.translate(cx, cy);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    if (phase === "fill") {
+      const g = ctx.createRadialGradient(-rx * 0.25, -ry * 0.3, rx * 0.15, 0, 0, Math.max(rx, ry));
+      g.addColorStop(0, "rgba(255, 255, 255, 0.34)");
+      g.addColorStop(0.42, "rgba(186, 224, 255, 0.14)");
+      g.addColorStop(1, "rgba(140, 196, 232, 0.24)");
+      ctx.fillStyle = g;
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = "rgba(226, 246, 255, 0.95)";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(0, 0, Math.max(1, rx - 3.5), Math.max(1, ry - 3.5), 0, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+      ctx.lineWidth = 1.15;
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(-rx * 0.28, -ry * 0.32, rx * 0.26, ry * 0.15, -0.7, Math.PI * 1.05, Math.PI * 1.62);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255, 176, 210, 0.5)";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.ellipse(rx * 0.2, ry * 0.16, rx * 0.2, ry * 0.11, 0.55, Math.PI * 0.12, Math.PI * 0.68);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Крыло остриём в +x. Контекст не сдвигается насовсем: внутри свой save.
+  private paintWing(ctx: CanvasRenderingContext2D, angle: number, scale: number, alpha: number): void {
+    ctx.save();
+    ctx.rotate(angle);
+    ctx.scale(scale, scale);
+    ctx.globalAlpha *= alpha;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(0, 2);
+    ctx.quadraticCurveTo(8, -18, 22, -13);
+    ctx.quadraticCurveTo(30, -8, 31, -2);
+    ctx.lineTo(23, -1);
+    ctx.lineTo(28, 5);
+    ctx.lineTo(18, 2);
+    ctx.lineTo(21, 11);
+    ctx.quadraticCurveTo(10, 6, 0, 3);
+    ctx.closePath();
+    ctx.fillStyle = "#f5f9ff";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(6, 2);
+    ctx.quadraticCurveTo(14, 4, 20, 10);
+    ctx.quadraticCurveTo(12, 6, 5, 3);
+    ctx.closePath();
+    ctx.fillStyle = "#d4e4f4";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(0, 2);
+    ctx.quadraticCurveTo(8, -18, 22, -13);
+    ctx.quadraticCurveTo(30, -8, 31, -2);
+    ctx.lineTo(23, -1);
+    ctx.lineTo(28, 5);
+    ctx.lineTo(18, 2);
+    ctx.lineTo(21, 11);
+    ctx.quadraticCurveTo(10, 6, 0, 3);
+    ctx.closePath();
+    ctx.strokeStyle = "#1a3346";
+    ctx.lineWidth = 1.7 / scale;
+    ctx.stroke();
+    ctx.strokeStyle = "#93b0c6";
+    ctx.lineWidth = 1.05 / scale;
+    ctx.beginPath();
+    ctx.moveTo(5, -1);
+    ctx.quadraticCurveTo(16, -10, 25, -8);
+    ctx.moveTo(4, 1);
+    ctx.quadraticCurveTo(16, 0, 24, 1);
+    ctx.moveTo(4, 2);
+    ctx.lineTo(19, 8);
+    ctx.stroke();
+    ctx.fillStyle = "#f0c85a";
+    ctx.strokeStyle = "#6e5016";
+    ctx.lineWidth = 1 / scale;
+    ctx.beginPath();
+    ctx.arc(2, 2, 2.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private drawBubblePop(): void {
+    const left = this.bubblePopUntil - performance.now();
+    if (left <= 0) return;
+    const t = 1 - left / 320;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = 1 - t;
+    ctx.translate(this.px, this.py - BUBBLE_LIFT);
+    ctx.strokeStyle = "rgba(230, 248, 255, 0.95)";
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, BUBBLE_RX * (1 + t * 0.4), BUBBLE_RY * (1 + t * 0.4), 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   private drawJetpackBehind(originX: number, y: number, w: number, h: number): void {
@@ -1044,16 +1258,32 @@ export class BulbaJump {
   }
 }
 
-function boostScore(kind: PowerUpKind): number {
+function boostScore(kind: FlightKind): number {
   if (kind === "heli") return HELI_SCORE;
   if (kind === "jet") return JET_SCORE;
+  if (kind === "wings") return WING_SCORE;
   return ROCKET_SCORE;
 }
 
-function boostVy(kind: PowerUpKind): number {
+function boostVy(kind: FlightKind): number {
   if (kind === "heli") return HELI_VY;
   if (kind === "jet") return JET_VY;
+  if (kind === "wings") return WING_VY;
   return ROCKET_VY;
+}
+
+function pickupHalf(kind: PowerUpKind, horizontal: boolean): number {
+  if (kind === "rocket") return (horizontal ? ROCKET_PICKUP_W : ROCKET_PICKUP_H) / 2;
+  if (kind === "insurance") return INSURANCE_R;
+  return POWER_SIZE / 2;
+}
+
+/** +1 — крылья вверху, −1 — внизу. Взмах вниз короче, чем подъём. */
+function wingLift(now: number, period: number): number {
+  const p = (now % period) / period;
+  const down = 0.38;
+  if (p < down) return 1 - (p / down) * 2;
+  return -1 + ((p - down) / (1 - down)) * 2;
 }
 
 function formatSpeed(v: number): string {
