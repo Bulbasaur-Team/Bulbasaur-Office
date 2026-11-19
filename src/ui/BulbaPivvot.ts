@@ -34,7 +34,6 @@ const CIRCLE_RADIUS = 46;
 const CIRCLE_CLEARANCE = 30;
 const CIRCLE_DETOUR_OFFSET = CIRCLE_RADIUS + CIRCLE_CLEARANCE;
 const CIRCLE_LOOP_MS = 1800;
-const CIRCLE_LOOP_GRACE_MS = 450;
 const CIRCLE_PAIR_CHANCE = 0.35;
 const CIRCLE_PAIR_SPACING = CIRCLE_DETOUR_OFFSET * 5.3;
 const CIRCLE_PAIR_GATE_MS = 1800;
@@ -228,7 +227,6 @@ export class BulbaPivvot {
   private loopCircle: CircleObstacle | null = null;
   private loopT = 0;
   private loopCenter: Pt = { x: 0, y: 0 };
-  private loopGrace = 0;
   private passedCircles: CircleObstacle[] = [];
 
   private trail: Pt[] = [];
@@ -414,7 +412,6 @@ export class BulbaPivvot {
     this.lastStatus = "";
     this.loopCircle = null;
     this.loopT = 0;
-    this.loopGrace = 0;
     this.passedCircles = [];
     this.pendingPairGateMs = 0;
     // Пара декоративных шипов, чтобы на стартовом экране было видно, чего ждать.
@@ -451,7 +448,6 @@ export class BulbaPivvot {
     this.lastStatus = "";
     this.loopCircle = null;
     this.loopT = 0;
-    this.loopGrace = 0;
     this.passedCircles = [];
     this.pendingPairGateMs = 0;
     this.updateStatus(true);
@@ -519,6 +515,11 @@ export class BulbaPivvot {
       (o): o is CircleObstacle => o.kind === "circle" && o.s - this.traveled <= 0,
     );
     if (circle) {
+      // Страховка на кадре входа в петлю: если наконечник уже внутри круга — конец.
+      if (this.circleHitsBall(circle, ball)) {
+        this.die();
+        return;
+      }
       this.startLoop(circle);
       return;
     }
@@ -556,12 +557,11 @@ export class BulbaPivvot {
     this.angle += (this.dir() * rot * dt) / 1000;
 
     this.loopT = Math.min(1, this.loopT + dt / CIRCLE_LOOP_MS);
-    this.loopGrace = Math.max(0, this.loopGrace - dt);
 
     const ball = this.ballPos();
     this.pushTrail(ball);
 
-    if (this.loopCircle && this.loopGrace <= 0) {
+    if (this.loopCircle) {
       const dist = Math.hypot(ball.x - this.loopCenter.x, ball.y - this.loopCenter.y);
       if (dist <= this.loopCircle.radius + BALL_R * 0.9) {
         this.die();
@@ -585,7 +585,6 @@ export class BulbaPivvot {
       if (this.loopCircle) this.passedCircles.push(this.loopCircle);
       this.loopCircle = null;
       this.loopT = 0;
-      this.loopGrace = 0;
     }
   }
 
@@ -593,7 +592,6 @@ export class BulbaPivvot {
     this.obstacles = this.obstacles.filter((o) => o !== circle);
     this.loopCircle = circle;
     this.loopT = 0;
-    this.loopGrace = CIRCLE_LOOP_GRACE_MS;
     this.loopCenter = { x: circle.baseX, y: PIVOT_Y };
   }
 
