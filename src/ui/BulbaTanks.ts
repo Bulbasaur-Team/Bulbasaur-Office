@@ -11,6 +11,8 @@ const MAX_LEVEL = 35;
 const ENEMIES_PER_LEVEL = 20;
 const MAX_TANK_POWER = 3;
 const SECOND = 60;
+// Звук игры по умолчанию выключен: включается только кнопкой в самой игре.
+const SOUND_KEY = "bulba_tanks_sound";
 
 type Dir = "up" | "down" | "left" | "right";
 type TileKind = 0 | 1 | 2 | 3 | 4;
@@ -75,6 +77,9 @@ export class BulbaTanks {
   private canvas = document.getElementById("btCanvas") as HTMLCanvasElement;
   private ctx = this.canvas.getContext("2d")!;
   private statusEl = document.getElementById("btStatus")!;
+  private soundBtn = document.getElementById("btSound") as HTMLButtonElement | null;
+  private soundOn = localStorage.getItem(SOUND_KEY) === "1";
+  private activeSounds = new Set<HTMLAudioElement>();
   private shootSound = this.makeSound("shoot.mp3", 0.55);
   private explosionSound = this.makeSound("enemy-explosion.mp3", 0.62);
   private introSound = this.makeSound("intro.mp3", 0.4);
@@ -111,6 +116,8 @@ export class BulbaTanks {
     document.getElementById("btClose")!.onclick = () => this.close();
     document.getElementById("btLb")!.onclick = () => this.onLeaderboard?.();
     document.getElementById("btRestart")!.onclick = () => this.resetCampaign();
+    if (this.soundBtn) this.soundBtn.onclick = () => this.setSoundEnabled(!this.soundOn);
+    this.renderSoundButton();
     attachArcadePad(this.root.querySelector<HTMLElement>(".arcade-frame")!, (c, d) => this.pressKey(c, d), {
       left: [
         { label: "◀", code: "ArrowLeft" },
@@ -135,8 +142,10 @@ export class BulbaTanks {
     this.root.classList.remove("hidden");
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
-    this.startAudio();
-    this.playSound(this.introSound);
+    if (this.soundOn) {
+      this.startAudio();
+      this.playSound(this.introSound);
+    }
     this.resetCampaign();
   }
 
@@ -149,6 +158,7 @@ export class BulbaTanks {
     this.root.classList.add("hidden");
     this.keys.clear();
     this.stopMusic();
+    this.stopActiveSounds();
     this.onClose?.();
   }
 
@@ -159,6 +169,9 @@ export class BulbaTanks {
     } else if ((this.over || this.won) && e.code === "Enter") {
       e.preventDefault();
       this.resetCampaign();
+    } else if (e.code === "KeyM" && !e.repeat) {
+      e.preventDefault();
+      this.setSoundEnabled(!this.soundOn);
     } else if (e.code === "Escape") {
       this.close();
     }
@@ -1027,6 +1040,40 @@ export class BulbaTanks {
     return { x: Math.floor(COLS / 2) * TILE + 2, y: (ROWS - 2) * TILE + 2, w: TILE - 4, h: TILE - 4 };
   }
 
+  private setSoundEnabled(on: boolean): void {
+    if (this.soundOn === on) {
+      this.renderSoundButton();
+      return;
+    }
+    this.soundOn = on;
+    localStorage.setItem(SOUND_KEY, on ? "1" : "0");
+    this.renderSoundButton();
+    if (!on) {
+      this.stopMusic();
+      this.stopActiveSounds();
+      void this.audio?.suspend();
+      return;
+    }
+    this.startAudio();
+    if (this.isOpen && !this.over && !this.won) this.startMusic();
+  }
+
+  private renderSoundButton(): void {
+    if (!this.soundBtn) return;
+    this.soundBtn.textContent = this.soundOn ? "🔊 Звук включен" : "🔇 Звук выключен";
+    this.soundBtn.setAttribute("aria-pressed", this.soundOn ? "true" : "false");
+    this.soundBtn.setAttribute("aria-label", this.soundOn ? "выключить звук" : "включить звук");
+    this.soundBtn.title = this.soundOn ? "Звук включен (M)" : "Звук выключен (M)";
+  }
+
+  private stopActiveSounds(): void {
+    for (const sound of this.activeSounds) {
+      sound.pause();
+      sound.currentTime = 0;
+    }
+    this.activeSounds.clear();
+  }
+
   private startAudio(): void {
     if (!this.audio) {
       const Ctx = (window.AudioContext || (window as Window & { webkitAudioContext?: AudioContextCtor }).webkitAudioContext) as AudioContextCtor | undefined;
@@ -1040,6 +1087,7 @@ export class BulbaTanks {
   }
 
   private startMusic(): void {
+    if (!this.soundOn) return;
     this.startAudio();
     if (this.musicTimer || !this.audio) return;
     this.musicTimer = window.setInterval(() => this.playMusicTick(), 145);
@@ -1052,7 +1100,7 @@ export class BulbaTanks {
   }
 
   private playMusicTick(): void {
-    if (!this.audio || !this.master || this.over || this.won || this.audio.state !== "running") return;
+    if (!this.soundOn || !this.audio || !this.master || this.over || this.won || this.audio.state !== "running") return;
     const bass = [55, 55, 82, 55, 73, 55, 98, 55];
     const lead = [220, 0, 247, 0, 196, 0, 165, 0, 147, 0, 165, 0, 196, 0, 247, 0];
     const step = this.musicStep++;
@@ -1098,14 +1146,21 @@ export class BulbaTanks {
   }
 
   private playSound(sound: HTMLAudioElement): void {
+    if (!this.soundOn) return;
     const clone = sound.cloneNode(true) as HTMLAudioElement;
     clone.volume = sound.volume;
     clone.currentTime = 0;
-    void clone.play().catch(() => {});
+    this.activeSounds.add(clone);
+    const forget = (): void => {
+      this.activeSounds.delete(clone);
+    };
+    clone.addEventListener("ended", forget, { once: true });
+    clone.addEventListener("error", forget, { once: true });
+    void clone.play().catch(() => this.activeSounds.delete(clone));
   }
 
   private tone(freq: number, duration: number, type: OscillatorType, volume: number, attack = 0.006, slide = 0): void {
-    if (!this.audio || !this.master) return;
+    if (!this.soundOn || !this.audio || !this.master) return;
     const now = this.audio.currentTime;
     const osc = this.audio.createOscillator();
     const gain = this.audio.createGain();
@@ -1122,7 +1177,7 @@ export class BulbaTanks {
   }
 
   private noise(duration: number, volume: number, filterFreq: number, attack = 0.004): void {
-    if (!this.audio || !this.master) return;
+    if (!this.soundOn || !this.audio || !this.master) return;
     const bufferSize = Math.max(1, Math.floor(this.audio.sampleRate * duration));
     const buffer = this.audio.createBuffer(1, bufferSize, this.audio.sampleRate);
     const data = buffer.getChannelData(0);
