@@ -30,13 +30,16 @@ const SAW_SPIN = 1.9;
 
 // Круг-препятствие: вокруг него трасса делает полную окружность,
 // а точка вращения проезжает по этой окружности.
-const CIRCLE_RADIUS = 54;
+const CIRCLE_RADIUS = 46;
 const CIRCLE_CLEARANCE = 30;
 const CIRCLE_DETOUR_OFFSET = CIRCLE_RADIUS + CIRCLE_CLEARANCE;
 const CIRCLE_LOOP_MS = 1800;
 const CIRCLE_LOOP_GRACE_MS = 450;
 const CIRCLE_PAIR_CHANCE = 0.35;
-const CIRCLE_PAIR_SPACING = CIRCLE_DETOUR_OFFSET * 2.4;
+const CIRCLE_PAIR_SPACING = CIRCLE_DETOUR_OFFSET * 5.3;
+const CIRCLE_PAIR_GATE_MS = 1800;
+
+const RESTART_LOCK_MS = 1000;
 
 const START_SPEED = 350;      // px/s
 const SPEED_GROWTH = 2.6;     // прирост скорости за секунду
@@ -219,6 +222,7 @@ export class BulbaPivvot {
   private obstacles: Obstacle[] = [];
   private gateTimer = 0;
   private specialCooldown = 0;
+  private pendingPairGateMs = 0;
   private lastSide: Side = 1;
 
   private loopCircle: CircleObstacle | null = null;
@@ -293,6 +297,17 @@ export class BulbaPivvot {
       this.close();
       return;
     }
+    // После поражения короткая пауза: случайное нажатие не должно сразу начинать заново.
+    if (this.phase === "over" && this.deathT < RESTART_LOCK_MS) {
+      if (
+        e.code === "ArrowLeft" || e.code === "ArrowRight" ||
+        e.code === "KeyA" || e.code === "KeyD" ||
+        e.code === "Space" || e.code === "Enter"
+      ) {
+        e.preventDefault();
+      }
+      return;
+    }
     const left = e.code === "ArrowLeft" || e.code === "KeyA";
     const right = e.code === "ArrowRight" || e.code === "KeyD";
     if (left || right) {
@@ -322,6 +337,7 @@ export class BulbaPivvot {
   private onPointerDown = (e: PointerEvent): void => {
     if (!this.isOpen) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (this.phase === "over" && this.deathT < RESTART_LOCK_MS) return;
     e.preventDefault();
     try {
       this.canvas.setPointerCapture(e.pointerId);
@@ -400,6 +416,7 @@ export class BulbaPivvot {
     this.loopT = 0;
     this.loopGrace = 0;
     this.passedCircles = [];
+    this.pendingPairGateMs = 0;
     // Пара декоративных шипов, чтобы на стартовом экране было видно, чего ждать.
     this.obstacles = [
       { kind: "spike", s: 300, side: -1, depth: SPIKE_DEPTH },
@@ -436,6 +453,7 @@ export class BulbaPivvot {
     this.loopT = 0;
     this.loopGrace = 0;
     this.passedCircles = [];
+    this.pendingPairGateMs = 0;
     this.updateStatus(true);
     this.lastT = performance.now();
   }
@@ -490,6 +508,11 @@ export class BulbaPivvot {
       this.gateTimer = this.gateInterval();
       // После пилы/круга даём чуть больше воздуха перед следующим шипом.
       if (special) this.gateTimer = Math.max(this.gateTimer, SPECIAL_MIN_GAP_MS);
+      if (this.pendingPairGateMs > 0) {
+        // Пара кругов занимает больше места — следующий шип не должен попасть в петлю.
+        this.gateTimer = Math.max(this.gateTimer, this.pendingPairGateMs);
+        this.pendingPairGateMs = 0;
+      }
     }
 
     const circle = this.obstacles.find(
@@ -623,6 +646,7 @@ export class BulbaPivvot {
         // Иногда — пара кругов подряд: сначала обход с одной стороны, затем с другой.
         if (Math.random() < CIRCLE_PAIR_CHANCE) {
           addCircle(s + CIRCLE_PAIR_SPACING, detour === 1 ? -1 : 1);
+          this.pendingPairGateMs = CIRCLE_PAIR_GATE_MS;
         }
         this.specialCooldown = SPECIAL_COOLDOWN_MS;
         return true;
@@ -798,6 +822,12 @@ export class BulbaPivvot {
     return circleHitsTriangle(ball.x, ball.y, BALL_R * 0.88, g.a, g.b, g.c);
   }
 
+  private circleHitsBall(circle: CircleObstacle, ball: Pt): boolean {
+    const cy = this.screenY(circle.s);
+    if (cy < -circle.radius - 80 || cy > H + circle.radius + 80) return false;
+    return Math.hypot(ball.x - circle.baseX, ball.y - cy) <= circle.radius + BALL_R * 0.9;
+  }
+
   private sawHitsBall(saw: Saw, ball: Pt): boolean {
     const cx = this.roadX(saw.s);
     const cy = this.screenY(saw.s);
@@ -817,8 +847,7 @@ export class BulbaPivvot {
       case "spike":
         return this.spikeHitsBall(obstacle, ball);
       case "circle":
-        // До входа в круговой участок круг — только предупреждение.
-        return false;
+        return this.circleHitsBall(obstacle, ball);
       case "saw":
         return this.sawHitsBall(obstacle, ball);
     }
@@ -1517,11 +1546,12 @@ export class BulbaPivvot {
     }
 
     const pulse = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(this.clock / 240));
-    ctx.globalAlpha = a * pulse;
+    const ready = clamp((this.deathT - RESTART_LOCK_MS) / 300, 0, 1);
+    ctx.globalAlpha = a * pulse * ready;
     ctx.fillStyle = "#7ac07a";
     ctx.font = "bold 17px 'Trebuchet MS', sans-serif";
     ctx.fillText("ENTER / ТАП — ЕЩЁ РАЗ", W / 2, cardY + 244);
-    ctx.globalAlpha = a;
+    ctx.globalAlpha = a * ready;
 
     ctx.fillStyle = "rgba(232,239,230,0.5)";
     ctx.font = "12px 'Trebuchet MS', sans-serif";

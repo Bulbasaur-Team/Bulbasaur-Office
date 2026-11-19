@@ -700,7 +700,15 @@
     .bj-season-play { width: 100%; margin-top: 12px; }
     html.bp-400 .bj-season { padding: 10px; }
     #bpCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(600px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 600; }
-    #bpvCanvas { display: block; background: #0a1413; border: 2px solid var(--accent); border-radius: 10px; height: min(720px, calc(var(--sh) * .72), calc((var(--sw) - 64px) * 1.5)); width: auto; max-width: 100%; aspect-ratio: 480 / 720; touch-action: none; cursor: pointer; }
+    #bpvCanvas { display: block; background: #0a1413; border: 2px solid var(--accent); border-radius: 10px; height: min(720px, calc(var(--sh) * .72), calc((var(--sw) - 64px) * 1.5)); width: auto; max-width: 100%; aspect-ratio: 480 / 720; touch-action: none; cursor: pointer; outline: none; }
+    /* Мобильный тап по игре: без выделения, tap-highlight и контекстного меню. */
+    #bulbapivvot, #bulbapivvot * {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #bulbapivvot { touch-action: manipulation; }
     #bpkCanvas { background: #26303a; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 640; }
     #btCanvas { background: #101418; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 456 / 504; }
     #bsCanvas { background: #1a2430; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(560px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 560; cursor: none; }
