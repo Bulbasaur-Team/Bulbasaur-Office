@@ -14,6 +14,7 @@ import { LocationMenu } from "../ui/LocationMenu";
 import { GameMenu } from "../ui/GameMenu";
 import { BulbaJump } from "../ui/BulbaJump";
 import { BulbaJumpSeason } from "../ui/BulbaJumpSeason";
+import { BulbaPivvot } from "../ui/BulbaPivvot";
 import { BulbaPacker } from "../ui/BulbaPacker";
 import { BulbaParking } from "../ui/BulbaParking";
 import { BulbaTanks } from "../ui/BulbaTanks";
@@ -91,6 +92,7 @@ const GAMES: LeaderboardGame[] = [
   { id: "wotd-bulbaguess", code: "bulbaguess", daily: true, title: "Слово дня: Bulba Guess", format: formatAttempts },
   { id: "wotd-bulbawordle", code: "bulbawordle", daily: true, title: "Слово дня: Bulba Wordle", format: formatAttempts },
   { id: "bulbajump", title: "Bulba Jump", format: (v) => String(v) },
+  { id: "bulbapivvot", title: "Bulba Pivvot", format: (v) => (v / 1000).toFixed(1) + " с" },
   { id: "bulbapacker", title: "Bulba Packer", format: (v) => String(v) },
   { id: "bulbaparking", title: "Bulba Parking", format: (v) => (v / 1000).toFixed(1) + " с" },
   { id: "bulbatanks", title: "Bulba Tanks", format: (v) => String(v) },
@@ -157,6 +159,7 @@ export class WorldScene extends Phaser.Scene {
   private gameMenu!: GameMenu;
   private bulbaJump!: BulbaJump;
   private jumpSeason!: BulbaJumpSeason;
+  private bulbaPivvot!: BulbaPivvot;
   private bulbaPacker!: BulbaPacker;
   private bulbaParking!: BulbaParking;
   private bulbaTanks!: BulbaTanks;
@@ -412,6 +415,7 @@ export class WorldScene extends Phaser.Scene {
     };
     this.jumpSeason.onLeave = () => this.jumpSeason.close();
     this.bulbaPacker = new BulbaPacker();
+    this.bulbaPivvot = new BulbaPivvot();
     this.bulbaParking = new BulbaParking();
     this.bulbaTanks = new BulbaTanks();
     this.bulbaGuess = new BulbaGuess();
@@ -421,7 +425,7 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaQuiz = new BulbaQuiz();
     this.airHockey = new AirHockey();
     // Закрытие fullscreen-аркады будит Phaser: update() во сне не крутится.
-    for (const g of [this.bulbaJump, this.bulbaPacker, this.bulbaParking, this.bulbaTanks, this.bulbaGuess, this.bulbaWordle, this.bulbaColors, this.bulbaSurki, this.airHockey]) {
+    for (const g of [this.bulbaJump, this.bulbaPivvot, this.bulbaPacker, this.bulbaParking, this.bulbaTanks, this.bulbaGuess, this.bulbaWordle, this.bulbaColors, this.bulbaSurki, this.airHockey]) {
       g.onClose = () => this.setPhaserAsleep(false);
     }
     this.bulbaQuiz.storyQuizAvailable = () => this.quest.quantumQuizAvailable;
@@ -503,6 +507,7 @@ export class WorldScene extends Phaser.Scene {
     document.getElementById("wotdGuessBtn")!.onclick = () => void this.openDailyGame("bulbaguess");
     document.getElementById("wotdWordleBtn")!.onclick = () => void this.openDailyGame("bulbawordle");
     this.bulbaJump.onGameOver = (v) => this.reportScore("bulbajump", v);
+    this.bulbaPivvot.onGameOver = (v) => this.reportScore("bulbapivvot", v);
     this.bulbaPacker.onGameOver = (v) => this.reportScore("bulbapacker", v);
     this.bulbaParking.onGameOver = (v) => this.reportScore("bulbaparking", v);
     this.bulbaTanks.onGameOver = (v) => this.reportScore("bulbatanks", v);
@@ -511,6 +516,7 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaColors.onGameOver = (v) => this.reportScore("bulbacolors", v);
     this.bulbaSurki.onGameOver = (v) => this.reportScore("bulbasurki", v);
     this.bulbaJump.onLeaderboard = () => void this.leaderboard.open("bulbajump");
+    this.bulbaPivvot.onLeaderboard = () => void this.leaderboard.open("bulbapivvot");
     this.bulbaPacker.onLeaderboard = () => void this.leaderboard.open("bulbapacker");
     this.bulbaParking.onLeaderboard = () => void this.leaderboard.open("bulbaparking");
     this.bulbaTanks.onLeaderboard = () => void this.leaderboard.open("bulbatanks");
@@ -1344,6 +1350,7 @@ export class WorldScene extends Phaser.Scene {
       this.bulbaGames.isOpen ||
       this.jumpSeason.isOpen ||
       this.bulbaJump.isOpen ||
+      this.bulbaPivvot.isOpen ||
       this.bulbaPacker.isOpen ||
       this.bulbaParking.isOpen ||
       this.bulbaTanks.isOpen ||
@@ -1376,6 +1383,7 @@ export class WorldScene extends Phaser.Scene {
     this.bulbaGames.close();
     if (!(await this.requireSession())) return;
     if (id === "bulbajump") await this.bulbaJump.open(this.appearance);
+    else if (id === "bulbapivvot") this.bulbaPivvot.open();
     else if (id === "bulbapacker") this.bulbaPacker.open();
     else if (id === "bulbaparking") this.bulbaParking.open();
     else if (id === "bulbatanks") this.bulbaTanks.open();

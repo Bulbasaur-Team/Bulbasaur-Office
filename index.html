@@ -606,7 +606,7 @@
     /* Полноэкранное окно игры */
     /* safe center — второй строкой: если окно игры выше экрана, верх не уезжает
        за край (иначе flex-центрирование делает его недоступным для скролла). */
-    #bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki, #bulbaquiz, #airhockey { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; align-items: safe center; justify-content: center; padding: 24px; overflow: auto; }
+    #bulbajump, #bulbapivvot, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki, #bulbaquiz, #airhockey { position: fixed; inset: 0; z-index: 45; background: rgba(8,10,14,.9); display: flex; align-items: center; align-items: safe center; justify-content: center; padding: 24px; overflow: auto; }
     #bjCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72 - 52px)); width: auto; aspect-ratio: 420 / 640; touch-action: none; }
     .bj-stage { position: relative; display: flex; flex-direction: column; align-items: stretch; width: max-content; max-width: 100%; min-width: 0; }
     .bj-heli {
@@ -700,6 +700,7 @@
     .bj-season-play { width: 100%; margin-top: 12px; }
     html.bp-400 .bj-season { padding: 10px; }
     #bpCanvas { background: #0e1620; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(600px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 600; }
+    #bpvCanvas { display: block; background: #0a1413; border: 2px solid var(--accent); border-radius: 10px; height: min(720px, calc(var(--sh) * .72), calc((var(--sw) - 64px) * 1.5)); width: auto; max-width: 100%; aspect-ratio: 480 / 720; touch-action: none; cursor: pointer; }
     #bpkCanvas { background: #26303a; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 640; }
     #btCanvas { background: #101418; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(640px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 456 / 504; }
     #bsCanvas { background: #1a2430; border: 2px solid var(--accent); border-radius: 10px; image-rendering: pixelated; height: min(560px, calc(var(--sh) * .72)); width: auto; aspect-ratio: 480 / 560; cursor: none; }
@@ -2778,7 +2779,7 @@
        Брейкпоинты — классы bp-* от ширины сцены (media-запрос мерил бы окно). */
     html.bp-640 h1 { font-size: 16px; margin: 6px 0 2px; }
     html.bp-640 #game canvas { border-width: 2px; }
-    html.bp-640 :is(#bulbajump, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki, #bulbaquiz, #airhockey, #slides) { padding: 10px; }
+    html.bp-640 :is(#bulbajump, #bulbapivvot, #bulbapacker, #bulbaparking, #bulbatanks, #bulbaguess, #bulbawordle, #bulbacolors, #bulbasurki, #bulbaquiz, #airhockey, #slides) { padding: 10px; }
     html.bp-640 #bcRef { width: 96px; height: 96px; }
     html.bp-640 .bc-options { gap: 10px; width: min(240px, calc(var(--sw) * .78)); }
     html.bp-640 .arcade-frame { padding: 16px 14px; gap: 10px; }
@@ -3390,6 +3391,22 @@
         <div class="arcade-actions">
           <button class="ttt-restart" id="bsRestart">Заново</button>
           <button class="arcade-lb" id="bsLb" aria-label="лидерборд" title="Лидерборд">
+            <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="bulbapivvot" class="hidden">
+      <div class="arcade-frame">
+        <button class="arcade-close" id="bpvClose" aria-label="закрыть">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <h2 class="arcade-title">Bulba Pivvot</h2>
+        <div class="ttt-status" id="bpvStatus">← → или тап по половинам экрана</div>
+        <canvas id="bpvCanvas" width="480" height="720"></canvas>
+        <div class="arcade-actions">
+          <button class="arcade-lb" id="bpvLb" aria-label="лидерборд" title="Лидерборд">
             <svg viewBox="0 0 24 24"><path d="M4 20h5v-6H4zM9.5 20h5V8h-5zM15 20h5v-10h-5z"/></svg>
           </button>
         </div>

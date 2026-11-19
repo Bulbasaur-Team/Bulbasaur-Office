@@ -9,6 +9,7 @@ const SCREENS: ReadonlyArray<readonly [string, Orient]> = [
   ["roleSelect", "landscape"],
   ["modeSelect", "portrait"],
   ["bulbajump", "portrait"],
+  ["bulbapivvot", "portrait"],
   ["bulbapacker", "portrait"],
   ["bulbaparking", "portrait"],
   ["bulbatanks", "portrait"],

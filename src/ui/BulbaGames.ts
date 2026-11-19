@@ -12,6 +12,7 @@ export interface BulbaGameOption {
 
 const GAMES: BulbaGameOption[] = [
   { id: "bulbajump", label: "Bulba Jump", icon: "🚀", image: "assets/bulbajump/jetpack.png" },
+  { id: "bulbapivvot", label: "Bulba Pivvot", icon: "🌀" },
   { id: "bulbapacker", label: "Bulba Packer", icon: "📦" },
   { id: "bulbaparking", label: "Bulba Parking", icon: "🚚" },
   { id: "bulbatanks", label: "Bulba Tanks", icon: "💥" },
